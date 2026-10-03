@@ -245,30 +245,33 @@ func (m *model) confirmRenameShared() tea.Cmd {
 		return clearErrAfter()
 	}
 	m.flashSuccess(fmt.Sprintf(tr("Renamed '%s' to '%s' for everyone sharing it"), old, name))
-	return clearErrAfter()
+	// The rename's pass merged the file, so the store holds edits these
+	// copies lack.
+	repo := m.repo
+	return tea.Batch(clearErrAfter(), func() tea.Msg {
+		todos, err := repo.Load()
+		return reloadedMsg{todos: todos, err: err}
+	})
 }
 
 // followSharedRename moves the tasks in memory from the project's old name to
 // its new one, as the store already has them, and the undo history with
 // them: an undo that put a task back under the old name would take it out of
-// the shared project, for everyone.
+// the shared project, for everyone. It marks nothing dirty: the pass that
+// renamed them also merged the others' edits into the store, which the
+// copies here predate, and saving one would stamp its stale fields as new
+// edits over theirs. A task already dirty saves under the new name.
 func (m *model) followSharedRename(old, name string) {
-	var ids []string
-	for id, t := range m.tasks {
+	for _, t := range m.tasks {
 		if t.Project == old {
 			t.Project = name
-			ids = append(ids, id)
 		}
 	}
 	m.undoStack = undoRenamingProject(m.undoStack, old, name)
 	if m.projectPinned == old {
 		m.projectPinned = name
 	}
-	if len(ids) > 0 {
-		m.markModified(ids...)
-	} else {
-		m.markCacheDirty()
-	}
+	m.markCacheDirty()
 }
 
 // confirmLeaveShared leaves the project and removes its tasks here. Edits

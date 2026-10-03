@@ -1297,6 +1297,77 @@ func TestScriptRenameASharedProject(t *testing.T) {
 
 // Settings → Join a project asks before sharing tasks already filed under
 // the project's name, and joins on y.
+// A rename's pass merges the file too, so the app's copies of the project's
+// tasks predate the others' edits it brought in. Following the rename must
+// not save those copies, or their stale fields would be stamped as new edits
+// and undo the others' work for everyone: whether the rename is made here or
+// taken up from the file.
+func TestARenameInTheAppKeepsTheOthersEdits(t *testing.T) {
+	setup := func(t *testing.T) (model, *sharer, string) {
+		folder := t.TempDir()
+		setTestHome(t, t.TempDir())
+		testStore(t)
+		captureStdout(t, func() { cliAdd([]string{"Book the ferry", "--project", "Trip"}) })
+		m := initialModel(newSQLiteRepo())
+		m.termWidth, m.termHeight = 120, 40
+		m.tab = tabProjects
+		m.refreshCaches()
+		m.projectCursor = slices.Index(m.allProjectsForList(), "Trip")
+		m = sendKey(t, m, "S")
+		m = script(t, m, folder, "enter")
+		p, ok := m.shared.find("Trip")
+		if !ok {
+			t.Fatalf("not shared: %s", m.err)
+		}
+		if _, err := syncAllShared(db, rank.Biases{}, m.editor()); err != nil {
+			t.Fatal(err)
+		}
+		ferry := m.allTodos()[0].ID
+		anna := newSharer(t, "Anna")
+		anna.join(t, p.File)
+		anna.sync(t, "Trip")
+		got, _ := anna.task(t, ferry)
+		got.Title = "Book the 9:00 ferry"
+		anna.save(t, time.Now(), got)
+		return m, anna, ferry
+	}
+	check := func(t *testing.T, m model, anna *sharer, ferry string) {
+		t.Helper()
+		m.flushPendingWrites()
+		anna.sync(t, anna.cfg.Projects[0].Name)
+		for _, s := range []*sharer{{h: db, by: m.editor()}, anna} {
+			if got, _ := s.task(t, ferry); got.Title != "Book the 9:00 ferry" || got.Project != "Summer" {
+				t.Errorf("%s's store holds %q in %q, want Anna's title in Summer", s.by.name, got.Title, got.Project)
+			}
+		}
+	}
+
+	t.Run("renamed here", func(t *testing.T) {
+		m, anna, ferry := setup(t)
+		anna.sync(t, "Trip")
+		m.projectCursor = slices.Index(m.allProjectsForList(), "Trip")
+		m = sendKey(t, m, "r")
+		m.textInput.SetValue("Summer")
+		m = sendKey(t, m, "enter")
+		m = sendKey(t, m, "y")
+		check(t, m, anna, ferry)
+	})
+
+	t.Run("renamed elsewhere", func(t *testing.T) {
+		m, anna, ferry := setup(t)
+		if _, err := renameShared(anna.h, &anna.cfg, "Trip", "Summer", rank.Biases{}, anna.by, func(sharedConfig) error { return nil }); err != nil {
+			t.Fatal(err)
+		}
+		pass, err := syncAllShared(db, rank.Biases{}, m.editor())
+		if err != nil {
+			t.Fatal(err)
+		}
+		next, _ := m.handleSharedDone(sharedDoneMsg{sharedPass: pass})
+		m = next.(model)
+		check(t, m, anna, ferry)
+	})
+}
+
 func TestScriptJoinFromSettingsAsksFirst(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "Trip.tjek")
 	writeSharedFile(t, file, "trip-id", "Trip")
