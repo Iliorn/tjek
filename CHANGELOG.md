@@ -13,6 +13,17 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+## [1.51.5] - 2026-10-04
+
+### Fixed
+
+- Editing a task no longer undoes what a sync just brought in, or deletes its new comments.
+- Renaming a shared project no longer undoes other people's recent edits to its tasks.
+- Changes from a sync or another terminal show up even when they land right after a save.
+- Starting a timer saves the stop of the one it replaced, which no longer runs on after a restart.
+- Declining to close a task with open subtasks keeps its timer running.
+- A recurring task's next instance keeps its subtasks after a restart.
+
 ## [1.51.4] - 2026-10-02
 
 ### Changed
