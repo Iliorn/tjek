@@ -125,7 +125,7 @@ func (m model) updateDetail(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					m.pushUndo("toggle timer", undoIDs...)
 					m.toggleTimer(sub)
-					m.markModified(sub.ID)
+					m.markModified(undoIDs...) // the timer it stopped too
 					if !m.timerTickOn && m.anyTimerRunning() {
 						m.timerTickOn = true
 						return m, timerTick()

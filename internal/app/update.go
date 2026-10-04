@@ -865,7 +865,7 @@ func (m *model) toggleRowTimer() tea.Cmd {
 	}
 	m.pushUndo("toggle timer", undoIDs...)
 	m.toggleTimer(t)
-	m.markModified(t.ID)
+	m.markModified(undoIDs...) // the timer it stopped too
 	if !m.timerTickOn && m.anyTimerRunning() {
 		m.timerTickOn = true
 		return timerTick()

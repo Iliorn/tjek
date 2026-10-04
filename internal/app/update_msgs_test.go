@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -101,6 +102,28 @@ func TestSaveTickWritesWhatTheKeyChanged(t *testing.T) {
 	runCmd(cmd)
 	if len(repo.saves) != 1 {
 		t.Errorf("a tick with nothing pending saved again (%d saves)", len(repo.saves))
+	}
+}
+
+// Starting a timer stops the one running on another task, and the save
+// writes that stop too: left out, the store would keep the other timer
+// running, and a restart or another device would count its time on.
+func TestStartingATimerSavesTheOneItStopped(t *testing.T) {
+	a, b := todo.New("first"), todo.New("second")
+	m, repo := modelWithRecordingRepo(t, a, b)
+	first := m.currentTodo().ID
+	m = sendKey(t, m, "t")
+	m, cmd := send(t, m, saveTickMsg{})
+	runCmd(cmd)
+	m = sendKey(t, m, "down")
+	m = sendKey(t, m, "t")
+	if m.timerRunning(m.get(first)) {
+		t.Fatal("setup: the first timer still runs")
+	}
+	_, cmd = send(t, m, saveTickMsg{})
+	runCmd(cmd)
+	if len(repo.saves) != 2 || !slices.Contains(repo.saves[1].dirty, first) {
+		t.Errorf("saves %+v, want the second to hold the task whose timer stopped", repo.saves)
 	}
 }
 
