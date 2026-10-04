@@ -355,6 +355,21 @@ per row (`getRenderedTagsForTask`), not for every task on each refresh, and
 the Projects pane's timeline is drawn only for the rows the pane shows.
 `BenchmarkCursorMove` times one step plus its frame on every surface.
 
+### The file watcher
+
+`watcher.go` turns writes to `tasks.db` by anyone into a reload. Every write
+the app makes itself wakes it too, so before reading the store the reload
+asks whether anything wrote that memory does not hold (`unseenWrite`):
+another process's commit, which moves SQLite's `data_version` (it counts
+other connections' commits, and the app has one connection), or one of this
+process's own writes that did not come from memory, which bump
+`foreignWrites` (`noteForeignWrite`: `mergeIntoStore`, the shared pass's
+edits and removals). The app's saves, the timer heartbeat and the score
+resync move neither, and cost one query off the loop. The answer is exact:
+a time window would take another writer's commit landing just after a save
+for that save, and drop it. A reload is also deferred while the user types
+(`shouldReloadNow`) and while a save runs (`reloadIfChangedCmd`).
+
 ### Cursors are clamped in one place
 
 `clampCursors` runs once at the tail of every `dispatch` and pulls each list
@@ -396,7 +411,8 @@ The CLI has no model: `loadForCLI` puts the ranker on the repository it
 returns, and the paths that run beside a command read settings.json directly
 (`storedBiases`, `storedBoard`).
 
-What remains global is set once at startup and read on the Update loop:
+What remains global is set once at startup and read on the Update loop,
+with one counter besides:
 
 - **Theme.** lipgloss styles are package-level vars reassigned by
   `applyTheme(theme)`; rendering reads them directly. `init()` in `styles.go`
@@ -404,6 +420,10 @@ What remains global is set once at startup and read on the Update loop:
 - **Language.** `activeLang`, set by `applyLang`. See *Localization*.
 - **Keybindings.** `activeKeys`, set by `applyKeys` from settings.json
   `"keys"`.
+- **`foreignWrites`** (watcher.go), an atomic count of the writes this process
+  makes to the store that did not come from memory: a sync merge, a shared
+  project's pass, a client's push to the in-process server. Those run on
+  goroutines with no model to tell; see *The file watcher*.
 
 ### Localization
 

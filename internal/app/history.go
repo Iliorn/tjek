@@ -64,7 +64,7 @@ func (m *model) adoptSaved(saved []*todo.Todo, sent map[string]*todo.Todo) {
 			// Deleted elsewhere while edited here; the edit did not undo
 			// the delete, so the task goes, as a sync would decide.
 			m.Store.remove(s.ID)
-			delete(m.base, s.ID)
+			m.Store.dropBase(s.ID)
 			refreshed = true
 			continue
 		}

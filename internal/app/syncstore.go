@@ -99,6 +99,7 @@ func mergeIntoStoreOnce(h *sql.DB, incoming []todo.Todo, b rank.Biases) ([]todo.
 	if err := tx.Commit(); err != nil {
 		return nil, false, err
 	}
+	noteForeignWrite()
 	return merged, true, nil
 }
 

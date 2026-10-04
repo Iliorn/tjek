@@ -37,7 +37,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return next, cmd
 	}
 	if n.mode == modeNormal && n.watcher != nil && n.watcher.drainPending() {
-		cmd = tea.Batch(cmd, n.reloadCmd())
+		cmd = tea.Batch(cmd, n.reloadIfChangedCmd())
 	}
 	return n, cmd
 }

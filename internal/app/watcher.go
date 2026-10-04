@@ -1,11 +1,13 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Iliorn/tjek/tasksync"
@@ -32,20 +34,43 @@ import (
 //     re-arms by returning the same Cmd. This is the canonical Bubble Tea
 //     pattern for long-lived goroutines.
 //
-//   - Self-write suppression: every Save records lastSelfSaveAt; reload is
-//     skipped if a fs event arrives within the suppression window
-//     (selfWriteWindow = 500ms). Without this, every save the TUI itself
-//     does would round-trip back as a reload.
+//   - Whose write: every write the TUI makes itself wakes the watcher too,
+//     and must not cost a reload. Before reading the store, the reload asks
+//     whether anything wrote that memory does not hold (unseenWrite): another
+//     process's commit, which moves SQLite's data_version (it counts commits
+//     by other connections, and this process has one), or a write of this
+//     process's own that did not come from memory (foreignWrites: a sync
+//     merge, a shared project's pass, a client's push to the in-process
+//     server). The answer is exact, so a write that lands just after the
+//     TUI's own save is never mistaken for it.
 //
 //   - Modal suppression: when m.mode != modeNormal (text input, confirm
 //     prompt, etc.) the reload is deferred — clobbering an in-flight edit
 //     would be jarring. The watcher sets pendingExternalReload; the next
 //     return to modeNormal triggers the deferred reload.
 
-const (
-	watcherDebounceWindow  = 200 * time.Millisecond
-	watcherSelfWriteWindow = 500 * time.Millisecond
-)
+const watcherDebounceWindow = 200 * time.Millisecond
+
+// foreignWrites counts the writes this process makes to the store that did
+// not come from the app's memory: a sync merge, a shared project's pass, a
+// client's push to the in-process server. They run on goroutines with no
+// model to tell, and share the app's connection, so data_version does not
+// see them; the watcher compares this count instead (unseenWrite).
+var foreignWrites atomic.Uint64
+
+// noteForeignWrite records a committed write of that kind.
+func noteForeignWrite() { foreignWrites.Add(1) }
+
+// storeDataVersion is SQLite's data_version on the app's connection, which
+// moves when another connection, so another process, commits.
+func storeDataVersion() (int64, error) {
+	if db == nil {
+		return 0, errors.New("no store open")
+	}
+	var v int64
+	err := db.QueryRow(`PRAGMA data_version`).Scan(&v)
+	return v, err
+}
 
 // watchSignal is the single-bit "the DB changed, you should consider reloading"
 // signal posted by the watcher goroutine. We use a 1-buffered channel and
@@ -60,33 +85,35 @@ type reloadedMsg struct {
 	err   error
 	// epoch is the model's saveEpoch when the read was started (reloadCmd).
 	epoch uint64
+	// fingerprint and versions are loadedFingerprint(todos), worked out off
+	// the loop; zero and nil when the sender left them to handleReloaded.
+	fingerprint uint64
+	versions    []uint64
 }
 
-// watcherState lives on the model. The mutex protects lastSelfSaveAt and
-// pendingExternalReload — both are touched from the Update goroutine
-// (single-threaded) AND from the user-driven save path; the lock is cheap
-// insurance against accidental concurrent reads in tests.
+// watcherState lives on the model. The mutex protects pendingExternalReload
+// and the seen marks, which the Update goroutine and the reload commands
+// running off it both touch.
 type watcherState struct {
 	mu                    sync.Mutex
 	ch                    chan dbChangedMsg
-	lastSelfSaveAt        time.Time
 	pendingExternalReload bool
+	// seenVersion and seenWrites are the data_version and foreignWrites
+	// as of the last read of the store (unseenWrite); seen is false until
+	// the first.
+	seenVersion int64
+	seenWrites  uint64
+	seen        bool
 }
 
 func newWatcherState() *watcherState {
 	return &watcherState{ch: make(chan dbChangedMsg, 1)}
 }
 
-func (w *watcherState) recordSelfSave() {
-	w.mu.Lock()
-	w.lastSelfSaveAt = time.Now()
-	w.mu.Unlock()
-}
-
-// shouldReloadNow decides whether a watcher signal arriving at `now` should
-// trigger a reload right away. Pure given the inputs; unit-testable without
-// fsnotify or a real DB.
-func (w *watcherState) shouldReloadNow(now time.Time, mode appMode) bool {
+// shouldReloadNow decides whether a watcher signal should be looked into
+// now: not while the user is typing, which would clobber the input. Pure
+// given the mode; unit-testable without fsnotify or a real DB.
+func (w *watcherState) shouldReloadNow(mode appMode) bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if mode != modeNormal {
@@ -95,11 +122,23 @@ func (w *watcherState) shouldReloadNow(now time.Time, mode appMode) bool {
 		w.pendingExternalReload = true
 		return false
 	}
-	if now.Sub(w.lastSelfSaveAt) < watcherSelfWriteWindow {
-		// Looks like our own save round-tripping back. Skip.
-		return false
-	}
 	return true
+}
+
+// unseenWrite reports whether the store holds a write memory has not seen
+// since the last call: another process's commit, or one of this process's
+// foreign writes. It marks both seen, so a read of the store started after
+// it holds everything it reported. A data_version it cannot read counts as a
+// write, which costs a read and nothing else. It runs off the loop: the
+// query waits for the connection a save may hold.
+func (w *watcherState) unseenWrite(version func() (int64, error)) bool {
+	writes := foreignWrites.Load()
+	v, err := version()
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	changed := err != nil || !w.seen || v != w.seenVersion || writes != w.seenWrites
+	w.seenVersion, w.seenWrites, w.seen = v, writes, err == nil
+	return changed
 }
 
 // drainPending returns true if a deferred reload was queued while the user

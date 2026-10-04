@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/binary"
+	"hash/maphash"
 	"time"
 
 	"github.com/Iliorn/tjek/todo"
@@ -35,6 +36,12 @@ type Store struct {
 	// never changed in place, only replaced, so a save can read one off the
 	// Update goroutine.
 	base map[string]*todo.Todo
+	// versions is the taskVersion of the stored version each base was set
+	// from, and baseFingerprint their XOR: the store as this copy last
+	// agreed with it, which a reload compares the loaded set against
+	// without hashing memory (sameAsLoaded). Kept by setBase and dropBase.
+	versions        map[string]uint64
+	baseFingerprint uint64
 
 	// Maintained indexes. Update them via Store mutators; never write directly
 	// or they will drift from `tasks`.
@@ -182,11 +189,28 @@ func (s *Store) add(t todo.Todo) *todo.Todo {
 }
 
 // setBase records t as the version the store holds (base).
-func (s *Store) setBase(t *todo.Todo) {
+func (s *Store) setBase(t *todo.Todo) { s.setBaseVersion(t, taskVersion(t)) }
+
+// setBaseVersion is setBase with t's taskVersion already worked out, as a
+// reload does off the loop.
+func (s *Store) setBaseVersion(t *todo.Todo, v uint64) {
 	if s.base == nil {
 		s.base = make(map[string]*todo.Todo, len(s.tasks))
+		s.versions = make(map[string]uint64, len(s.tasks))
 	}
+	s.dropBase(t.ID)
 	s.base[t.ID] = baseCopy(t)
+	s.versions[t.ID] = v
+	s.baseFingerprint ^= v
+}
+
+// dropBase forgets the base of id, if it has one.
+func (s *Store) dropBase(id string) {
+	if v, ok := s.versions[id]; ok {
+		s.baseFingerprint ^= v
+		delete(s.versions, id)
+	}
+	delete(s.base, id)
 }
 
 // replace puts t in place of the stored task with its ID, keeping the
@@ -290,7 +314,7 @@ func (s *Store) markTombstone(id string) {
 	delete(s.dirtyIDs, id)
 	// Brought back by an undo, the task is saved whole: against a live base
 	// the restore would look like no change at all.
-	delete(s.base, id)
+	s.dropBase(id)
 }
 
 // changeSet is what one save writes: the dirty tasks, deep-copied so the save
@@ -420,7 +444,7 @@ func (s *Store) forget(ids []string) {
 		s.remove(id)
 		delete(s.dirtyIDs, id)
 		delete(s.tombstones, id)
-		delete(s.base, id)
+		s.dropBase(id)
 	}
 	s.undoStack = undoWithout(s.undoStack, gone)
 }
@@ -470,48 +494,120 @@ func (s *Store) restoreFromUndo(entry undoEntry) {
 	}
 }
 
-// taskSetFingerprint hashes the identity+version of a task set: every ID with
-// its ModifiedAt and deletion stamp. Two sets with the same fingerprint are the
-// same set of task versions, whatever order they arrive in. It is deliberately
-// not a content hash — ModifiedAt is bumped by every mutation (StampModified),
-// so a version change always moves the fingerprint.
-func taskSetFingerprint(seq func(yield func(id string, modified, deleted time.Time))) uint64 {
-	// FNV-1a, folded commutatively (XOR of per-task hashes) so iteration order
-	// — a map on one side, a slice on the other — cannot change the result.
+// taskSetFingerprint hashes the identity and version of a task set
+// (taskVersion), folded so that two sets of the same task versions match
+// whatever order they arrive in. It is deliberately not a content hash: it
+// runs on a reload, on the loop.
+func taskSetFingerprint(seq func(yield func(t *todo.Todo))) uint64 {
+	// Folded commutatively (XOR of per-task hashes) so iteration order — a
+	// map on one side, a slice on the other — cannot change the result.
 	var acc uint64
-	seq(func(id string, modified, deleted time.Time) {
-		h := uint64(14695981039346656037)
-		mix := func(b []byte) {
-			for _, c := range b {
-				h ^= uint64(c)
-				h *= 1099511628211
-			}
-		}
-		mix([]byte(id))
-		var buf [16]byte
-		binary.LittleEndian.PutUint64(buf[0:8], uint64(modified.UnixNano()))
-		binary.LittleEndian.PutUint64(buf[8:16], uint64(deleted.UnixNano()))
-		mix(buf[:])
-		acc ^= h
-	})
+	seq(func(t *todo.Todo) { acc ^= taskVersion(t) })
 	return acc
 }
 
+// versionSeed keys taskVersion's hashes; one seed per process, so the two
+// sides a reload compares hash alike.
+var versionSeed = maphash.MakeSeed()
+
+// taskVersion hashes a task as the app shows it: every field, tag and
+// dependency, and each comment and time entry. It is a content hash because
+// nothing cheaper moves with every change: a merge keeps the later of two
+// ModifiedAts, so an edit merged in from a device whose clock is behind
+// changes a field and leaves it where it was, and a live load carries no
+// stamps. It runs off the loop for a reload (loadedFingerprint) and once per
+// task saved, so its cost never lands on a keystroke. A running timer's
+// heartbeat is left out: the app and the store each stamp it, at slightly
+// different instants. Comments and time entries fold by XOR, since the
+// store keeps no order for them.
+func taskVersion(t *todo.Todo) uint64 {
+	var h maphash.Hash
+	h.SetSeed(versionSeed)
+	var buf [8]byte
+	num := func(h *maphash.Hash, n int64) {
+		binary.LittleEndian.PutUint64(buf[:], uint64(n))
+		h.Write(buf[:])
+	}
+	str := func(h *maphash.Hash, s string) {
+		num(h, int64(len(s)))
+		h.WriteString(s)
+	}
+	at := func(h *maphash.Hash, x time.Time) { num(h, x.UnixNano()) }
+	for _, s := range []string{t.ID, t.Title, t.Notes, t.Project, t.ParentID, t.Recurrence, t.Stage} {
+		str(&h, s)
+	}
+	for _, n := range []int64{int64(t.Status), int64(t.Priority), int64(t.Size), int64(t.SeqRankAtDone), int64(len(t.History))} {
+		num(&h, n)
+	}
+	if t.Deleted {
+		num(&h, 1)
+	}
+	for _, x := range []time.Time{t.CreatedAt, t.ModifiedAt, t.CompletedAt, t.StartDate, t.DueDate, t.DeletedAt} {
+		at(&h, x)
+	}
+	for _, set := range [][]string{t.Tags, t.Dependencies} {
+		num(&h, int64(len(set)))
+		for _, x := range set {
+			str(&h, x)
+		}
+	}
+	var records uint64
+	var r maphash.Hash
+	r.SetSeed(versionSeed)
+	for _, c := range t.Comments {
+		r.Reset()
+		str(&r, c.ID)
+		str(&r, c.Text)
+		at(&r, c.CreatedAt)
+		at(&r, c.ModifiedAt)
+		at(&r, c.DeletedAt)
+		records ^= r.Sum64()
+	}
+	for _, e := range t.TimeEntries {
+		r.Reset()
+		str(&r, e.ID)
+		at(&r, e.StartedAt)
+		at(&r, e.StoppedAt)
+		at(&r, e.ModifiedAt)
+		at(&r, e.DeletedAt)
+		records ^= r.Sum64()
+	}
+	num(&h, int64(records))
+	return h.Sum64()
+}
+
 // sameAsLoaded reports whether a freshly loaded task set holds exactly the task
-// versions the Store already has.
-func (s *Store) sameAsLoaded(loaded []todo.Todo) bool {
+// versions the Store already has. theirs is loadedFingerprint(loaded), which
+// the reload works out off the loop; zero has it worked out here. When every
+// task has a base, the Store's side is baseFingerprint, kept as bases change,
+// so a reload that brings nothing new costs a comparison; the caller rules
+// out unsaved edits, which the bases predate.
+func (s *Store) sameAsLoaded(loaded []todo.Todo, theirs uint64) bool {
 	if len(loaded) != len(s.tasks) {
 		return false
 	}
-	mine := taskSetFingerprint(func(yield func(string, time.Time, time.Time)) {
-		for _, t := range s.tasks {
-			yield(t.ID, t.ModifiedAt, t.DeletedAt)
-		}
-	})
-	theirs := taskSetFingerprint(func(yield func(string, time.Time, time.Time)) {
-		for i := range loaded {
-			yield(loaded[i].ID, loaded[i].ModifiedAt, loaded[i].DeletedAt)
-		}
-	})
+	if theirs == 0 {
+		theirs, _ = loadedFingerprint(loaded)
+	}
+	mine := s.baseFingerprint
+	if len(s.versions) != len(s.tasks) {
+		mine = taskSetFingerprint(func(yield func(*todo.Todo)) {
+			for _, t := range s.tasks {
+				yield(t)
+			}
+		})
+	}
 	return mine == theirs
+}
+
+// loadedFingerprint is taskSetFingerprint of a loaded task set, with each
+// task's taskVersion, in order, for the bases a swap sets.
+func loadedFingerprint(loaded []todo.Todo) (uint64, []uint64) {
+	versions := make([]uint64, len(loaded))
+	var fp uint64
+	for i := range loaded {
+		versions[i] = taskVersion(&loaded[i])
+		fp ^= versions[i]
+	}
+	return fp, versions
 }

@@ -1,10 +1,13 @@
 package app
 
 import (
+	"errors"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Iliorn/tjek/todo"
 )
 
 // startWatcherOrSkip starts a watcher, skipping the test when the host can't
@@ -29,9 +32,8 @@ func startWatcherOrSkip(t *testing.T, state *watcherState, dir string) func() {
 // Update wrapper can drain it on mode exit.
 func TestShouldReloadNowWhileTypingDefers(t *testing.T) {
 	ws := newWatcherState()
-	now := time.Now()
 
-	if ws.shouldReloadNow(now, modeInput) {
+	if ws.shouldReloadNow(modeInput) {
 		t.Error("modeInput should defer reload, got true")
 	}
 	if !ws.drainPending() {
@@ -42,35 +44,15 @@ func TestShouldReloadNowWhileTypingDefers(t *testing.T) {
 	}
 }
 
-// TestShouldReloadNowSuppressesOurOwnSave is the self-write loop guard:
-// when a fs event arrives within selfWriteWindow of our own Save, it's
-// our own write coming back through fsnotify. Skip without queueing.
-func TestShouldReloadNowSuppressesOurOwnSave(t *testing.T) {
-	ws := newWatcherState()
-	ws.recordSelfSave()
-
-	// Within the suppression window — should skip.
-	if ws.shouldReloadNow(time.Now(), modeNormal) {
-		t.Error("event within selfWriteWindow should be suppressed")
-	}
-	if ws.drainPending() {
-		t.Error("self-write suppression must NOT queue a pending reload")
-	}
-
-	// Outside the window — should reload.
-	wayLater := time.Now().Add(watcherSelfWriteWindow + 100*time.Millisecond)
-	if !ws.shouldReloadNow(wayLater, modeNormal) {
-		t.Error("event outside selfWriteWindow should trigger reload")
-	}
-}
-
-// TestShouldReloadNowHappyPath confirms the simple case: idle TUI, external
-// write, no recent save → reload immediately.
+// An idle TUI looks into a signal at once; whether it reads the store is
+// unseenWrite's to say.
 func TestShouldReloadNowHappyPath(t *testing.T) {
 	ws := newWatcherState()
-	// lastSelfSaveAt is the zero value → way in the past → not suppressed.
-	if !ws.shouldReloadNow(time.Now(), modeNormal) {
-		t.Error("idle TUI + external write should reload immediately")
+	if !ws.shouldReloadNow(modeNormal) {
+		t.Error("an idle TUI should look into the signal immediately")
+	}
+	if ws.drainPending() {
+		t.Error("looking into it now must not also queue it for later")
 	}
 }
 
@@ -122,17 +104,62 @@ func TestStartWatcherIgnoresUnrelatedFiles(t *testing.T) {
 	}
 }
 
-// TestRecordSelfSaveAdvancesWindow verifies recordSelfSave bumps the
-// suppression deadline so back-to-back saves both stay protected.
-func TestRecordSelfSaveAdvancesWindow(t *testing.T) {
+// unseenWrite answers what the watcher must know: whether anything but the
+// app's own saves wrote since the last read. Another process moves
+// data_version; this process's merges move foreignWrites; the app's own
+// saves move neither. Each answer marks what it saw.
+func TestUnseenWriteTellsTheAppsOwnWritesApart(t *testing.T) {
 	ws := newWatcherState()
-	ws.recordSelfSave()
-	firstStamp := ws.lastSelfSaveAt
+	version := int64(7)
+	read := func() (int64, error) { return version, nil }
 
-	time.Sleep(5 * time.Millisecond)
-	ws.recordSelfSave()
-	if !ws.lastSelfSaveAt.After(firstStamp) {
-		t.Errorf("second recordSelfSave didn't advance the stamp: first=%v second=%v",
-			firstStamp, ws.lastSelfSaveAt)
+	if !ws.unseenWrite(read) {
+		t.Error("before any read, the store counts as unseen")
+	}
+	if ws.unseenWrite(read) {
+		t.Error("nothing wrote, yet a write was reported (the app's own save looks like this)")
+	}
+	version++
+	if !ws.unseenWrite(read) || ws.unseenWrite(read) {
+		t.Error("another process's commit was not reported exactly once")
+	}
+	noteForeignWrite()
+	if !ws.unseenWrite(read) || ws.unseenWrite(read) {
+		t.Error("a sync merge in this process was not reported exactly once")
+	}
+	if !ws.unseenWrite(func() (int64, error) { return 0, errors.New("busy") }) {
+		t.Error("an unreadable data_version must count as a write")
 	}
 }
+
+// The real store: a write by another connection moves data_version, a write
+// on the app's own does not, so a save landing next to another process's
+// commit can no longer hide it.
+func TestDataVersionSeesOnlyOtherConnections(t *testing.T) {
+	setTestHome(t, t.TempDir())
+	testStore(t)
+	ws := newWatcherState()
+	ws.unseenWrite(storeDataVersion)
+
+	if err := newSQLiteRepo().Save([]*todo.Todo{ptr(todo.New("mine"))}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if ws.unseenWrite(storeDataVersion) {
+		t.Error("the app's own save was taken for someone else's")
+	}
+
+	other, err := openStoreAt(dbPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer other.Close()
+	theirs := todo.New("theirs")
+	if err := saveStamped(other, []*todo.Todo{&theirs}, nil, func(*todo.Todo) float64 { return 0 }, time.Now(), editor{name: "cli"}); err != nil {
+		t.Fatal(err)
+	}
+	if !ws.unseenWrite(storeDataVersion) {
+		t.Error("another connection's commit was not seen")
+	}
+}
+
+func ptr[T any](v T) *T { return &v }

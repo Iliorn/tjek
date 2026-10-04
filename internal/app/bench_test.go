@@ -186,15 +186,33 @@ func benchKey(m model, k string) model {
 
 // BenchmarkReload times a reload that changed something, so the store is
 // rebuilt: the stutter an external change costs on the loop, base copies
-// (Store.base) included.
+// (Store.base) included. The fingerprint is worked out off the loop, as
+// reloadCmd does.
 func BenchmarkReload(b *testing.B) {
 	m := benchModel(2000)
 	loaded := benchTodos(2000)
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		b.StopTimer()
 		loaded[0].ModifiedAt = loaded[0].ModifiedAt.Add(time.Millisecond)
-		next, _ := m.handleReloaded(reloadedMsg{todos: loaded, epoch: m.saveEpoch})
+		fp, versions := loadedFingerprint(loaded)
+		b.StartTimer()
+		next, _ := m.handleReloaded(reloadedMsg{todos: loaded, epoch: m.saveEpoch, fingerprint: fp, versions: versions})
+		m = next.(model)
+	}
+}
+
+// BenchmarkReloadUnchanged times a reload that brings nothing new, on the
+// loop: a comparison against the bases' fingerprint, no rebuild.
+func BenchmarkReloadUnchanged(b *testing.B) {
+	m := benchModel(2000)
+	loaded := todoValues(m.allTodos())
+	fp, versions := loadedFingerprint(loaded)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		next, _ := m.handleReloaded(reloadedMsg{todos: loaded, epoch: m.saveEpoch, fingerprint: fp, versions: versions})
 		m = next.(model)
 	}
 }

@@ -430,7 +430,11 @@ func removeProjectTasks(h *sql.DB, name string) ([]string, error) {
 	if err := removeTaskRows(tx, ids); err != nil {
 		return nil, err
 	}
-	return ids, tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	noteForeignWrite()
+	return ids, nil
 }
 
 // removeTaskRows deletes every row of the tasks ids, as removeProjectTasks
@@ -917,7 +921,11 @@ func autoEdit(h *sql.DB, b rank.Biases, by editor, edit func(t *todo.Todo, byID 
 	}
 	now := time.Now()
 	rk := rank.Ranker{Biases: b}.Refreshed(now, live)
-	return len(changed), saveStamped(h, changed, nil, rk.ScoreNow(), now, by)
+	if err := saveStamped(h, changed, nil, rk.ScoreNow(), now, by); err != nil {
+		return 0, err
+	}
+	noteForeignWrite()
+	return len(changed), nil
 }
 
 // A task moved out of a shared project leaves the file, and the others must
@@ -1002,7 +1010,11 @@ func removeTasks(h *sql.DB, ids []string) error {
 	if err := removeTaskRows(tx, ids); err != nil {
 		return err
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	noteForeignWrite()
+	return nil
 }
 
 // projectKey is the merge unit of a task's project (todo.Fields).

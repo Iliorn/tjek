@@ -87,8 +87,7 @@ func (m model) handleTimerTick() (tea.Model, tea.Cmd) {
 	}
 	// Heartbeat the running timer's last_seen at most once a minute so the
 	// stale-timer recoverer never mistakes this live timer for an abandoned
-	// one. recordSelfSave keeps the fs watcher from reloading on our own
-	// write. The write itself runs as a tea.Cmd — off the Update goroutine —
+	// one. The write itself runs as a tea.Cmd — off the Update goroutine —
 	// so a busy DB (concurrent sync/CLI write inside busy_timeout) can't
 	// freeze the UI for up to 5s.
 	if time.Since(m.lastTimerHeartbeat) < time.Minute {
@@ -98,9 +97,6 @@ func (m model) handleTimerTick() (tea.Model, tea.Cmd) {
 	// Keep the in-memory entries in step with the DB heartbeat — see
 	// stampRunningTimersSeen for why saves depend on this.
 	m.stampRunningTimersSeen(m.lastTimerHeartbeat)
-	if m.watcher != nil {
-		m.watcher.recordSelfSave()
-	}
 	sc := m.timers
 	return m, tea.Batch(timerTick(), func() tea.Msg {
 		_ = heartbeatRunningTimers(db, time.Now(), sc)
@@ -207,12 +203,6 @@ func (m model) handleSaveTick() (tea.Model, tea.Cmd) {
 	}
 	m.beginSave()
 	repo := m.repo
-	if m.watcher != nil {
-		// Record the timestamp BEFORE the save so a fast fs event firing
-		// during the write is still inside the suppression window. The save
-		// goroutine doesn't need to update this.
-		m.watcher.recordSelfSave()
-	}
 	return m, tea.Batch(func() tea.Msg {
 		if err := repo.SaveOnto(c.dirty, c.bases, c.tombstones); err != nil {
 			return saveErrMsg{err}
@@ -221,15 +211,15 @@ func (m model) handleSaveTick() (tea.Model, tea.Cmd) {
 	}, m.exportSoon())
 }
 
-// handleDBChanged answers an external writer (CLI, another process) touching
-// the DB: reload now, or defer until the user exits a modal mode. The watcher
-// channel listener is always re-armed.
+// handleDBChanged answers a write to the store: reload now if anything but
+// this app's own saves wrote (reloadIfChangedCmd), or defer until the user
+// exits a modal mode. The watcher channel listener is always re-armed.
 func (m model) handleDBChanged() (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	if m.watcher != nil {
 		cmds = append(cmds, waitForDBChange(m.watcher.ch))
-		if m.watcher.shouldReloadNow(time.Now(), m.mode) {
-			cmds = append(cmds, m.reloadCmd())
+		if m.watcher.shouldReloadNow(m.mode) {
+			cmds = append(cmds, m.reloadIfChangedCmd())
 		}
 	}
 	if len(cmds) == 0 {
@@ -257,15 +247,16 @@ func (m model) handleReloaded(msg reloadedMsg) (tea.Model, tea.Cmd) {
 	// the loaded version (rebase), which becomes its base; one with no base
 	// stays as it is, to be saved whole. The change set is carried across so
 	// the scheduled save still flushes it.
-	// A reload the user cannot see is the common case, not the exception: the
-	// watcher fires on our own WAL writes, on a sync that merged nothing, on a
-	// checkpoint. Rebuilding the whole Store for those costs ~15ms at a couple
-	// of thousand tasks — on the Update goroutine, so it lands as a stutter on
-	// whatever key is pressed next. Compare a cheap fingerprint first and skip
-	// the swap when the snapshot says what we already have. Pending local
-	// changes make the snapshot stale by definition, so the guard only applies
-	// when there are none.
-	if len(m.dirtyIDs) == 0 && len(m.tombstones) == 0 && m.sameAsLoaded(msg.todos) {
+	// A reload the user cannot see still happens: another process can commit
+	// what the store already held, and the explicit reloads (after leaving or
+	// renaming a shared project, after a save they waited for) read whatever
+	// is there. Rebuilding the whole Store costs milliseconds at a couple of
+	// thousand tasks — on the Update goroutine, so it lands as a stutter on
+	// whatever key is pressed next. Compare a fingerprint first (taskVersion)
+	// and skip the swap when the snapshot says what we already have. Pending
+	// local changes make the snapshot stale by definition, so the guard only
+	// applies when there are none.
+	if len(m.dirtyIDs) == 0 && len(m.tombstones) == 0 && m.sameAsLoaded(msg.todos, msg.fingerprint) {
 		return m, nil
 	}
 
@@ -279,7 +270,11 @@ func (m model) handleReloaded(msg reloadedMsg) (tea.Model, tea.Cmd) {
 			dirtyTasks[id] = copyTodo(*t)
 		}
 	}
-	oldBase := m.base
+	oldBase, oldVersions := m.base, m.versions
+	versions := msg.versions
+	if len(versions) != len(msg.todos) {
+		_, versions = loadedFingerprint(msg.todos)
+	}
 	m.Store = Store{timers: m.timers}
 	m.Store.ensureTasks()
 	m.undoStack = undo
@@ -294,10 +289,10 @@ func (m model) handleReloaded(msg reloadedMsg) (tea.Model, tea.Cmd) {
 		switch b := oldBase[t.ID]; {
 		case !dirty:
 			m.Store.add(*t)
-			m.Store.setBase(t)
+			m.Store.setBaseVersion(t, versions[i])
 		case b != nil:
 			m.Store.add(rebase(t, b, &d))
-			m.Store.setBase(t)
+			m.Store.setBaseVersion(t, versions[i])
 		default:
 			m.Store.add(d)
 		}
@@ -308,7 +303,7 @@ func (m model) handleReloaded(msg reloadedMsg) (tea.Model, tea.Cmd) {
 		if m.get(id) == nil {
 			m.Store.add(d)
 			if b := oldBase[id]; b != nil {
-				m.Store.setBase(b)
+				m.Store.setBaseVersion(b, oldVersions[id])
 			}
 		}
 	}

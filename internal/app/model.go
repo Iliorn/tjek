@@ -454,12 +454,14 @@ type model struct {
 	saveScheduled bool
 	// savesInFlight counts the saves running off the loop, and saveEpoch
 	// moves each time one starts: a reload read while a save runs lacks what
-	// it writes, so reloads wait for the saves (reloadCmd, reloadWanted) and
-	// one a save started behind is read again (handleReloaded). Saves run
-	// one at a time, so two cannot commit out of order.
+	// it writes, so reloads wait for the saves (reloadCmd, reloadWanted, and
+	// recheckWanted for a watcher signal's) and one a save started behind is
+	// read again (handleReloaded). Saves run one at a time, so two cannot
+	// commit out of order.
 	savesInFlight int
 	saveEpoch     uint64
 	reloadWanted  bool
+	recheckWanted bool
 	editorTaskID  string
 	editorCmd     string
 	// editorToInput routes the next editor round-trip back into the active text
@@ -797,11 +799,10 @@ func startModelWatcher(m *model) {
 		return
 	}
 	state := newWatcherState()
-	// Startup already wrote to the database — initialModel resyncs the score
-	// column — and WAL flushes that write to disk after we start watching. Seed
-	// the self-write window so our own startup write doesn't come straight back
-	// as an external change and make the first keystroke pay for a reload.
-	state.recordSelfSave()
+	// Memory holds the store as it is now: mark it seen, so the first signal
+	// (startup's own write, the score resync, flushing to disk) is not taken
+	// for a change and does not make the first keystroke pay for a reload.
+	state.unseenWrite(storeDataVersion)
 	if stop, werr := startWatcher(state, dir); werr == nil {
 		m.watcher = state
 		m.watcherStop = stop
@@ -843,9 +844,6 @@ func (m *model) saveNow() error {
 		return nil
 	}
 	m.saveEpoch++
-	if m.watcher != nil {
-		m.watcher.recordSelfSave()
-	}
 	if err := m.repo.SaveOnto(c.dirty, c.bases, c.tombstones); err != nil {
 		return err
 	}
@@ -857,14 +855,33 @@ func (m *model) saveNow() error {
 // the loop the read would miss what it writes and memory would lose those
 // edits, so it waits for the save to finish (saveFinished).
 func (m *model) reloadCmd() tea.Cmd {
+	return m.reload(false)
+}
+
+// reloadIfChangedCmd is reloadCmd for a watcher signal: it reads the store
+// only when something wrote that memory does not hold (unseenWrite), so the
+// app's own writes cost a query off the loop and no read.
+func (m *model) reloadIfChangedCmd() tea.Cmd {
+	return m.reload(true)
+}
+
+func (m *model) reload(ifChanged bool) tea.Cmd {
 	if m.savesInFlight > 0 {
-		m.reloadWanted = true
+		if ifChanged {
+			m.recheckWanted = true
+		} else {
+			m.reloadWanted = true
+		}
 		return nil
 	}
-	repo, epoch := m.repo, m.saveEpoch
+	repo, epoch, w := m.repo, m.saveEpoch, m.watcher
 	return func() tea.Msg {
+		if w != nil && !w.unseenWrite(storeDataVersion) && ifChanged {
+			return nil
+		}
 		todos, err := repo.Load()
-		return reloadedMsg{todos: todos, err: err, epoch: epoch}
+		fp, versions := loadedFingerprint(todos)
+		return reloadedMsg{todos: todos, err: err, epoch: epoch, fingerprint: fp, versions: versions}
 	}
 }
 
@@ -887,10 +904,13 @@ func (m *model) saveFinished() tea.Cmd {
 		m.saveScheduled = true
 		cmds = append(cmds, scheduleSave())
 	}
-	if m.reloadWanted {
-		m.reloadWanted = false
+	switch {
+	case m.reloadWanted:
 		cmds = append(cmds, m.reloadCmd())
+	case m.recheckWanted:
+		cmds = append(cmds, m.reloadIfChangedCmd())
 	}
+	m.reloadWanted, m.recheckWanted = false, false
 	return tea.Batch(cmds...)
 }
 

@@ -216,9 +216,6 @@ func (m *model) startImport(tasks []todo.Todo) tea.Cmd {
 	m.savePending = false
 	m.beginSave()
 	repo, biases := m.repo, m.rank.Biases
-	if m.watcher != nil {
-		m.watcher.recordSelfSave()
-	}
 	return func() tea.Msg {
 		if !c.empty() {
 			if err := repo.SaveOnto(c.dirty, c.bases, c.tombstones); err != nil {

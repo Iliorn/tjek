@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Iliorn/tjek/hlc"
+	"github.com/Iliorn/tjek/rank"
 	"github.com/Iliorn/tjek/todo"
 )
 
@@ -320,8 +322,26 @@ func TestMonkeyEditsAreStoredAsShown(t *testing.T) {
 				where := fmt.Sprintf("seed %d after%s", seed, trail)
 				checkStored(t, shown, where)
 				checkShown(t, m, shown, where)
+				checkReloadIsANoop(t, m, where)
 			}
 		})
+	}
+}
+
+// checkReloadIsANoop asserts the store as just saved reads back as no change
+// (sameAsLoaded through the bases), so a reload after the app's own save
+// never costs a rebuild.
+func checkReloadIsANoop(t *testing.T, m model, trail string) {
+	t.Helper()
+	if len(m.dirtyIDs) > 0 || len(m.tombstones) > 0 {
+		return
+	}
+	loaded, err := m.repo.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !m.sameAsLoaded(loaded, 0) {
+		t.Fatalf("%s: the store as just saved reads back as a change", trail)
 	}
 }
 
@@ -408,4 +428,66 @@ func contentDiff(a, b *todo.Todo) string {
 		out = append(out, fmt.Sprintf("time entries (%+v vs %+v)", a.TimeEntries, b.TimeEntries))
 	}
 	return strings.Join(out, "; ")
+}
+
+// A sync merge that lands right after the app's own save reaches the screen:
+// the watcher's signal is looked into and the store read, where a guess by
+// time took it for the save. The save's own signal costs no read.
+func TestAMergeRightAfterASaveReachesTheScreen(t *testing.T) {
+	task := todo.New("Book the ferry")
+	m := sqliteModel(t, task)
+	m.watcher = newWatcherState()
+	m.watcher.unseenWrite(storeDataVersion)
+
+	bumpPriority(&m, task.ID)
+	m = runSave(t, m)
+	if msgs := runCmd(m.reloadIfChangedCmd()); len(msgs) != 0 {
+		t.Fatalf("the app's own save made the watcher read the store: %v", msgs)
+	}
+
+	theirs := storedRow(t, task.ID)
+	theirs.Title = "Book the 9:00 ferry"
+	theirs.Stamps["title"] = hlc.At(time.Now().Add(time.Minute))
+	if _, _, err := mergeIntoStore(db, []todo.Todo{theirs}, rank.Biases{}); err != nil {
+		t.Fatal(err)
+	}
+	msgs := runCmd(m.reloadIfChangedCmd())
+	if len(msgs) != 1 {
+		t.Fatalf("the merge's signal produced %v, want the store read", msgs)
+	}
+	m, _ = send(t, m, msgs[0])
+	if got := m.get(task.ID); got.Title != "Book the 9:00 ferry" || got.Priority == task.Priority {
+		t.Errorf("the app shows %q at %v, want the merged title and its own priority", got.Title, got.Priority)
+	}
+}
+
+// A reload that brings nothing new is told apart without hashing memory: the
+// bases carry the store's version of each task, a save's result included,
+// which must hash as the next load of it does. A merge since is a change.
+func TestAnUnchangedReloadIsKnownByItsBases(t *testing.T) {
+	task := todo.New("Book the ferry")
+	task.AddComment("cabin 12")
+	m := sqliteModel(t, task, todo.New("Pack"))
+	bumpPriority(&m, task.ID)
+	m = runSave(t, m)
+	if len(m.versions) != len(m.tasks) {
+		t.Fatalf("%d of %d tasks have a base version", len(m.versions), len(m.tasks))
+	}
+
+	loaded, err := m.repo.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !m.sameAsLoaded(loaded, 0) {
+		t.Error("the store as just saved was taken for a change")
+	}
+	theirs := storedRow(t, task.ID)
+	theirs.Title = "Book the 9:00 ferry"
+	theirs.Stamps["title"] = hlc.At(time.Now().Add(time.Minute))
+	if _, _, err := mergeIntoStore(db, []todo.Todo{theirs}, rank.Biases{}); err != nil {
+		t.Fatal(err)
+	}
+	if loaded, _ = m.repo.Load(); m.sameAsLoaded(loaded, 0) {
+		t.Error("a merge since the save was taken for no change")
+	}
 }
