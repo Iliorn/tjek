@@ -37,16 +37,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return next, cmd
 	}
 	if n.mode == modeNormal && n.watcher != nil && n.watcher.drainPending() {
-		repo := n.repo
-		reload := func() tea.Msg {
-			todos, err := repo.Load()
-			return reloadedMsg{todos: todos, err: err}
-		}
-		if cmd == nil {
-			cmd = reload
-		} else {
-			cmd = tea.Batch(cmd, reload)
-		}
+		cmd = tea.Batch(cmd, n.reloadCmd())
 	}
 	return n, cmd
 }

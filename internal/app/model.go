@@ -236,7 +236,10 @@ type clearErrMsg struct{}
 
 // saveDoneMsg carries the tasks a save wrote, each with its full stored
 // history, the event this save recorded included.
-type saveDoneMsg struct{ saved []*todo.Todo }
+type saveDoneMsg struct {
+	saved []*todo.Todo
+	sent  map[string]*todo.Todo // each task as drained (changeSet.sent)
+}
 type saveErrMsg struct{ err error }
 type editorFinishedMsg struct {
 	taskID   string
@@ -449,6 +452,14 @@ type model struct {
 	dirty         bool
 	savePending   bool
 	saveScheduled bool
+	// savesInFlight counts the saves running off the loop, and saveEpoch
+	// moves each time one starts: a reload read while a save runs lacks what
+	// it writes, so reloads wait for the saves (reloadCmd, reloadWanted) and
+	// one a save started behind is read again (handleReloaded). Saves run
+	// one at a time, so two cannot commit out of order.
+	savesInFlight int
+	saveEpoch     uint64
+	reloadWanted  bool
 	editorTaskID  string
 	editorCmd     string
 	// editorToInput routes the next editor round-trip back into the active text
@@ -567,7 +578,7 @@ func initialModel(repo Repository) model {
 	store := Store{}
 	store.ensureTasks()
 	for i := range todos {
-		store.add(todos[i])
+		store.setBase(store.add(todos[i]))
 	}
 	// Restore persisted delete-undo entries so a user can `u` a task they
 	// removed in a prior session. A corrupt file surfaces in errMsg; the
@@ -816,18 +827,71 @@ func (m *model) closeWatcher() {
 func (m *model) flushPendingWrites() {
 	m.flushExport()
 	defer m.flushShared() // after the save below, so the folder gets it
-	dirty, tombstones := m.Store.drainDirty()
-	if len(dirty) == 0 && len(tombstones) == 0 {
-		return
-	}
-	if m.watcher != nil {
-		m.watcher.recordSelfSave()
-	}
-	if err := m.repo.Save(dirty, tombstones); err != nil {
+	if err := m.saveNow(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error saving tasks on quit: %v\n", err)
 	}
 	m.dirty = false
+}
+
+// saveNow writes the pending changes on the loop, for the few paths that
+// must have them stored before they go on (quitting, leaving or renaming a
+// shared project), and takes the result into memory.
+func (m *model) saveNow() error {
 	m.savePending = false
+	c := m.Store.drainDirty()
+	if c.empty() {
+		return nil
+	}
+	m.saveEpoch++
+	if m.watcher != nil {
+		m.watcher.recordSelfSave()
+	}
+	if err := m.repo.SaveOnto(c.dirty, c.bases, c.tombstones); err != nil {
+		return err
+	}
+	m.adoptSaved(c.dirty, c.sent)
+	return nil
+}
+
+// reloadCmd reads the store back in (handleReloaded). While a save runs off
+// the loop the read would miss what it writes and memory would lose those
+// edits, so it waits for the save to finish (saveFinished).
+func (m *model) reloadCmd() tea.Cmd {
+	if m.savesInFlight > 0 {
+		m.reloadWanted = true
+		return nil
+	}
+	repo, epoch := m.repo, m.saveEpoch
+	return func() tea.Msg {
+		todos, err := repo.Load()
+		return reloadedMsg{todos: todos, err: err, epoch: epoch}
+	}
+}
+
+// beginSave and saveFinished bracket a save run off the loop. The end runs
+// what waited for it: a reload, and a save deferred while this one ran.
+func (m *model) beginSave() {
+	m.savesInFlight++
+	m.saveEpoch++
+}
+
+func (m *model) saveFinished() tea.Cmd {
+	if m.savesInFlight > 0 {
+		m.savesInFlight--
+	}
+	if m.savesInFlight > 0 {
+		return nil
+	}
+	var cmds []tea.Cmd
+	if m.savePending && !m.saveScheduled {
+		m.saveScheduled = true
+		cmds = append(cmds, scheduleSave())
+	}
+	if m.reloadWanted {
+		m.reloadWanted = false
+		cmds = append(cmds, m.reloadCmd())
+	}
+	return tea.Batch(cmds...)
 }
 
 // copyTodo deep-copies the nested slices of a single task so the result can be

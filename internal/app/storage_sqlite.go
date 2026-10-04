@@ -650,16 +650,12 @@ func loadTodosCore(h querier, includeDeleted bool) ([]todo.Todo, error) {
 		}); err != nil {
 		return nil, err
 	}
-	if err := loadChildren(h, todos, "task_comments", "id, task_id, text, created_at, modified_at, deleted_at, author", childWhere,
+	if err := loadChildren(h, todos, "task_comments", commentColumns, childWhere,
 		func(s *sql.Rows) error {
-			var c todo.Comment
-			var taskID, createdAt, modifiedAt, deletedAt string
-			if err := s.Scan(&c.ID, &taskID, &c.Text, &createdAt, &modifiedAt, &deletedAt, &c.Author); err != nil {
+			taskID, c, err := scanComment(s)
+			if err != nil {
 				return err
 			}
-			c.CreatedAt = parseTime(createdAt)
-			c.ModifiedAt = parseTime(modifiedAt)
-			c.DeletedAt = parseTime(deletedAt)
 			if t := todos[taskID]; t != nil {
 				t.Comments = append(t.Comments, c)
 			}
@@ -667,18 +663,12 @@ func loadTodosCore(h querier, includeDeleted bool) ([]todo.Todo, error) {
 		}); err != nil {
 		return nil, err
 	}
-	if err := loadChildren(h, todos, "task_time_entries", "id, task_id, started_at, stopped_at, last_seen, modified_at, deleted_at, author", childWhere,
+	if err := loadChildren(h, todos, "task_time_entries", timeEntryColumns, childWhere,
 		func(s *sql.Rows) error {
-			var e todo.TimeEntry
-			var taskID, startedAt, stoppedAt, lastSeen, modifiedAt, deletedAt string
-			if err := s.Scan(&e.ID, &taskID, &startedAt, &stoppedAt, &lastSeen, &modifiedAt, &deletedAt, &e.Author); err != nil {
+			taskID, e, err := scanTimeEntry(s)
+			if err != nil {
 				return err
 			}
-			e.StartedAt = parseTime(startedAt)
-			e.StoppedAt = parseTime(stoppedAt)
-			e.LastSeen = parseTime(lastSeen)
-			e.ModifiedAt = parseTime(modifiedAt)
-			e.DeletedAt = parseTime(deletedAt)
 			if t := todos[taskID]; t != nil {
 				t.TimeEntries = append(t.TimeEntries, e)
 			}
@@ -712,6 +702,37 @@ func loadTodosCore(h querier, includeDeleted bool) ([]todo.Todo, error) {
 		tasksync.ResolveParents(out)
 	}
 	return out, nil
+}
+
+// commentColumns and timeEntryColumns are the columns scanComment and
+// scanTimeEntry read, in their order.
+const (
+	commentColumns   = "id, task_id, text, created_at, modified_at, deleted_at, author"
+	timeEntryColumns = "id, task_id, started_at, stopped_at, last_seen, modified_at, deleted_at, author"
+)
+
+func scanComment(row interface{ Scan(...any) error }) (taskID string, c todo.Comment, err error) {
+	var createdAt, modifiedAt, deletedAt string
+	if err := row.Scan(&c.ID, &taskID, &c.Text, &createdAt, &modifiedAt, &deletedAt, &c.Author); err != nil {
+		return "", c, err
+	}
+	c.CreatedAt = parseTime(createdAt)
+	c.ModifiedAt = parseTime(modifiedAt)
+	c.DeletedAt = parseTime(deletedAt)
+	return taskID, c, nil
+}
+
+func scanTimeEntry(row interface{ Scan(...any) error }) (taskID string, e todo.TimeEntry, err error) {
+	var startedAt, stoppedAt, lastSeen, modifiedAt, deletedAt string
+	if err := row.Scan(&e.ID, &taskID, &startedAt, &stoppedAt, &lastSeen, &modifiedAt, &deletedAt, &e.Author); err != nil {
+		return "", e, err
+	}
+	e.StartedAt = parseTime(startedAt)
+	e.StoppedAt = parseTime(stoppedAt)
+	e.LastSeen = parseTime(lastSeen)
+	e.ModifiedAt = parseTime(modifiedAt)
+	e.DeletedAt = parseTime(deletedAt)
+	return taskID, e, nil
 }
 
 func loadChildren(h querier, todos map[string]*todo.Todo, table, cols, where string,
@@ -907,8 +928,12 @@ func resyncSequenceColumn(h *sql.DB, score func(*todo.Todo) float64) error {
 // the call (no concurrent mutation). The Store.drainDirty path hands us a
 // deep-copied snapshot, which satisfies this.
 func (r *sqliteRepo) Save(dirty []*todo.Todo, tombstones map[string]time.Time) error {
+	return r.SaveOnto(dirty, nil, tombstones)
+}
+
+func (r *sqliteRepo) SaveOnto(dirty []*todo.Todo, bases map[string]*todo.Todo, tombstones map[string]time.Time) error {
 	if err := openStore(); err != nil {
 		return err
 	}
-	return saveStamped(db, dirty, tombstones, r.ranker().ScoreNow(), time.Now(), r.editor())
+	return saveStampedOnto(db, dirty, bases, tombstones, r.ranker().ScoreNow(), time.Now(), r.editor())
 }

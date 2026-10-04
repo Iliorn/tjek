@@ -186,7 +186,7 @@ func TestScriptImportFromFile(t *testing.T) {
 	if !strings.Contains(m.err, "1 new, 1 updated") {
 		t.Errorf("toast = %q", m.err)
 	}
-	next, _ = m.Update(reloadedMsg{todos: done.todos})
+	next, _ = m.Update(reloadedMsg{todos: done.todos, epoch: m.saveEpoch})
 	m = next.(model)
 	titles := map[string]bool{}
 	for _, t := range m.allTodos() {

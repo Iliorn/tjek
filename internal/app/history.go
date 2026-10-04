@@ -45,46 +45,36 @@ func accountName() string {
 	return login
 }
 
-// adoptSaved takes what a save wrote onto the tasks it handed back
-// (saveDoneMsg) onto the live tasks: the history, with the event it recorded,
-// and the authors it gave new comments and time entries, so both show without
-// a reload. The history is a union, not a copy: the task may have been
-// reloaded with newer events meanwhile, and the save's copy may be from an
-// undo snapshot that lacked some.
-func (m *model) adoptSaved(saved []*todo.Todo) {
-	changed := false
+// adoptSaved takes what a save wrote (saveDoneMsg) into the live tasks, so it
+// shows without a reload: the history with the event it recorded, the
+// authors it gave new comments and time entries, and what the save found
+// others had changed in the store. Each live task keeps the edits made since
+// the save drained it (sent), applied to the saved version (rebase), which
+// becomes its base. The caches are rebuilt only when the save brought in
+// something of someone else's.
+func (m *model) adoptSaved(saved []*todo.Todo, sent map[string]*todo.Todo) {
+	refreshed := false
 	for _, s := range saved {
-		t := m.get(s.ID)
-		if t == nil {
+		t, d := m.get(s.ID), sent[s.ID]
+		if t == nil || d == nil {
 			continue
 		}
-		if len(s.History) > 0 {
-			if merged := todo.MergeHistory(t.History, s.History); len(merged) != len(t.History) {
-				t.History = merged
-				changed = true
-			}
+		next := rebase(s, d, t)
+		if next.Deleted {
+			// Deleted elsewhere while edited here; the edit did not undo
+			// the delete, so the task goes, as a sync would decide.
+			m.Store.remove(s.ID)
+			delete(m.base, s.ID)
+			refreshed = true
+			continue
 		}
-		authors := make(map[string]string)
-		for _, c := range s.Comments {
-			authors[c.ID] = c.Author
-		}
-		for _, e := range s.TimeEntries {
-			authors[e.ID] = e.Author
-		}
-		for i := range t.Comments {
-			if c := &t.Comments[i]; c.Author == "" && authors[c.ID] != "" {
-				c.Author = authors[c.ID]
-				changed = true
-			}
-		}
-		for i := range t.TimeEntries {
-			if e := &t.TimeEntries[i]; e.Author == "" && authors[e.ID] != "" {
-				e.Author = authors[e.ID]
-				changed = true
-			}
-		}
+		refreshed = refreshed || !sameContent(&next, t)
+		m.Store.replace(next)
+		m.Store.setBase(s)
 	}
-	if changed {
+	if refreshed {
+		m.markCacheDirty()
+	} else if len(saved) > 0 {
 		m.invalidateDetailCache()
 	}
 }

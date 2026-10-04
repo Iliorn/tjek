@@ -35,5 +35,10 @@ func (r *fakeRepo) Save(dirty []*todo.Todo, tombstones map[string]time.Time) err
 	return nil
 }
 
+// SaveOnto saves whole: the fake keeps no stored rows to rebase onto.
+func (r *fakeRepo) SaveOnto(dirty []*todo.Todo, _ map[string]*todo.Todo, tombstones map[string]time.Time) error {
+	return r.Save(dirty, tombstones)
+}
+
 // newTestModel builds a model backed by an empty in-memory repo.
 func newTestModel() model { return initialModel(&fakeRepo{}) }

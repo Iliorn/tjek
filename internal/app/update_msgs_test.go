@@ -32,6 +32,10 @@ func (r *recordingRepo) Save(dirty []*todo.Todo, tombstones map[string]time.Time
 	return r.err
 }
 
+func (r *recordingRepo) SaveOnto(dirty []*todo.Todo, _ map[string]*todo.Todo, tombstones map[string]time.Time) error {
+	return r.Save(dirty, tombstones)
+}
+
 func modelWithRecordingRepo(t *testing.T, tasks ...todo.Todo) (model, *recordingRepo) {
 	t.Helper()
 	m := modelWithTasks(t, tasks...)
@@ -114,7 +118,9 @@ func TestStartingATimerSavesTheOneItStopped(t *testing.T) {
 	first := m.currentTodo().ID
 	m = sendKey(t, m, "t")
 	m, cmd := send(t, m, saveTickMsg{})
-	runCmd(cmd)
+	for _, msg := range runCmd(cmd) {
+		m, _ = send(t, m, msg) // the save's end, which lets the next one run
+	}
 	m = sendKey(t, m, "down")
 	m = sendKey(t, m, "t")
 	if m.timerRunning(m.get(first)) {

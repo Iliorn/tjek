@@ -509,9 +509,25 @@ Rules:
 - **Saves are debounced and differential.** Mutations set
   `dirty`/`savePending`; a `saveTickMsg` (300ms) drains the change set with
   `Store.drainDirty()` (deep copies, so the save goroutine never reads a task
-  being edited) and hands it to `Repository.Save` on a background command.
+  being edited) and hands it to `Repository.SaveOnto` on a background command.
   Quitting calls `flushPendingWrites` synchronously. Never write the store
-  synchronously from `Update`.
+  synchronously from `Update`. Saves run one at a time (`beginSave`,
+  `saveFinished`), and a reload waits for a running save and is read again
+  if one started behind it (`reloadCmd`, `reloadedMsg.epoch`): a read that
+  missed a save would put the edits it wrote back to before them.
+- **A save writes edits, not copies** (`rebase.go`). A sync, a shared
+  project's pass or another process can change a stored task while the app
+  holds an older copy, and saving that copy whole would stamp its stale
+  fields as new edits and tombstone the comments it never saw. So the store
+  keeps each task's base (`Store.base`: the version this copy last agreed
+  with the store on, set on load, reload and save), and the save applies
+  only what differs from it to the row as stored now (`rebase`): each unit of
+  `todo.Fields`, each tag and dependency, each comment and time entry by ID.
+  The result comes back into memory the same way (`adoptSaved`), as does a
+  reload under a task still being edited. A task with no base (new here, or
+  restored after a delete) is saved whole, as the CLI's short-lived saves are.
+  `TestMonkeyEditsAreStoredAsShown` drives random edits over a real store and
+  checks each save stores what the screen showed.
 
 ## Paths (`paths/`)
 

@@ -33,8 +33,8 @@ func (m model) handleBackgroundMsg(msg tea.Msg) (next tea.Model, cmd tea.Cmd, ok
 	case updateCheckMsg:
 		next, cmd = m.handleUpdateCheck(msg)
 	case saveDoneMsg:
-		m.adoptSaved(msg.saved)
-		next, cmd = m, m.sharedSoon()
+		m.adoptSaved(msg.saved, msg.sent)
+		next, cmd = m, tea.Batch(m.sharedSoon(), m.saveFinished())
 	case sharedPollMsg, sharedSoonMsg:
 		next, cmd = m.handleSharedTick(msg)
 	case sharedDoneMsg:
@@ -65,7 +65,7 @@ func (m model) handleBackgroundMsg(msg tea.Msg) (next tea.Model, cmd tea.Cmd, ok
 		next = m
 	case saveErrMsg:
 		m.flashError(fmt.Sprintf("Error saving tasks: %v", msg.err))
-		next, cmd = m, clearErrAfter()
+		next, cmd = m, tea.Batch(clearErrAfter(), m.saveFinished())
 	case editorFinishedMsg:
 		next, cmd = m.handleEditorFinished(msg)
 	case saveTickMsg:
@@ -194,14 +194,18 @@ func (m model) handleSaveTick() (tea.Model, tea.Cmd) {
 	if !m.savePending {
 		return m, nil
 	}
+	if m.savesInFlight > 0 {
+		return m, nil // saveFinished schedules it
+	}
 	m.savePending = false
 	// Drain only the dirty IDs and tombstones from the Store. The per-task
 	// deep copies drainDirty makes are what keep this save goroutine safe
 	// from the mutations the Update goroutine keeps making while it runs.
-	dirty, tombstones := m.Store.drainDirty()
-	if len(dirty) == 0 && len(tombstones) == 0 {
+	c := m.Store.drainDirty()
+	if c.empty() {
 		return m, nil
 	}
+	m.beginSave()
 	repo := m.repo
 	if m.watcher != nil {
 		// Record the timestamp BEFORE the save so a fast fs event firing
@@ -210,10 +214,10 @@ func (m model) handleSaveTick() (tea.Model, tea.Cmd) {
 		m.watcher.recordSelfSave()
 	}
 	return m, tea.Batch(func() tea.Msg {
-		if err := repo.Save(dirty, tombstones); err != nil {
+		if err := repo.SaveOnto(c.dirty, c.bases, c.tombstones); err != nil {
 			return saveErrMsg{err}
 		}
-		return saveDoneMsg{saved: dirty}
+		return saveDoneMsg{saved: c.dirty, sent: c.sent}
 	}, m.exportSoon())
 }
 
@@ -225,11 +229,7 @@ func (m model) handleDBChanged() (tea.Model, tea.Cmd) {
 	if m.watcher != nil {
 		cmds = append(cmds, waitForDBChange(m.watcher.ch))
 		if m.watcher.shouldReloadNow(time.Now(), m.mode) {
-			repo := m.repo
-			cmds = append(cmds, func() tea.Msg {
-				todos, err := repo.Load()
-				return reloadedMsg{todos: todos, err: err}
-			})
+			cmds = append(cmds, m.reloadCmd())
 		}
 	}
 	if len(cmds) == 0 {
@@ -243,15 +243,20 @@ func (m model) handleReloaded(msg reloadedMsg) (tea.Model, tea.Cmd) {
 		m.flashError(fmt.Sprintf("External reload failed: %v", msg.err))
 		return m, clearErrAfter()
 	}
+	if msg.epoch != m.saveEpoch {
+		// A save started after this read did, which may have missed it.
+		return m, m.reloadCmd()
+	}
 	// Atomic swap: rebuild the Store from the freshly-loaded task set,
 	// invalidate caches, and follow the same task ID across the new ordering
 	// so the cursor stays anchored where the user expected.
 	//
 	// The swap must not wipe what only exists in memory: the undo stack, and
 	// any mutation still inside the save debounce (dirty tasks and pending
-	// tombstones the snapshot predates). Those local changes are newer than
-	// anything on disk — overlay them on the loaded set and carry the change
-	// set across so the scheduled save still flushes it.
+	// tombstones the snapshot predates). A dirty task takes its edits onto
+	// the loaded version (rebase), which becomes its base; one with no base
+	// stays as it is, to be saved whole. The change set is carried across so
+	// the scheduled save still flushes it.
 	// A reload the user cannot see is the common case, not the exception: the
 	// watcher fires on our own WAL writes, on a sync that merged nothing, on a
 	// checkpoint. Rebuilding the whole Store for those costs ~15ms at a couple
@@ -274,25 +279,37 @@ func (m model) handleReloaded(msg reloadedMsg) (tea.Model, tea.Cmd) {
 			dirtyTasks[id] = copyTodo(*t)
 		}
 	}
+	oldBase := m.base
 	m.Store = Store{timers: m.timers}
 	m.Store.ensureTasks()
 	m.undoStack = undo
 	m.dirtyIDs = dirtyIDs
 	m.tombstones = tombstones
 	for i := range msg.todos {
-		t := msg.todos[i]
+		t := &msg.todos[i]
 		if _, dead := tombstones[t.ID]; dead {
 			continue // deleted locally, deletion not yet flushed — stays dead
 		}
-		if d, ok := dirtyTasks[t.ID]; ok {
-			t = d // unsaved local edit is newer than the DB snapshot
+		d, dirty := dirtyTasks[t.ID]
+		switch b := oldBase[t.ID]; {
+		case !dirty:
+			m.Store.add(*t)
+			m.Store.setBase(t)
+		case b != nil:
+			m.Store.add(rebase(t, b, &d))
+			m.Store.setBase(t)
+		default:
+			m.Store.add(d)
 		}
-		m.Store.add(t)
 	}
-	// Dirty tasks the snapshot doesn't know yet (created locally, unflushed).
+	// Dirty tasks the snapshot doesn't hold: created here and not yet
+	// saved, or gone from the store since, which their base still says.
 	for id, d := range dirtyTasks {
 		if m.get(id) == nil {
 			m.Store.add(d)
+			if b := oldBase[id]; b != nil {
+				m.Store.setBase(b)
+			}
 		}
 	}
 	m.markCacheDirty()

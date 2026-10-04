@@ -183,3 +183,33 @@ func benchKey(m model, k string) model {
 	next, _ := m.Update(msg)
 	return next.(model)
 }
+
+// BenchmarkReload times a reload that changed something, so the store is
+// rebuilt: the stutter an external change costs on the loop, base copies
+// (Store.base) included.
+func BenchmarkReload(b *testing.B) {
+	m := benchModel(2000)
+	loaded := benchTodos(2000)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		loaded[0].ModifiedAt = loaded[0].ModifiedAt.Add(time.Millisecond)
+		next, _ := m.handleReloaded(reloadedMsg{todos: loaded, epoch: m.saveEpoch})
+		m = next.(model)
+	}
+}
+
+// BenchmarkAdoptSaved times what a finished save of one edited task costs on
+// the loop: taking the saved version back into memory (adoptSaved).
+func BenchmarkAdoptSaved(b *testing.B) {
+	m := benchModel(2000)
+	id := "t1"
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		m.get(id).Title = fmt.Sprintf("edit %d", i)
+		m.markDirty(id)
+		c := m.Store.drainDirty()
+		m.adoptSaved(c.dirty, c.sent)
+	}
+}

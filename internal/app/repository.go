@@ -22,6 +22,10 @@ import (
 type Repository interface {
 	Load() ([]todo.Todo, error)
 	Save(dirty []*todo.Todo, tombstones map[string]time.Time) error
+	// SaveOnto is Save for tasks edited in memory: a dirty task with a base
+	// (Store.base) is written as its edits since then, applied to the task as
+	// stored now, and handed back as written (rebase.go).
+	SaveOnto(dirty []*todo.Todo, bases map[string]*todo.Todo, tombstones map[string]time.Time) error
 	// SetRanker hands the repository the ranker it scores the persisted
 	// `sequence` column with. Safe to call while a Save is running.
 	SetRanker(rank.Ranker)

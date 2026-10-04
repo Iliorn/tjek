@@ -3,6 +3,7 @@ package app
 import (
 	"database/sql"
 	"encoding/json"
+	"slices"
 	"strings"
 	"time"
 
@@ -32,11 +33,19 @@ import (
 // and hands every dirty task back with its full stored history, so the app
 // can show what this save recorded without reloading.
 func saveStamped(h *sql.DB, dirty []*todo.Todo, tombstones map[string]time.Time, score func(*todo.Todo) float64, now time.Time, by editor) error {
+	return saveStampedOnto(h, dirty, nil, tombstones, score, now, by)
+}
+
+// saveStampedOnto is saveStamped for tasks edited in memory: a dirty task
+// with a base in bases is written as its edits since that base, applied to
+// the stored row (rebase), and handed back as written. One without is
+// written whole.
+func saveStampedOnto(h *sql.DB, dirty []*todo.Todo, bases map[string]*todo.Todo, tombstones map[string]time.Time, score func(*todo.Todo) float64, now time.Time, by editor) error {
 	if len(dirty) == 0 && len(tombstones) == 0 {
 		return nil
 	}
 	for attempt := 0; ; attempt++ {
-		err := saveStampedOnce(h, dirty, tombstones, score, now, by)
+		err := saveStampedOnce(h, dirty, bases, tombstones, score, now, by)
 		if err == nil || attempt >= mergeTxRetries || !isBusyErr(err) {
 			return err
 		}
@@ -44,7 +53,7 @@ func saveStamped(h *sql.DB, dirty []*todo.Todo, tombstones map[string]time.Time,
 	}
 }
 
-func saveStampedOnce(h *sql.DB, dirty []*todo.Todo, tombstones map[string]time.Time, score func(*todo.Todo) float64, now time.Time, by editor) error {
+func saveStampedOnce(h *sql.DB, dirty []*todo.Todo, bases map[string]*todo.Todo, tombstones map[string]time.Time, score func(*todo.Todo) float64, now time.Time, by editor) error {
 	tx, err := h.Begin()
 	if err != nil {
 		return err
@@ -66,12 +75,18 @@ func saveStampedOnce(h *sql.DB, dirty []*todo.Todo, tombstones map[string]time.T
 	if err != nil {
 		return err
 	}
+	// The attempt works on its own copies of the rebased tasks, so a retry
+	// rebases the edits as they came in, not this attempt's result.
+	work, err := rebaseDirty(tx, dirty, bases, stored)
+	if err != nil {
+		return err
+	}
 	known, err := storedChildIDs(tx, ids[:len(dirty)])
 	if err != nil {
 		return err
 	}
 	events := make(map[string]todo.Event, len(dirty))
-	for _, t := range dirty {
+	for _, t := range work {
 		signNewChildren(t, known, by.name)
 		old, ok := stored[t.ID]
 		var prev *todo.Todo
@@ -83,7 +98,7 @@ func saveStampedOnce(h *sql.DB, dirty []*todo.Todo, tombstones map[string]time.T
 			events[t.ID] = e
 		}
 	}
-	if err := saveNormalizedIn(tx, dirty, tombstones, score); err != nil {
+	if err := saveNormalizedIn(tx, work, tombstones, score); err != nil {
 		return err
 	}
 	for id, e := range events {
@@ -124,10 +139,45 @@ func saveStampedOnce(h *sql.DB, dirty []*todo.Todo, tombstones map[string]time.T
 	}
 	// Only once committed: a retried attempt starts from the tasks as they
 	// came in, and must not find this attempt's rolled-back event on them.
-	for _, t := range dirty {
+	for i, t := range work {
 		t.History = history[t.ID]
+		if t != dirty[i] {
+			*dirty[i] = *t
+		}
 	}
 	return nil
+}
+
+// rebaseDirty is dirty with each task that has a base and a stored row
+// replaced by a copy holding its edits applied to that row (rebase). The
+// others are dirty's own pointers. stored is loadStampBases' rows, which
+// lack the comments and time entries; those are read here.
+func rebaseDirty(tx *sql.Tx, dirty []*todo.Todo, bases map[string]*todo.Todo, stored map[string]todo.Todo) ([]*todo.Todo, error) {
+	work := slices.Clone(dirty)
+	var ids []string
+	for _, t := range dirty {
+		if _, ok := stored[t.ID]; ok && bases[t.ID] != nil {
+			ids = append(ids, t.ID)
+		}
+	}
+	if len(ids) == 0 {
+		return work, nil
+	}
+	comments, entries, err := loadLiveRecords(tx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for i, t := range dirty {
+		b := bases[t.ID]
+		row, ok := stored[t.ID]
+		if b == nil || !ok {
+			continue
+		}
+		row.Comments, row.TimeEntries = comments[t.ID], entries[t.ID]
+		r := rebase(&row, b, t)
+		work[i] = &r
+	}
+	return work, nil
 }
 
 // stampEdit is the stamps t is saved with, given the stored version old (nil
@@ -189,8 +239,10 @@ func stampEdit(old, t *todo.Todo, clock *hlc.Clock, now time.Time) map[string]hl
 }
 
 // loadStampBases reads the stored versions of ids, with what stampEdit
-// compares: the scalar fields, the stamps, tags and dependencies. Comments
-// and time entries are left out; they merge as records.
+// compares: the scalar fields, the stamps, tags and dependencies, and the
+// creation time a rebased row is written with. Comments and time entries are
+// left out; they merge as records, and rebaseDirty reads them when it needs
+// them.
 func loadStampBases(tx *sql.Tx, ids []string) (map[string]todo.Todo, error) {
 	out := make(map[string]todo.Todo, len(ids))
 	const chunk = 500
@@ -204,7 +256,7 @@ func loadStampBases(tx *sql.Tx, ids []string) (map[string]todo.Todo, error) {
 			args[i] = id
 		}
 		rows, err := tx.Query(`SELECT id, title, status, priority, size, project, parent_id,
-			modified_at, due_date, start_date, completed_at, notes, recurrence,
+			created_at, modified_at, due_date, start_date, completed_at, notes, recurrence,
 			seq_rank_done, stage, deleted, deleted_at, stamps
 			FROM todos WHERE id IN `+in, args...)
 		if err != nil {
@@ -213,9 +265,9 @@ func loadStampBases(tx *sql.Tx, ids []string) (map[string]todo.Todo, error) {
 		for rows.Next() {
 			var t todo.Todo
 			var status, priority, size, deleted int
-			var modifiedAt, dueDate, startDate, completedAt, deletedAt, stamps string
+			var createdAt, modifiedAt, dueDate, startDate, completedAt, deletedAt, stamps string
 			if err := rows.Scan(&t.ID, &t.Title, &status, &priority, &size, &t.Project, &t.ParentID,
-				&modifiedAt, &dueDate, &startDate, &completedAt, &t.Notes, &t.Recurrence,
+				&createdAt, &modifiedAt, &dueDate, &startDate, &completedAt, &t.Notes, &t.Recurrence,
 				&t.SeqRankAtDone, &t.Stage, &deleted, &deletedAt, &stamps); err != nil {
 				rows.Close()
 				return nil, err
@@ -223,6 +275,7 @@ func loadStampBases(tx *sql.Tx, ids []string) (map[string]todo.Todo, error) {
 			t.Status = safeStatus(status, t.ID)
 			t.Priority = safePriority(priority, t.ID)
 			t.Size = safeSize(size, t.ID)
+			t.CreatedAt = parseTime(createdAt)
 			t.ModifiedAt = parseTime(modifiedAt)
 			t.DueDate = parseTime(dueDate)
 			t.StartDate = parseTime(startDate)
@@ -443,6 +496,56 @@ func storedChildIDs(tx *sql.Tx, ids []string) (map[string]bool, error) {
 		}
 	}
 	return out, nil
+}
+
+// loadLiveRecords reads the live comments and time entries of the tasks ids.
+func loadLiveRecords(tx *sql.Tx, ids []string) (map[string][]todo.Comment, map[string][]todo.TimeEntry, error) {
+	comments := map[string][]todo.Comment{}
+	entries := map[string][]todo.TimeEntry{}
+	const chunk = 500
+	for len(ids) > 0 {
+		n := min(chunk, len(ids))
+		part := ids[:n]
+		ids = ids[n:]
+		in := "(" + strings.TrimSuffix(strings.Repeat("?,", len(part)), ",") + ")"
+		args := make([]any, len(part))
+		for i, id := range part {
+			args[i] = id
+		}
+		for _, q := range []struct {
+			query string
+			scan  func(*sql.Rows) error
+		}{
+			{`SELECT ` + commentColumns + ` FROM task_comments WHERE deleted_at = '' AND task_id IN ` + in,
+				func(r *sql.Rows) error {
+					taskID, c, err := scanComment(r)
+					comments[taskID] = append(comments[taskID], c)
+					return err
+				}},
+			{`SELECT ` + timeEntryColumns + ` FROM task_time_entries WHERE deleted_at = '' AND task_id IN ` + in,
+				func(r *sql.Rows) error {
+					taskID, e, err := scanTimeEntry(r)
+					entries[taskID] = append(entries[taskID], e)
+					return err
+				}},
+		} {
+			rows, err := tx.Query(q.query, args...)
+			if err != nil {
+				return nil, nil, err
+			}
+			for rows.Next() {
+				if err := q.scan(rows); err != nil {
+					rows.Close()
+					return nil, nil, err
+				}
+			}
+			rows.Close()
+			if err := rows.Err(); err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+	return comments, entries, nil
 }
 
 // eventColumns are the task_events columns scanEvent reads, in its order.

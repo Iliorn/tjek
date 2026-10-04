@@ -29,6 +29,13 @@ type Store struct {
 	// two keystrokes.
 	tombstones map[string]time.Time
 
+	// base is, for each task loaded from or saved to the store, the task as
+	// this copy last agreed with the store on: what a save writes the task's
+	// edits against (rebase.go). A task with none is saved whole. Entries are
+	// never changed in place, only replaced, so a save can read one off the
+	// Update goroutine.
+	base map[string]*todo.Todo
+
 	// Maintained indexes. Update them via Store mutators; never write directly
 	// or they will drift from `tasks`.
 	subtaskOf     map[string][]string // parentID → child IDs in CreatedAt order
@@ -174,6 +181,36 @@ func (s *Store) add(t todo.Todo) *todo.Todo {
 	return s.tasks[cp.ID]
 }
 
+// setBase records t as the version the store holds (base).
+func (s *Store) setBase(t *todo.Todo) {
+	if s.base == nil {
+		s.base = make(map[string]*todo.Todo, len(s.tasks))
+	}
+	s.base[t.ID] = baseCopy(t)
+}
+
+// replace puts t in place of the stored task with its ID, keeping the
+// pointer, and the maintained indexes in step with what changed.
+func (s *Store) replace(t todo.Todo) {
+	cur := s.tasks[t.ID]
+	if cur == nil {
+		s.add(t)
+		return
+	}
+	if cur.ParentID != t.ParentID {
+		s.removeSubtaskOf(cur.ParentID, t.ID)
+		*cur = t
+		s.addSubtaskOf(t.ParentID, cur)
+	} else {
+		*cur = t
+	}
+	if cur.TimerRunningBy(s.timerOwner(cur)) {
+		s.runningTimers[t.ID] = struct{}{}
+	} else {
+		delete(s.runningTimers, t.ID)
+	}
+}
+
 // remove drops a task and updates every maintained index.
 func (s *Store) remove(id string) {
 	t := s.tasks[id]
@@ -251,37 +288,57 @@ func (s *Store) markTombstone(id string) {
 		s.tombstones[id] = time.Now()
 	}
 	delete(s.dirtyIDs, id)
+	// Brought back by an undo, the task is saved whole: against a live base
+	// the restore would look like no change at all.
+	delete(s.base, id)
 }
 
-// drainDirty extracts the current dirty set and tombstones for a save. Each
-// dirty task is deep-copied so the async save goroutine sees a stable snapshot
-// even if the Update goroutine continues mutating the stored pointer
-// concurrently. (Pointer stability across mutations is guaranteed by the map,
-// but field-level concurrent reads still need a snapshot.)
-func (s *Store) drainDirty() (dirty []*todo.Todo, tombstones map[string]time.Time) {
+// changeSet is what one save writes: the dirty tasks, deep-copied so the save
+// goroutine sees a stable snapshot while the Update goroutine keeps mutating
+// the stored pointers; the base of each that has one (rebase.go); each as it
+// was drained, which the save's result is adopted against (adoptSaved); and
+// the tombstones.
+type changeSet struct {
+	dirty      []*todo.Todo
+	bases      map[string]*todo.Todo
+	sent       map[string]*todo.Todo
+	tombstones map[string]time.Time
+}
+
+func (c changeSet) empty() bool { return len(c.dirty) == 0 && len(c.tombstones) == 0 }
+
+// drainDirty extracts the current dirty set and tombstones for a save.
+func (s *Store) drainDirty() changeSet {
+	var c changeSet
 	if n := len(s.dirtyIDs); n > 0 {
-		dirty = make([]*todo.Todo, 0, n)
+		c.dirty = make([]*todo.Todo, 0, n)
+		c.bases = make(map[string]*todo.Todo, n)
+		c.sent = make(map[string]*todo.Todo, n)
 		for id := range s.dirtyIDs {
 			t := s.tasks[id]
 			if t == nil {
 				continue
 			}
 			cp := copyTodo(*t)
-			dirty = append(dirty, &cp)
+			c.dirty = append(c.dirty, &cp)
+			c.sent[id] = baseCopy(t)
+			if b := s.base[id]; b != nil {
+				c.bases[id] = b
+			}
 			// The copy takes the Auto note to the save; the next edit of
 			// this task is someone's own unless flagged again.
 			t.Auto = false
 		}
 	}
 	if n := len(s.tombstones); n > 0 {
-		tombstones = make(map[string]time.Time, n)
+		c.tombstones = make(map[string]time.Time, n)
 		for id, at := range s.tombstones {
-			tombstones[id] = at
+			c.tombstones[id] = at
 		}
 	}
 	s.dirtyIDs = nil
 	s.tombstones = nil
-	return dirty, tombstones
+	return c
 }
 
 // ── Undo ──────────────────────────────────────────────────────────────────────
@@ -363,6 +420,7 @@ func (s *Store) forget(ids []string) {
 		s.remove(id)
 		delete(s.dirtyIDs, id)
 		delete(s.tombstones, id)
+		delete(s.base, id)
 	}
 	s.undoStack = undoWithout(s.undoStack, gone)
 }

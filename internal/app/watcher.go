@@ -58,6 +58,8 @@ type dbChangedMsg struct{}
 type reloadedMsg struct {
 	todos []todo.Todo
 	err   error
+	// epoch is the model's saveEpoch when the read was started (reloadCmd).
+	epoch uint64
 }
 
 // watcherState lives on the model. The mutex protects lastSelfSaveAt and

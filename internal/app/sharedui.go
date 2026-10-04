@@ -107,11 +107,7 @@ func (m model) handleSharedDone(msg sharedDoneMsg) (tea.Model, tea.Cmd) {
 	}
 	m.sharedFailed, m.sharedStatus = false, ""
 	if msg.changed && m.watcher == nil {
-		repo := m.repo
-		return m, func() tea.Msg {
-			todos, err := repo.Load()
-			return reloadedMsg{todos: todos, err: err}
-		}
+		return m, m.reloadCmd()
 	}
 	return m, nil
 }
@@ -225,12 +221,9 @@ func (m *model) confirmRenameShared() tea.Cmd {
 		m.flashInfo(tr("A shared project is syncing; try again in a moment"))
 		return clearErrAfter()
 	}
-	if dirty, tombstones := m.Store.drainDirty(); len(dirty) > 0 || len(tombstones) > 0 {
-		m.savePending = false
-		if err := m.repo.Save(dirty, tombstones); err != nil {
-			m.flashError(fmt.Sprintf(tr("Shared project: %v"), err))
-			return clearErrAfter()
-		}
+	if err := m.saveNow(); err != nil {
+		m.flashError(fmt.Sprintf(tr("Shared project: %v"), err))
+		return clearErrAfter()
 	}
 	old, name := m.pendingProjectName, m.pendingProjectRename
 	c := m.freshShared()
@@ -247,11 +240,7 @@ func (m *model) confirmRenameShared() tea.Cmd {
 	m.flashSuccess(fmt.Sprintf(tr("Renamed '%s' to '%s' for everyone sharing it"), old, name))
 	// The rename's pass merged the file, so the store holds edits these
 	// copies lack.
-	repo := m.repo
-	return tea.Batch(clearErrAfter(), func() tea.Msg {
-		todos, err := repo.Load()
-		return reloadedMsg{todos: todos, err: err}
-	})
+	return tea.Batch(clearErrAfter(), m.reloadCmd())
 }
 
 // followSharedRename moves the tasks in memory from the project's old name to
@@ -284,12 +273,9 @@ func (m *model) confirmLeaveShared() tea.Cmd {
 		m.flashInfo(tr("A shared project is syncing; try again in a moment"))
 		return clearErrAfter()
 	}
-	if dirty, tombstones := m.Store.drainDirty(); len(dirty) > 0 || len(tombstones) > 0 {
-		m.savePending = false
-		if err := m.repo.Save(dirty, tombstones); err != nil {
-			m.flashError(fmt.Sprintf(tr("Shared project: %v"), err))
-			return clearErrAfter()
-		}
+	if err := m.saveNow(); err != nil {
+		m.flashError(fmt.Sprintf(tr("Shared project: %v"), err))
+		return clearErrAfter()
 	}
 	c := m.freshShared()
 	p, ids, err := leaveShared(db, &c, m.pendingProjectName, m.rank.Biases, m.editor())
@@ -305,11 +291,7 @@ func (m *model) confirmLeaveShared() tea.Cmd {
 	m.markCacheDirty()
 	m.refreshTimerScope()
 	m.flashInfo(fmt.Sprintf(tr("Left '%s' and removed its %d task(s) here"), p.Name, len(ids)))
-	repo := m.repo
-	return tea.Batch(clearErrAfter(), func() tea.Msg {
-		todos, err := repo.Load()
-		return reloadedMsg{todos: todos, err: err}
-	})
+	return tea.Batch(clearErrAfter(), m.reloadCmd())
 }
 
 // updateShareFolder takes the folder to make a project's file in: tab

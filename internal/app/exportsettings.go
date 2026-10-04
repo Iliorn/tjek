@@ -212,15 +212,16 @@ func (m *model) startImport(tasks []todo.Todo) tea.Cmd {
 		ids = append(ids, tasks[i].ID)
 	}
 	m.pushUndo("import", ids...)
-	dirty, tombstones := m.Store.drainDirty()
+	c := m.Store.drainDirty()
 	m.savePending = false
+	m.beginSave()
 	repo, biases := m.repo, m.rank.Biases
 	if m.watcher != nil {
 		m.watcher.recordSelfSave()
 	}
 	return func() tea.Msg {
-		if len(dirty) > 0 || len(tombstones) > 0 {
-			if err := repo.Save(dirty, tombstones); err != nil {
+		if !c.empty() {
+			if err := repo.SaveOnto(c.dirty, c.bases, c.tombstones); err != nil {
 				return importDoneMsg{err: err}
 			}
 		}
@@ -235,9 +236,12 @@ func (m *model) startImport(tasks []todo.Todo) tea.Cmd {
 
 // handleImportDone reports an import and adopts the merged store.
 func (m model) handleImportDone(msg importDoneMsg) (tea.Model, tea.Cmd) {
+	// The import's read follows its save and its merge, and no other save
+	// ran meanwhile (beginSave), so it is current.
+	finished := m.saveFinished()
 	if msg.err != nil {
 		m.flashError(fmt.Sprintf(tr("Import failed: %v"), msg.err))
-		return m, clearErrAfter()
+		return m, tea.Batch(clearErrAfter(), finished)
 	}
 	if msg.res.added+msg.res.updated == 0 {
 		// Nothing to undo, so no undo step for it either.
@@ -245,11 +249,11 @@ func (m model) handleImportDone(msg importDoneMsg) (tea.Model, tea.Cmd) {
 			m.undoStack = m.undoStack[:n-1]
 		}
 		m.flashInfo(tr("Nothing to import: every task in the file is already here"))
-		return m, clearErrAfter()
+		return m, tea.Batch(clearErrAfter(), finished)
 	}
 	m.flashSuccess(fmt.Sprintf(tr("Imported %d new, %d updated · u undoes it"), msg.res.added, msg.res.updated))
-	todos := msg.todos
-	return m, tea.Batch(clearErrAfter(), func() tea.Msg { return reloadedMsg{todos: todos} })
+	reloaded := reloadedMsg{todos: msg.todos, epoch: m.saveEpoch}
+	return m, tea.Batch(clearErrAfter(), finished, func() tea.Msg { return reloaded })
 }
 
 // exportFolderDisplay is the Settings row's value: the folder, with the home
