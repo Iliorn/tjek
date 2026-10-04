@@ -280,10 +280,11 @@ func TestSpawnRecurrenceClonesSubtreeReset(t *testing.T) {
 	grand.Status = todo.Done
 
 	m := modelWithTasks(t, parent, c1, c2, grand)
-	newID := m.spawnNextRecurrence(m.get("p"))
-	if newID == "" {
-		t.Fatal("spawnNextRecurrence returned empty ID")
+	spawned := m.spawnNextRecurrence(m.get("p"))
+	if len(spawned) != 4 {
+		t.Fatalf("spawnNextRecurrence returned %v, want the instance and the three clones, to be saved", spawned)
 	}
+	newID := spawned[0]
 
 	cloneChildren := m.subtaskIDs(newID)
 	if len(cloneChildren) != 2 {
@@ -392,8 +393,7 @@ func TestRecurrenceSpawnsTheSameTasksOnEveryDevice(t *testing.T) {
 
 	spawnOn := func() []string {
 		m := modelWithTasks(t, parent, child, grand)
-		newID := m.spawnNextRecurrence(m.get("p"))
-		ids := []string{newID}
+		ids := m.spawnNextRecurrence(m.get("p"))[:1]
 		for i := 0; i < len(ids); i++ {
 			ids = append(ids, m.subtaskIDs(ids[i])...)
 		}

@@ -58,9 +58,7 @@ func (m *model) closePendingTask(t *todo.Todo) bool {
 	t.Toggle()
 	ids := []string{t.ID}
 	if t.IsRecurring() {
-		if newID := m.spawnNextRecurrence(t); newID != "" {
-			ids = append(ids, newID)
-		}
+		ids = append(ids, m.spawnNextRecurrence(t)...)
 	}
 	if isSub {
 		ids = append(ids, m.autoCloseAncestorsIfAllDone(t.ID)...)

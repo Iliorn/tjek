@@ -127,6 +127,36 @@ func TestStartingATimerSavesTheOneItStopped(t *testing.T) {
 	}
 }
 
+// Closing a recurring task with subtasks spawns its next instance with fresh
+// copies of them, and the save writes the copies too: left out, they lived
+// in memory alone and were gone after a restart.
+func TestClosingARecurringTaskSavesItsNextChecklist(t *testing.T) {
+	review := todo.New("Weekly review")
+	review.Recurrence = "weekly"
+	inbox := todo.NewSubtask("Empty the inbox", review.ID)
+	inbox.Status = todo.Done
+	m, repo := modelWithRecordingRepo(t, review, inbox)
+	m = sendKey(t, m, "d")
+	m, cmd := send(t, m, saveTickMsg{})
+	runCmd(cmd)
+	if len(repo.saves) != 1 {
+		t.Fatalf("saves %+v, want one", repo.saves)
+	}
+	var clones int
+	for _, x := range m.allTodos() {
+		if x.ParentID == "" || x.ParentID == review.ID {
+			continue
+		}
+		clones++
+		if !slices.Contains(repo.saves[0].dirty, x.ID) {
+			t.Errorf("the next instance's %q was not saved", x.Title)
+		}
+	}
+	if clones != 1 {
+		t.Errorf("the next instance has %d subtasks, want the one copy", clones)
+	}
+}
+
 // A delete reaches the repository as a tombstone, which is what makes it sync.
 func TestSaveTickCarriesTheTombstone(t *testing.T) {
 	keep, gone := todo.New("keep"), todo.New("gone")

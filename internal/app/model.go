@@ -1050,17 +1050,18 @@ func buildNextRecurrence(src todo.Todo) (todo.Todo, bool) {
 }
 
 // spawnNextRecurrence builds the next instance and adds it to the store.
-// Returns the spawned ID, or "" when the source isn't recurring or the rule
-// is unparseable. Also clones the source's subtree onto the new parent with
-// every child reset to Pending, so a recurring "weekly review" keeps its
-// checklist on each spawn instead of losing it.
-func (m *model) spawnNextRecurrence(src *todo.Todo) string {
+// Also clones the source's subtree onto the new parent with every child reset
+// to Pending, so a recurring "weekly review" keeps its checklist on each
+// spawn instead of losing it. Returns every task it added, the new instance
+// first, for the caller to save; none when the source isn't recurring or the
+// rule is unparseable.
+func (m *model) spawnNextRecurrence(src *todo.Todo) []string {
 	if src == nil {
-		return ""
+		return nil
 	}
 	next, ok := buildNextRecurrence(*src)
 	if !ok || m.get(next.ID) != nil {
-		return "" // not recurring, or its next instance already exists
+		return nil // not recurring, or its next instance already exists
 	}
 	m.add(next)
 	// The whole-parent due-date delta shifts child dates by the same amount,
@@ -1075,7 +1076,7 @@ func (m *model) spawnNextRecurrence(src *todo.Todo) string {
 	// the instance deleted) comes back under the same ID, so it has to
 	// outrank its own tombstone, as an undone delete does.
 	m.touchRestored(ids)
-	return next.ID
+	return ids
 }
 
 // cloneSubtreeReset clones every descendant of srcParentID, reparented under
@@ -1443,9 +1444,7 @@ func (m *model) autoCloseAncestorsIfAllDone(childID string) []string {
 		parent.Auto = true
 		closed = append(closed, parent.ID)
 		if parent.IsRecurring() {
-			if newID := m.spawnNextRecurrence(parent); newID != "" {
-				closed = append(closed, newID)
-			}
+			closed = append(closed, m.spawnNextRecurrence(parent)...)
 		}
 		cur = parent
 	}
@@ -1558,9 +1557,7 @@ func (m *model) toggleSubtask(parentID string, subtaskCursor int) []string {
 	t.Toggle()
 	out := []string{subID}
 	if wasPending && t.IsRecurring() {
-		if newID := m.spawnNextRecurrence(t); newID != "" {
-			out = append(out, newID)
-		}
+		out = append(out, m.spawnNextRecurrence(t)...)
 	}
 	if wasPending {
 		out = append(out, m.autoCloseAncestorsIfAllDone(subID)...)
