@@ -20,12 +20,6 @@ import (
 // staged instead of mutating (open subtasks without auto-close) — the confirm
 // flow completes the close on its own.
 func (m *model) closePendingTask(t *todo.Todo) bool {
-	// Closing a task while its timer is running would leave a dangling open
-	// entry — and the runningTimers index would go stale. Stop first, then
-	// toggle. Mirrors the CLI done path.
-	if m.timerRunning(t) {
-		m.stopTimer(t.ID)
-	}
 	isSub := t.ParentID != ""
 	// Pending parent with open subtasks: with auto-close-subtasks on, cascade
 	// them closed; otherwise stage a confirm rather than silently close (and
@@ -43,6 +37,14 @@ func (m *model) closePendingTask(t *todo.Todo) bool {
 				return false
 			}
 		}
+	}
+	// Closing a task while its timer is running would leave a dangling open
+	// entry — and the runningTimers index would go stale. Stop first, then
+	// toggle. Mirrors the CLI done path. Not before the confirm above: a
+	// close the user declines must leave the timer running
+	// (confirmCloseParent stops it on yes).
+	if m.timerRunning(t) {
+		m.stopTimer(t.ID)
 	}
 	// Full snapshot: ancestor cascade + recurrence spawn can touch arbitrary
 	// IDs not knowable until mid-mutation, so capture all state for a clean

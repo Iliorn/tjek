@@ -1603,3 +1603,23 @@ func TestScriptDetailEnterAndBackspaceStepAValue(t *testing.T) {
 			m.get(id).Size, detailSectionOf(m.detail.field))
 	}
 }
+
+// d on a task with open subtasks asks first, and declining leaves the task as
+// it was, its running timer included: stopped before the question, the stop
+// stayed in memory unsaved while the task stayed open.
+func TestScriptDecliningACloseKeepsTheTimer(t *testing.T) {
+	parent := todo.New("Fix the boiler")
+	sub := todo.NewSubtask("Find the receipt", parent.ID)
+	m := modelWithTasks(t, parent, sub)
+	if cur := m.currentTodo(); cur == nil || cur.ID != parent.ID {
+		t.Fatalf("setup: the cursor is on %+v, want the parent", cur)
+	}
+	m = script(t, m, "t", "d")
+	if m.mode != modeConfirm {
+		t.Fatalf("d on a parent with an open subtask: mode %v, want the question", m.mode)
+	}
+	m = sendKey(t, m, "n")
+	if got := m.get(parent.ID); got.Status != todo.Pending || !m.timerRunning(got) {
+		t.Errorf("after declining: status %v, timer running %v; want it open and still tracking", got.Status, m.timerRunning(got))
+	}
+}
