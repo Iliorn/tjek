@@ -1,8 +1,6 @@
 package app
 
 import (
-	"time"
-
 	"github.com/Iliorn/tjek/todo"
 	"github.com/google/uuid"
 )
@@ -50,9 +48,21 @@ func nextInstanceID(key string) string {
 	return uuid.NewSHA1(nextInstanceNamespace, []byte(key)).String()
 }
 
+// dueShiftDays is the calendar days a recurring task's due date moved from
+// src to its next instance, which its subtasks' dates move by too; zero when
+// either has none. Days, not a duration: a span across a DST switch is an hour
+// off a whole number of days, which moves a midnight due date onto the day
+// before.
+func dueShiftDays(src, next todo.Todo) int {
+	if src.DueDate.IsZero() || next.DueDate.IsZero() {
+		return 0
+	}
+	return calendarDays(src.DueDate, next.DueDate)
+}
+
 // cloneSubtreeResetFrom builds a fresh Pending copy of every descendant of
 // srcParentID, reparented under newParentID, with each clone's history wiped
-// (todo.NewSubtask starts clean) and DueDate/StartDate shifted by delta so the
+// (todo.NewSubtask starts clean) and DueDate/StartDate shifted by days so the
 // subtree's internal scheduling stays relative to the new parent. BFS with
 // (srcID, newParentID) pairs so nested grandchildren land under their
 // freshly-cloned parent rather than the recurring root. Each clone's ID is
@@ -60,7 +70,7 @@ func nextInstanceID(key string) string {
 // next instance spawned on two devices is the same set of tasks. Returns the
 // clones; the caller stores them (model.add / repo.Save).
 func cloneSubtreeResetFrom(children func(string) []string, get func(string) *todo.Todo,
-	srcParentID, newParentID string, delta time.Duration,
+	srcParentID, newParentID string, days int,
 ) []todo.Todo {
 	var out []todo.Todo
 	type pair struct{ srcID, newPID string }
@@ -80,15 +90,15 @@ func cloneSubtreeResetFrom(children func(string) []string, get func(string) *tod
 			clone.Size = child.Size
 			clone.Project = child.Project
 			clone.Notes = child.Notes
-			clone.Recurrence = child.Recurrence
+			clone.Recurrence, clone.RecurFrom = child.Recurrence, child.RecurFrom
 			if len(child.Tags) > 0 {
 				clone.Tags = append([]string{}, child.Tags...)
 			}
 			if !child.DueDate.IsZero() {
-				clone.DueDate = child.DueDate.Add(delta)
+				clone.DueDate = child.DueDate.AddDate(0, 0, days)
 			}
 			if !child.StartDate.IsZero() {
-				clone.StartDate = child.StartDate.Add(delta)
+				clone.StartDate = child.StartDate.AddDate(0, 0, days)
 			}
 			out = append(out, clone)
 			queue = append(queue, pair{child.ID, clone.ID})

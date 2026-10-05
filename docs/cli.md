@@ -20,6 +20,9 @@ tjek edit milk --p=high --add-tag=urgent --due=tomorrow
 tjek edit deploy --add-dep=sign-off   # depend on another task (refused if it would loop)
 tjek edit deploy --remove-dep=sign-off
 tjek edit a1b2 c3d4 e5f6 --project=hoth   # one change across several tasks (--title stays single-ref)
+tjek add "Rent" --due=31-01-27 --recur=monthly   # due on the 31st, or the month's last day
+tjek edit gym --recur=mon,thu/until:30-06-27     # set a rule; the series counts from the due date
+tjek edit gym --clear-recur                      # stop repeating
 tjek done milk                  # mark a task done
 tjek reopen milk                # move it back to pending (the counterpart to done)
 tjek delete milk                # soft delete (alias: tjek rm)

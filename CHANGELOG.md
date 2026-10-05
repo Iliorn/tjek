@@ -13,6 +13,22 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+### Added
+
+- Repeat on chosen weekdays, like `r:mon,thu`, or every other week: `r:2w:fri`.
+- A series can end on a date (`r:weekly/until:31-12-27`) or after N times (`r:daily/10x`).
+- `r` on the Recurrence field writes any rule, as does `tjek edit --recur`.
+
+### Changed
+
+- Moving a repeating task's due date moves only that one; its series stays put.
+
+### Fixed
+
+- A monthly task on the 31st falls on a short month's last day, then the 31st again.
+- A recurring task's subtasks keep their due dates across a daylight saving change.
+- A repeating task with no due date gets its next one at midnight, not the closing time.
+
 ## [1.51.5] - 2026-10-04
 
 ### Fixed

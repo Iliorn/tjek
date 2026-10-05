@@ -395,6 +395,7 @@ var cliHelpBlocks = []helpBlock{
 		{"--size=s|m|l", "new size"},
 		{"--due=DATE / --clear-due", "set / drop the due date"},
 		{"--start=DATE / --clear-start", "set / drop the start date"},
+		{"--recur=RULE / --clear-recur", "set the recurrence (restarting its series from the due date) / stop recurring"},
 		{"--project=NAME / --clear-project", "set / drop the project"},
 		{"--add-tag=t1,t2", "append tags"},
 		{"--remove-tag=t1,t2", "remove tags"},

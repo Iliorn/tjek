@@ -27,6 +27,8 @@ func cliEdit(args []string) int {
 	clearDue := fs.Bool("clear-due", false, "drop the due date")
 	start := fs.String("start", "", "set start date")
 	clearStart := fs.Bool("clear-start", false, "drop the start date")
+	recur := fs.String("recur", "", "set the recurrence rule, which restarts the series from the due date: "+recurRuleHelp)
+	clearRecur := fs.Bool("clear-recur", false, "stop the task recurring")
 	project := fs.String("project", "", "set project name")
 	clearProject := fs.Bool("clear-project", false, "drop the project")
 	stage := fs.String("stage", "", "move to a board stage (a name from settings.json \"stages\")")
@@ -47,6 +49,11 @@ func cliEdit(args []string) int {
 	}
 	if len(positionals) < 1 {
 		fmt.Fprintln(os.Stderr, "tjek edit: at least one ref required")
+		return 2
+	}
+	recurRule, ok := parseRecurInput(*recur)
+	if !ok {
+		fmt.Fprintf(os.Stderr, "invalid recurrence %q: use %s\n", *recur, recurRuleHelp)
 		return 2
 	}
 	// A title is one task's identity — applying the same one to several is
@@ -90,6 +97,7 @@ func cliEdit(args []string) int {
 		changed, code := editOneTask(t, todos, editFields{
 			title: *title, priority: *priority, size: *size, stage: *stage,
 			due: *due, clearDue: *clearDue, start: *start, clearStart: *clearStart,
+			recur: recurRule, clearRecur: *clearRecur,
 			project: *project, clearProject: *clearProject,
 			addTag: *addTag, removeTag: *removeTag,
 			addDep: *addDep, removeDep: *removeDep,
@@ -146,6 +154,8 @@ type editFields struct {
 	title, priority, size, stage       string
 	due, start, project                string
 	clearDue, clearStart, clearProject bool
+	recur                              string // canonical
+	clearRecur                         bool
 	addTag, removeTag                  string
 	addDep, removeDep                  string
 	note, appendNote                   string
@@ -201,8 +211,7 @@ func editOneTask(t *todo.Todo, todos []todo.Todo, f editFields, saveSet, propaga
 		changed = true
 	}
 	if *clearDue {
-		t.DueDate = time.Time{}
-		t.ModifiedAt = todo.StampModified(t.ModifiedAt)
+		t.SetDueDate(time.Time{})
 		changed = true
 	} else if *due != "" {
 		d, err := parseDueDate(*due)
@@ -211,6 +220,15 @@ func editOneTask(t *todo.Todo, todos []todo.Todo, f editFields, saveSet, propaga
 			return false, 2
 		}
 		t.SetDueDate(d)
+		changed = true
+	}
+	// After the due date: a rule set here starts its series from the date
+	// set with it.
+	if f.clearRecur {
+		t.ClearRecurrence()
+		changed = true
+	} else if f.recur != "" {
+		t.SetRecurrence(f.recur)
 		changed = true
 	}
 	if *clearStart {

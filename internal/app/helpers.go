@@ -970,10 +970,10 @@ func parseQuickAdd(input string) parsedTask {
 			}
 		case strings.HasPrefix(lower, "r:") || strings.HasPrefix(lower, "recur:"):
 			spec := strings.TrimPrefix(strings.TrimPrefix(lower, "recur:"), "r:")
-			// The canonical rule stays English on disk; only the word typed
-			// here is localized, so ParseRecurrence keeps its locale-free
-			// vocabulary (it lives in the domain package).
-			if canonical, ok := todo.ParseRecurrence(canonicalInputWord(spec)); ok && canonical != "" {
+			// The canonical rule stays English on disk; only the words typed
+			// here are localized (parseRecurInput), so the rule parser keeps
+			// its locale-free vocabulary (it lives in the domain package).
+			if canonical, ok := parseRecurInput(spec); ok && canonical != "" {
 				result.recurrence = canonical
 			} else {
 				titleWords = append(titleWords, word)

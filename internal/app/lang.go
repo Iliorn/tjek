@@ -260,18 +260,6 @@ func trSize(s todo.Size) string {
 	return tr(s.String())
 }
 
-// trRecurrence renders a recurrence rule for display. Canonical rules
-// (daily/weekly/monthly/yearly/weekdays) are translated; "every:Nd|w|m|y" is
-// kept as-is, since the prefix is a recognizable English keyword and the
-// number+unit is locale-neutral.
-func trRecurrence(rule string) string {
-	switch rule {
-	case "daily", "weekly", "monthly", "yearly", "weekdays":
-		return tr(rule)
-	}
-	return rule
-}
-
 // ── Translation tables ──────────────────────────────────────────────────────
 //
 // Keyed by English source string. Keep entries grouped by where they appear so
@@ -370,7 +358,7 @@ var daTranslations = map[string]string{
 	"quick add tag":                                       "tilføj hurtigt mærke",
 	"quick add / change project":                          "tilføj / skift projekt hurtigt",
 	"toggle subtask done":                                 "skift delopgave færdig",
-	"rename subtask / edit time entry":                    "omdøb delopgave / rediger tidsregistrering",
+	"rename subtask / edit time entry or rule":            "omdøb delopgave / rediger tid eller regel",
 	"remove field / delete subtask":                       "fjern felt / slet delopgave",
 	"Tags & Projects":                                     "Mærker & Projekter",
 	"Inside a tag / project":                              "Inde i et mærke / projekt",
@@ -464,6 +452,8 @@ var daTranslations = map[string]string{
 	"monthly":  "månedligt",
 	"yearly":   "årligt",
 	"weekdays": "hverdage",
+	"until":    "indtil",
+	"%d times": "%d gange",
 
 	// ── Parser keywords (lang_input.go) ──
 	// These double as input: the word shown here is the word the quick-add and
@@ -476,6 +466,7 @@ var daTranslations = map[string]string{
 	"due:":       "frist:",
 	"size:":      "størrelse:",
 	"recur:":     "gentag:",
+	"until:":     "indtil:",
 	"dep:":       "afh:",
 
 	// List headers / sort
@@ -710,6 +701,9 @@ var daTranslations = map[string]string{
 	"Completed (dd-mm-yy hh:mm, 'today', 'yesterday')...":   "Afsluttet (dd-mm-yy tt:mm, 'today', 'yesterday')...",
 	"Completion can't be in the future":                     "Afslutning kan ikke ligge i fremtiden",
 	"Due date (dd-mm-yy, 'today', 'next week', '+3d')...":   "Forfaldsdato (dd-mm-yy, 'today', 'next week', '+3d')...",
+
+	"Repeat (weekly, mon,thu, 2w:fri, monthly/until:31-12-27, daily/10x)...":       "Gentag (ugentligt, man,tor, 2w:fre, månedligt/indtil:31-12-27, dagligt/10x)...",
+	"Not a rule tjek knows: try weekly, mon,thu, 2w:fri or monthly/until:31-12-27": "Ikke en regel tjek kender: prøv ugentligt, man,tor, 2w:fre eller månedligt/indtil:31-12-27",
 
 	// ── Settings group headings ──
 	"Appearance": "Udseende",
@@ -1101,7 +1095,7 @@ var deTranslations = map[string]string{
 	"quick add tag":                                       "Schlagwort schnell hinzufügen",
 	"quick add / change project":                          "Projekt schnell setzen/ändern",
 	"toggle subtask done":                                 "Teilaufgabe fertig",
-	"rename subtask / edit time entry":                    "Teilaufgabe umbenennen / Zeit bearbeiten",
+	"rename subtask / edit time entry or rule":            "Teilaufgabe umbenennen / Zeit oder Regel bearbeiten",
 	"remove field / delete subtask":                       "Feld leeren / Teilaufgabe löschen",
 	"Tags & Projects":                                     "Schlagwörter & Projekte",
 	"Inside a tag / project":                              "In einem Schlagwort / Projekt",
@@ -1195,6 +1189,8 @@ var deTranslations = map[string]string{
 	"monthly":  "monatlich",
 	"yearly":   "jährlich",
 	"weekdays": "werktags",
+	"until":    "bis",
+	"%d times": "%d-mal",
 
 	// ── Parser keywords (lang_input.go) ──
 	// These double as input: the word shown here is the word the quick-add and
@@ -1207,6 +1203,7 @@ var deTranslations = map[string]string{
 	"due:":       "fällig:",
 	"size:":      "größe:",
 	"recur:":     "wiederh:",
+	"until:":     "bis:",
 	"dep:":       "abh:",
 
 	// List headers / sort
@@ -1441,6 +1438,9 @@ var deTranslations = map[string]string{
 	"Completed (dd-mm-yy hh:mm, 'today', 'yesterday')...":   "Erledigt am (dd-mm-yy hh:mm, 'today', 'yesterday')…",
 	"Completion can't be in the future":                     "Erledigt kann nicht in der Zukunft liegen",
 	"Due date (dd-mm-yy, 'today', 'next week', '+3d')...":   "Fälligkeit (dd-mm-yy, 'today', 'next week', '+3d')…",
+
+	"Repeat (weekly, mon,thu, 2w:fri, monthly/until:31-12-27, daily/10x)...":       "Wiederholen (wöchentlich, mo,do, 2w:fr, monatlich/bis:31-12-27, täglich/10x)…",
+	"Not a rule tjek knows: try weekly, mon,thu, 2w:fri or monthly/until:31-12-27": "Keine Regel, die tjek kennt: versuche wöchentlich, mo,do, 2w:fr oder monatlich/bis:31-12-27",
 
 	// ── Settings group headings ──
 	"Appearance": "Darstellung",

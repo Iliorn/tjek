@@ -27,7 +27,7 @@ func cliAdd(args []string) int {
 	size := fs.String("size", "", "size: s|m|l (default m, or copied from --like)")
 	project := fs.String("project", "", "project name")
 	tags := fs.String("tag", "", "comma-separated tags")
-	recur := fs.String("recur", "", "recurrence rule: daily|weekly|monthly|yearly|weekdays|Nd|Nw|Nm|Ny")
+	recur := fs.String("recur", "", "recurrence rule: "+recurRuleHelp)
 	stage := fs.String("stage", "", "board stage (a name from settings.json \"stages\"; default = first stage)")
 	depends := fs.String("depends", "", "make the new task depend on an existing task ref, or ^ for the last-added task")
 	chain := fs.Bool("chain", false, "batch add (-) only: each line depends on the previous line's task")
@@ -72,9 +72,9 @@ func cliAdd(args []string) int {
 	}
 	var recurRule string
 	if *recur != "" {
-		canonical, ok := todo.ParseRecurrence(*recur)
+		canonical, ok := parseRecurInput(*recur)
 		if !ok {
-			fmt.Fprintf(os.Stderr, "invalid recurrence %q: use daily|weekly|monthly|yearly|weekdays|Nd|Nw|Nm|Ny\n", *recur)
+			fmt.Fprintf(os.Stderr, "invalid recurrence %q: use %s\n", *recur, recurRuleHelp)
 			return 2
 		}
 		recurRule = canonical

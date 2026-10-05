@@ -256,7 +256,7 @@ func loadStampBases(tx *sql.Tx, ids []string) (map[string]todo.Todo, error) {
 			args[i] = id
 		}
 		rows, err := tx.Query(`SELECT id, title, status, priority, size, project, parent_id,
-			created_at, modified_at, due_date, start_date, completed_at, notes, recurrence,
+			created_at, modified_at, due_date, start_date, completed_at, notes, recurrence, recur_from,
 			seq_rank_done, stage, deleted, deleted_at, stamps
 			FROM todos WHERE id IN `+in, args...)
 		if err != nil {
@@ -265,9 +265,9 @@ func loadStampBases(tx *sql.Tx, ids []string) (map[string]todo.Todo, error) {
 		for rows.Next() {
 			var t todo.Todo
 			var status, priority, size, deleted int
-			var createdAt, modifiedAt, dueDate, startDate, completedAt, deletedAt, stamps string
+			var createdAt, modifiedAt, dueDate, startDate, completedAt, recurFrom, deletedAt, stamps string
 			if err := rows.Scan(&t.ID, &t.Title, &status, &priority, &size, &t.Project, &t.ParentID,
-				&createdAt, &modifiedAt, &dueDate, &startDate, &completedAt, &t.Notes, &t.Recurrence,
+				&createdAt, &modifiedAt, &dueDate, &startDate, &completedAt, &t.Notes, &t.Recurrence, &recurFrom,
 				&t.SeqRankAtDone, &t.Stage, &deleted, &deletedAt, &stamps); err != nil {
 				rows.Close()
 				return nil, err
@@ -280,6 +280,7 @@ func loadStampBases(tx *sql.Tx, ids []string) (map[string]todo.Todo, error) {
 			t.DueDate = parseTime(dueDate)
 			t.StartDate = parseTime(startDate)
 			t.CompletedAt = parseTime(completedAt)
+			t.RecurFrom = parseTime(recurFrom)
 			t.Deleted = deleted != 0
 			t.DeletedAt = parseTime(deletedAt)
 			t.Stamps = decodeStamps(stamps)

@@ -151,6 +151,18 @@ func (m model) updateDetail(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.detail.field == fieldSubtasks {
 			return m.startRenamingSelectedSubtask()
 		}
+		// Enter steps through the common rules; r writes any rule, and
+		// writing one again starts its series over from the due date.
+		if m.detail.field == fieldRecurrence {
+			if t := m.currentTodo(); t != nil {
+				m.mode = modeInput
+				m.textInput.SetValue(recurInputValue(t.Recurrence))
+				m.textInput.CursorEnd()
+				m.textInput.Placeholder = tr("Repeat (weekly, mon,thu, 2w:fri, monthly/until:31-12-27, daily/10x)...")
+				m.textInput.Focus()
+				return m, textinput.Blink
+			}
+		}
 		// Edit the selected time entry from the detail pane — reuses the same
 		// startEditTimeEntry flow as the calendar timeline so parsing and undo
 		// are identical across both surfaces.

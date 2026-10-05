@@ -120,7 +120,7 @@ var keymap = []binding{
 	{ctxTasksDetail, "d", "done", "toggle subtask done", secDetail, false, false},
 	{ctxTasksDetail, "t", "track", "start/stop subtask timer", secDetail, false, false},
 	{ctxTasksDetail, "n", "notes", "edit description (opens $EDITOR)", secDetail, false, false},
-	{ctxTasksDetail, "r", "edit", "rename subtask / edit time entry", secDetail, false, false},
+	{ctxTasksDetail, "r", "edit", "rename subtask / edit time entry or rule", secDetail, false, false},
 	{ctxTasksDetail, "x", "delete", "remove field / delete subtask", secDetail, true, false},
 	{ctxTasksDetail, "esc", "back", "back to list", secDetail, true, false},
 

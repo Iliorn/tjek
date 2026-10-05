@@ -867,6 +867,24 @@ func TestParseRecurrence(t *testing.T) {
 		{"every:d", "", false},
 		{"every:3x", "", false},
 		{"nonsense", "", false},
+		{"every:99999999999999999999d", "", false}, // would overflow
+		// Weekly on chosen days, Monday first however they are typed.
+		{"thu,mon", "weekly:mon,thu", true},
+		{"weekly:sun", "weekly:sun", true},
+		{"every:2w:mon,thu", "every:2w:mon,thu", true},
+		{"2w:fri", "every:2w:fri", true},
+		{"mon,mon", "weekly:mon", true},
+		{"every:3d:mon", "", false}, // days belong to a weekly rule
+		{"mon,funday", "", false},
+		// Ends.
+		{"monthly/until:2027-06-30", "monthly/until:2027-06-30", true},
+		{"weekly/until:30-06-27", "weekly/until:2027-06-30", true},
+		{"daily/10x", "daily/count:10", true},
+		{"mon,wed/count:8/until:01-09-27", "weekly:mon,wed/until:2027-09-01/count:8", true},
+		{"daily/0x", "", false},
+		{"daily/until:31-02-27", "", false},
+		{"daily/count:2/count:3", "", false},
+		{"daily/", "", false},
 	}
 	for _, c := range cases {
 		got, ok := ParseRecurrence(c.in)
@@ -874,48 +892,6 @@ func TestParseRecurrence(t *testing.T) {
 			t.Errorf("ParseRecurrence(%q) = (%q,%v), want (%q,%v)",
 				c.in, got, ok, c.want, c.wantOK)
 		}
-	}
-}
-
-func TestNextRecurrenceFrom(t *testing.T) {
-	base := time.Date(2026, 6, 15, 9, 0, 0, 0, time.UTC) // Monday
-	cases := []struct {
-		rule string
-		want time.Time
-	}{
-		{"daily", time.Date(2026, 6, 16, 9, 0, 0, 0, time.UTC)},
-		{"weekly", time.Date(2026, 6, 22, 9, 0, 0, 0, time.UTC)},
-		{"monthly", time.Date(2026, 7, 15, 9, 0, 0, 0, time.UTC)},
-		{"yearly", time.Date(2027, 6, 15, 9, 0, 0, 0, time.UTC)},
-		{"every:3d", time.Date(2026, 6, 18, 9, 0, 0, 0, time.UTC)},
-		{"every:2w", time.Date(2026, 6, 29, 9, 0, 0, 0, time.UTC)},
-		{"every:2m", time.Date(2026, 8, 15, 9, 0, 0, 0, time.UTC)},
-		{"weekdays", time.Date(2026, 6, 16, 9, 0, 0, 0, time.UTC)}, // Mon → Tue
-	}
-	for _, c := range cases {
-		got, ok := NextRecurrenceFrom(c.rule, base)
-		if !ok || !got.Equal(c.want) {
-			t.Errorf("NextRecurrenceFrom(%q, base) = (%v,%v), want (%v,true)",
-				c.rule, got, ok, c.want)
-		}
-	}
-
-	// Friday → Monday for weekdays.
-	fri := time.Date(2026, 6, 19, 9, 0, 0, 0, time.UTC)
-	if got, ok := NextRecurrenceFrom("weekdays", fri); !ok ||
-		!got.Equal(time.Date(2026, 6, 22, 9, 0, 0, 0, time.UTC)) {
-		t.Errorf("weekdays from Friday = %v, want next Monday", got)
-	}
-
-	// Empty rule and zero base return false.
-	if _, ok := NextRecurrenceFrom("", base); ok {
-		t.Error("empty rule should return false")
-	}
-	if _, ok := NextRecurrenceFrom("daily", time.Time{}); ok {
-		t.Error("zero base should return false")
-	}
-	if _, ok := NextRecurrenceFrom("garbage", base); ok {
-		t.Error("garbage rule should return false")
 	}
 }
 
@@ -933,6 +909,39 @@ func TestRecurrenceMutators(t *testing.T) {
 	if td.IsRecurring() || td.Recurrence != "" {
 		t.Errorf("after ClearRecurrence: IsRecurring=%v, Recurrence=%q",
 			td.IsRecurring(), td.Recurrence)
+	}
+}
+
+// Setting a rule anchors the series on the due date, and moving the due
+// date afterwards moves that instance alone.
+func TestRecurrenceAnchor(t *testing.T) {
+	jan31 := time.Date(2027, 1, 31, 0, 0, 0, 0, time.Local)
+	td := New("rent")
+	td.SetDueDate(jan31)
+	td.SetRecurrence("monthly")
+	if !td.RecurFrom.Equal(jan31) {
+		t.Fatalf("RecurFrom = %v, want the due date %v", td.RecurFrom, jan31)
+	}
+	td.SetDueDate(jan31.AddDate(0, 0, 2))
+	if !td.RecurFrom.Equal(jan31) {
+		t.Errorf("moving the due date moved the anchor to %v", td.RecurFrom)
+	}
+	td.ClearRecurrence()
+	if !td.RecurFrom.IsZero() {
+		t.Errorf("ClearRecurrence left the anchor %v", td.RecurFrom)
+	}
+
+	// A rule set before any due date: the first date set anchors it once it
+	// moves, and the series counts from that one.
+	late := New("water plants")
+	late.SetRecurrence("weekly")
+	late.SetDueDate(jan31)
+	if !late.RecurFrom.IsZero() {
+		t.Errorf("first due date set the anchor already: %v", late.RecurFrom)
+	}
+	late.SetDueDate(jan31.AddDate(0, 0, 3))
+	if !late.RecurFrom.Equal(jan31) {
+		t.Errorf("moving the first due date anchored on %v, want %v", late.RecurFrom, jan31)
 	}
 }
 

@@ -134,6 +134,21 @@ func (m model) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 						m.pushUndo("set completion date", t.ID)
 						t.SetCompletedAt(d)
+					case fieldRecurrence:
+						rule, ok := parseRecurInput(val)
+						if !ok {
+							// Stay in the prompt: the typed rule is still there to fix.
+							m.mode = modeInput
+							m.flashError(tr("Not a rule tjek knows: try weekly, mon,thu, 2w:fri or monthly/until:31-12-27"))
+							return m, clearErrAfter()
+						}
+						if rule == "" {
+							m.pushUndo("clear recurrence", t.ID)
+							t.ClearRecurrence()
+						} else {
+							m.pushUndo("set recurrence", t.ID)
+							t.SetRecurrence(rule)
+						}
 					case fieldDueDate:
 						if val == "" {
 							// A parent deadline applies to its whole subtree, so capture
@@ -308,8 +323,7 @@ func (m model) updateEditDue(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if val == "" {
 				if !t.DueDate.IsZero() {
 					m.pushUndo("clear due date", t.ID)
-					t.DueDate = time.Time{}
-					t.ModifiedAt = todo.StampModified(t.ModifiedAt)
+					t.SetDueDate(time.Time{})
 					m.markModified(t.ID)
 				}
 				m.mode = modeNormal

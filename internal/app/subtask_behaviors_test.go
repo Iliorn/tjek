@@ -383,6 +383,44 @@ func TestSubtaskProgressCacheMatchesLiveWalk(t *testing.T) {
 // its next instance. The instance and its checklist carry IDs derived from
 // the source, so the two spawns are the same tasks and the merge folds them
 // into one rather than listing the next "weekly review" twice.
+// A subtask due a week before its parent, across the end of summer time:
+// midnight to midnight is then a week and an hour, and shifting by that span
+// put the next child's due date at 23:00 the day before.
+func TestSpawnRecurrenceShiftsDatesByDaysAcrossDST(t *testing.T) {
+	cph, err := time.LoadLocation("Europe/Copenhagen")
+	if err != nil {
+		t.Skip("no tz database:", err)
+	}
+	day := func(m time.Month, d, h int) time.Time { return time.Date(2027, m, d, h, 0, 0, 0, cph) }
+	parent := makeSub("p", "weekly review", "", 0)
+	parent.Recurrence = "weekly"
+	parent.DueDate = day(time.November, 4, 0)
+	parent.StartDate = day(time.October, 28, 9) // summer time; the due date is not
+	child := makeSub("c", "prep", "p", time.Second)
+	child.DueDate = day(time.October, 28, 0)
+	child.StartDate = day(time.October, 27, 9)
+
+	m := modelWithTasks(t, parent, child)
+	spawned := m.spawnNextRecurrence(m.get("p"))
+	if len(spawned) != 2 {
+		t.Fatalf("spawned %v, want the instance and its subtask", spawned)
+	}
+	next, clone := m.get(spawned[0]), m.get(spawned[1])
+	for _, c := range []struct {
+		what      string
+		got, want time.Time
+	}{
+		{"instance due", next.DueDate, day(time.November, 11, 0)},
+		{"instance start", next.StartDate, day(time.November, 4, 9)},
+		{"subtask due", clone.DueDate, day(time.November, 4, 0)},
+		{"subtask start", clone.StartDate, day(time.November, 3, 9)},
+	} {
+		if !c.got.Equal(c.want) {
+			t.Errorf("%s = %s, want %s", c.what, c.got.In(cph).Format("2006-01-02 15:04"), c.want.Format("2006-01-02 15:04"))
+		}
+	}
+}
+
 func TestRecurrenceSpawnsTheSameTasksOnEveryDevice(t *testing.T) {
 	now := time.Now()
 	parent := makeSub("p", "weekly review", "", 0)

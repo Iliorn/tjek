@@ -40,8 +40,8 @@ var cliCommandSpecs = []cliCommandSpec{
 	{name: "why", summary: "explain one task's sequence rank", flags: []string{"json"}, refArg: true},
 	{name: "edit", summary: "change fields on one task", refArg: true, flags: []string{
 		"add-dep", "add-tag", "append-note", "clear-due", "clear-note", "clear-project",
-		"clear-start", "due", "note", "p", "priority", "project", "remove-dep", "remove-tag",
-		"size", "stage", "start", "title"}},
+		"clear-recur", "clear-start", "due", "note", "p", "priority", "project", "recur",
+		"remove-dep", "remove-tag", "size", "stage", "start", "title"}},
 	{name: "done", summary: "mark tasks done", flags: []string{"cascade", "comment", "m"}, refArg: true},
 	{name: "reopen", summary: "move tasks back to pending", flags: []string{"comment", "m"}, refArg: true},
 	{name: "delete", summary: "soft-delete a task", flags: []string{"f"}, refArg: true},

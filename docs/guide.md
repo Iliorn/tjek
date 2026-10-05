@@ -175,7 +175,8 @@ Buy groceries #shopping due:friday p:high size:s @personal
 ```
 
 The add field understands `#tag`, `@project`, `due:date`,
-`p:high/medium/low` and `size:s/m/l`. Typing `#` or `@` offers your existing
+`p:high/medium/low`, `size:s/m/l` and `r:rule` (see
+[Repeating tasks](#repeating-tasks)). Typing `#` or `@` offers your existing
 tags and projects, most recently used first; `tab` inserts the highlighted
 one, `↑/↓` pick another. Projects whose name contains a space aren't offered
 there, since the field splits on spaces; set those from the detail pane's `@`
@@ -184,6 +185,25 @@ picker. Tags are lowercase, and spaces become `-` (`Deep Work` becomes
 
 Dates: `today` · `tomorrow` · `next week` · `monday` · `15-06-25` · `+3d` ·
 `+2w` · `+1m` · `-2d` (counting back)
+
+## Repeating tasks
+
+`r:` in the add field, or `r` on a task's **Recurrence** field, makes it
+repeat; `enter` on that field steps through the common rules. When you finish
+one, the next appears with its due date, its subtasks reopened.
+
+| Rule | Repeats |
+|------|---------|
+| `daily` · `weekly` · `monthly` · `yearly` | every day, week, month or year |
+| `weekdays` | Monday to Friday |
+| `3d` · `2w` · `6m` · `2y` | every 3 days, 2 weeks, 6 months, 2 years |
+| `mon,thu` · `2w:fri` | on those days, every week or every other week |
+| `…/until:31-12-27` · `…/10x` | and stops after that date, or after 10 in all |
+
+A series keeps to its days. A monthly task due on the 31st is due on 28
+February and on 31 March again. Moving one task's due date moves that one
+only, and the next falls where it would have anyway. To move the whole
+series, set its rule again: it then counts from the task's due date.
 
 ## Filtering
 

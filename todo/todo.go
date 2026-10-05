@@ -4,7 +4,6 @@
 package todo
 
 import (
-	"fmt"
 	"strings"
 	"time"
 	"unicode"
@@ -224,6 +223,12 @@ type Todo struct {
 	ParentID     string      `json:"parent_id,omitempty"`
 	Recurrence   string      `json:"recurrence,omitempty"`
 
+	// RecurFrom is the anchor of a recurring task's series (recur.go): the
+	// date its instances are counted from. Zero for a series without one
+	// yet (its rule set before any due date, or before anchors existed),
+	// which counts from its due date as it stands.
+	RecurFrom time.Time `json:"recur_from,omitzero"`
+
 	// Stage is the kanban board column a pending top-level task sits in — one
 	// of the user-configured stage names (settings.json "stages"). Empty means
 	// the first configured stage, so existing tasks need no backfill and a
@@ -331,7 +336,13 @@ func (t *Todo) SetCompletedAt(d time.Time) {
 	t.ModifiedAt = StampModified(t.ModifiedAt)
 }
 
+// SetDueDate moves the task's due date. On a recurring task it moves this
+// instance alone: a series not yet anchored keeps the date it had
+// (RecurFrom), so the later instances still fall where it put them.
 func (t *Todo) SetDueDate(d time.Time) {
+	if t.IsRecurring() && t.RecurFrom.IsZero() {
+		t.RecurFrom = t.DueDate
+	}
 	t.DueDate = d
 	t.ModifiedAt = StampModified(t.ModifiedAt)
 }
@@ -608,127 +619,78 @@ func (t *Todo) SetNotes(notes string) {
 
 // ── Recurrence ────────────────────────────────────────────────────────────────
 //
-// A task with a non-empty Recurrence respawns when marked Done: a fresh
-// pending copy with a new ID is added to the store, and the original keeps
-// its completion history. ParseRecurrence is the input validator; canonical
-// rules are: "daily", "weekly", "monthly", "yearly", "weekdays", and
-// "every:Nd|Nw|Nm|Ny" (N ≥ 1). NextRecurrenceFrom computes the next instance's
-// date given the rule and a base time (typically the previous DueDate, or
-// CompletedAt when no due date is set).
+// A task with a non-empty Recurrence spawns its next instance when marked
+// Done: a fresh pending copy is added, and the original keeps its completion
+// history. The rule and the series' anchor (RecurFrom) are recur.go's.
 
 func (t *Todo) IsRecurring() bool { return t.Recurrence != "" }
 
+// SetRecurrence sets the rule and starts the series over from the task's due
+// date, which is how a series is moved: its later instances fall where the
+// rule puts them counting from there. With no due date yet, the series is
+// anchored on the first one set (SetDueDate) or, failing that, on the day
+// the task is closed.
 func (t *Todo) SetRecurrence(rule string) {
 	t.Recurrence = rule
+	t.RecurFrom = t.DueDate
 	t.ModifiedAt = StampModified(t.ModifiedAt)
 }
 
 func (t *Todo) ClearRecurrence() {
 	t.Recurrence = ""
+	t.RecurFrom = time.Time{}
 	t.ModifiedAt = StampModified(t.ModifiedAt)
 }
 
-// ParseRecurrence canonicalizes a user-supplied recurrence string. Returns the
-// canonical form and true if recognized. The empty string parses as ("", true)
-// — a way to clear an existing rule via the same path.
+// ParseRecurrence canonicalizes a user-supplied recurrence string (ParseRule).
+// Returns the canonical form and true if recognized. The empty string parses
+// as ("", true) — a way to clear an existing rule via the same path.
 func ParseRecurrence(s string) (string, bool) {
-	s = strings.ToLower(strings.TrimSpace(s))
-	if s == "" {
+	if strings.TrimSpace(s) == "" {
 		return "", true
 	}
-	switch s {
-	case "daily", "day":
-		return "daily", true
-	case "weekly", "week":
-		return "weekly", true
-	case "monthly", "month":
-		return "monthly", true
-	case "yearly", "year", "annual", "annually":
-		return "yearly", true
-	case "weekdays", "weekday":
-		return "weekdays", true
+	r, ok := ParseRule(s)
+	if !ok {
+		return "", false
 	}
-	// "every:Nd|Nw|Nm|Ny" and the shorthand "Nd|Nw|Nm|Ny".
-	spec := strings.TrimPrefix(s, "every:")
-	if len(spec) >= 2 {
-		unit := spec[len(spec)-1]
-		numStr := spec[:len(spec)-1]
-		n, ok := parsePositiveInt(numStr)
-		if ok && n >= 1 {
-			switch unit {
-			case 'd', 'w', 'm', 'y':
-				if n == 1 {
-					switch unit {
-					case 'd':
-						return "daily", true
-					case 'w':
-						return "weekly", true
-					case 'm':
-						return "monthly", true
-					case 'y':
-						return "yearly", true
-					}
-				}
-				return fmt.Sprintf("every:%d%c", n, unit), true
-			}
-		}
-	}
-	return "", false
+	return r.String(), true
 }
 
-// NextRecurrenceFrom returns the next instance date for rule, computed from
-// base. Returns (zero, false) when rule is invalid or empty. The result keeps
-// the wall-clock time of base (so "daily" with a base at 09:00 lands on the
-// next day at 09:00). "weekdays" advances to the next Mon–Fri; if base is
-// itself a weekday, it advances by one weekday.
-func NextRecurrenceFrom(rule string, base time.Time) (time.Time, bool) {
-	if rule == "" || base.IsZero() {
-		return time.Time{}, false
+// NextRecurrence is the due date of the instance that follows t, and the
+// anchor of the series it belongs to, as of now; false when t does not
+// recur or its series has ended. It is the first date the rule gives, counted
+// from the anchor, after t's due date (its completion day when it has none)
+// and not before today, so an overdue series does not spawn into the past.
+func (t *Todo) NextRecurrence(now time.Time) (next, from time.Time, ok bool) {
+	r, ok := ParseRule(t.Recurrence)
+	if !ok {
+		return time.Time{}, time.Time{}, false
 	}
-	switch rule {
-	case "daily":
-		return base.AddDate(0, 0, 1), true
-	case "weekly":
-		return base.AddDate(0, 0, 7), true
-	case "monthly":
-		return base.AddDate(0, 1, 0), true
-	case "yearly":
-		return base.AddDate(1, 0, 0), true
-	case "weekdays":
-		next := base.AddDate(0, 0, 1)
-		for {
-			wd := next.Weekday()
-			if wd != time.Saturday && wd != time.Sunday {
-				return next, true
-			}
-			next = next.AddDate(0, 0, 1)
+	after := t.DueDate
+	if after.IsZero() {
+		at := t.CompletedAt
+		if at.IsZero() {
+			at = now
 		}
+		after = time.Date(at.Year(), at.Month(), at.Day(), 0, 0, 0, 0, at.Location())
 	}
-	if strings.HasPrefix(rule, "every:") {
-		spec := strings.TrimPrefix(rule, "every:")
-		if len(spec) >= 2 {
-			unit := spec[len(spec)-1]
-			n, ok := parsePositiveInt(spec[:len(spec)-1])
-			if ok && n >= 1 {
-				switch unit {
-				case 'd':
-					return base.AddDate(0, 0, n), true
-				case 'w':
-					return base.AddDate(0, 0, n*7), true
-				case 'm':
-					return base.AddDate(0, n, 0), true
-				case 'y':
-					return base.AddDate(n, 0, 0), true
-				}
-			}
-		}
+	from = t.RecurFrom
+	if from.IsZero() {
+		from = after
 	}
-	return time.Time{}, false
+	if yesterday := time.Date(now.Year(), now.Month(), now.Day()-1, 0, 0, 0, 0, now.Location()); after.Before(yesterday) {
+		after = yesterday
+	}
+	next, ok = r.Next(from, after)
+	return next, from, ok
 }
 
 func parsePositiveInt(s string) (int, bool) {
 	if s == "" {
 		return 0, false
+	}
+	if len(s) > 9 {
+		return 0, false // no rule or date needs more, and more could overflow
 	}
 	n := 0
 	for _, r := range s {

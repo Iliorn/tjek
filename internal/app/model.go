@@ -1071,48 +1071,26 @@ func (m *model) followTask(taskID string) {
 
 // buildNextRecurrence constructs (but does not store) a fresh pending instance
 // for a just-completed recurring task. Returns (zero, false) if the source
-// isn't recurring or the rule is unparseable. The new instance inherits
-// identity-ish fields (title, priority, size, project, notes, tags, recurrence
-// rule) but starts clean on history (no time entries, comments,
-// dependencies, subtasks).
+// isn't recurring, the rule is unparseable, or its series has ended. The new
+// instance inherits identity-ish fields (title, priority, size, project,
+// notes, tags, recurrence rule and its anchor) but starts clean on history
+// (no time entries, comments, dependencies, subtasks).
 //
-// The next DueDate is computed by rolling forward from the previous DueDate (or
-// CompletedAt if no due date was set) until it lands at or after today — that
-// way a long-overdue "monthly" task doesn't immediately reappear in the past.
-// StartDate, if set on the source, is shifted by the same delta the DueDate
-// moved by, so the lead time between start and due is preserved.
+// Its due date is the series' next date (todo.NextRecurrence): counted from
+// the series' anchor, after the source's due date and not before today, so a
+// long-overdue "monthly" task doesn't reappear in the past. A recurring task
+// with no due date still gets one, counted from the day it was closed, which
+// keeps urgency scoring meaningful rather than leaving the rule inert.
+// StartDate, if set on the source, is shifted by the days the due date moved
+// by, so the lead time between start and due is preserved.
 //
 // The instance's ID is derived from the source's (nextInstanceID), so a
 // task closed on two devices before they sync spawns one next instance, not
 // two, and closing it again after a reopen finds the one already there.
 func buildNextRecurrence(src todo.Todo) (todo.Todo, bool) {
-	if !src.IsRecurring() {
-		return todo.Todo{}, false
-	}
-	rule := src.Recurrence
-	// Anchor the next instance on the source's due date. A recurring task with
-	// no due date intentionally still gets one on respawn: we fall back to its
-	// completion time (or now) as the base, so e.g. a "weekly" task closed today
-	// yields a fresh instance due one interval out ("next one's due in a week").
-	// That keeps urgency scoring meaningful rather than leaving recur rules inert.
-	base := src.DueDate
-	if base.IsZero() {
-		base = src.CompletedAt
-	}
-	if base.IsZero() {
-		base = time.Now()
-	}
-	next, ok := todo.NextRecurrenceFrom(rule, base)
+	next, from, ok := src.NextRecurrence(time.Now())
 	if !ok {
 		return todo.Todo{}, false
-	}
-	today := startOfDay(time.Now())
-	for next.Before(today) {
-		advanced, ok := todo.NextRecurrenceFrom(rule, next)
-		if !ok {
-			break
-		}
-		next = advanced
 	}
 
 	clone := todo.New(src.Title)
@@ -1122,13 +1100,13 @@ func buildNextRecurrence(src todo.Todo) (todo.Todo, bool) {
 	clone.Size = src.Size
 	clone.Project = src.Project
 	clone.Notes = src.Notes
-	clone.Recurrence = src.Recurrence
+	clone.Recurrence, clone.RecurFrom = src.Recurrence, from
 	if len(src.Tags) > 0 {
 		clone.Tags = append([]string{}, src.Tags...)
 	}
 	clone.DueDate = next
 	if !src.StartDate.IsZero() && !src.DueDate.IsZero() {
-		clone.StartDate = next.Add(-src.DueDate.Sub(src.StartDate))
+		clone.StartDate = src.StartDate.AddDate(0, 0, calendarDays(src.DueDate, next))
 	}
 	return clone, true
 }
@@ -1148,14 +1126,10 @@ func (m *model) spawnNextRecurrence(src *todo.Todo) []string {
 		return nil // not recurring, or its next instance already exists
 	}
 	m.add(next)
-	// The whole-parent due-date delta shifts child dates by the same amount,
-	// so a "due 2 days before parent" child stays "due 2 days before parent"
-	// on the next instance. Zero when either end has no due date.
-	var delta time.Duration
-	if !src.DueDate.IsZero() && !next.DueDate.IsZero() {
-		delta = next.DueDate.Sub(src.DueDate)
-	}
-	ids := append([]string{next.ID}, m.cloneSubtreeReset(src.ID, next.ID, delta)...)
+	// Child dates move by the days the parent's due date moved, so a "due 2
+	// days before parent" child stays "due 2 days before parent" on the next
+	// instance.
+	ids := append([]string{next.ID}, m.cloneSubtreeReset(src.ID, next.ID, dueShiftDays(*src, next))...)
 	// An instance that was spawned before and removed (the close undone, or
 	// the instance deleted) comes back under the same ID, so it has to
 	// outrank its own tombstone, as an undone delete does.
@@ -1166,11 +1140,11 @@ func (m *model) spawnNextRecurrence(src *todo.Todo) []string {
 // cloneSubtreeReset clones every descendant of srcParentID, reparented under
 // newParentID, with each clone reset to Pending and history wiped
 // (CompletedAt, TimeEntries, Comments cleared). DueDate and
-// StartDate are shifted by `delta` so the subtree's internal scheduling is
+// StartDate are shifted by `days` so the subtree's internal scheduling is
 // preserved relative to the new parent. Shared traversal in taskops.go.
-func (m *model) cloneSubtreeReset(srcParentID, newParentID string, delta time.Duration) []string {
+func (m *model) cloneSubtreeReset(srcParentID, newParentID string, days int) []string {
 	var ids []string
-	for _, clone := range cloneSubtreeResetFrom(m.subtaskIDs, m.get, srcParentID, newParentID, delta) {
+	for _, clone := range cloneSubtreeResetFrom(m.subtaskIDs, m.get, srcParentID, newParentID, days) {
 		m.add(clone)
 		ids = append(ids, clone.ID)
 	}

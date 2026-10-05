@@ -718,7 +718,8 @@ The kanban tab (tab 5). Its configuration is a `boardConfig` on the model.
   an editor. All value changes go through `settingsAdjust(dir)`: enter steps
   forward, backspace back. The detail pane's stepped fields (recurrence,
   priority, size, stage) answer the same two keys (`detailStepValue`), so
-  ←/→ mean section in both panes and never change a value.
+  ←/→ mean section in both panes and never change a value. Recurrence also
+  takes `r`, which opens its rule as text, for the rules no step reaches.
 - **Modes drive input.** `m.mode` (an `appMode`) picks the `update*`/`render*`
   path. A feature with text entry or a confirm prompt adds an `appMode`, a
   handler (usually `update_modes.go`) and a render branch.

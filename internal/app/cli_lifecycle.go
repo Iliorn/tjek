@@ -125,12 +125,8 @@ func cliDone(args []string) int {
 				spawned = append(spawned, next)
 				// Clone the subtree onto the new parent so a recurring
 				// "weekly review" keeps its checklist on each spawn. Same
-				// delta-shifted semantics as the TUI path.
-				var delta time.Duration
-				if !t.DueDate.IsZero() && !next.DueDate.IsZero() {
-					delta = next.DueDate.Sub(t.DueDate)
-				}
-				spawned = append(spawned, cloneSubtreeResetFrom(children, get, t.ID, next.ID, delta)...)
+				// date-shifted semantics as the TUI path.
+				spawned = append(spawned, cloneSubtreeResetFrom(children, get, t.ID, next.ID, dueShiftDays(*t, next))...)
 			}
 		}
 		if doCascade {

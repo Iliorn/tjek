@@ -542,7 +542,7 @@ func taskVersion(t *todo.Todo) uint64 {
 	if t.Deleted {
 		num(&h, 1)
 	}
-	for _, x := range []time.Time{t.CreatedAt, t.ModifiedAt, t.CompletedAt, t.StartDate, t.DueDate, t.DeletedAt} {
+	for _, x := range []time.Time{t.CreatedAt, t.ModifiedAt, t.CompletedAt, t.StartDate, t.DueDate, t.RecurFrom, t.DeletedAt} {
 		at(&h, x)
 	}
 	for _, set := range [][]string{t.Tags, t.Dependencies} {

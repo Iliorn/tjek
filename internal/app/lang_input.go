@@ -54,6 +54,8 @@ var inputKeywords = []string{
 	"overdue",
 	// Field prefixes whose English form is a word rather than an initial.
 	"due:", "size:", "recur:", "dep:",
+	// A recurrence rule's end (r:weekly/until:…).
+	"until:",
 }
 
 // extraInputAliases are spellings accepted but never advertised: the
