@@ -756,3 +756,21 @@ func TestStatsChartGrowsIntoRowsTheSummaryLeaves(t *testing.T) {
 		t.Errorf("growing the chart should not push the summary into scrolling, max scroll %d", scroll)
 	}
 }
+
+// The compact form picks its precision by what it shows, so the step from
+// one decimal to none falls at "10d" and nothing reads "10.0d".
+func TestFormatDaysCompact(t *testing.T) {
+	day := 24 * time.Hour
+	for d, want := range map[time.Duration]string{
+		12 * time.Hour:        "<1d",
+		day + 12*time.Hour:    "1.5d",
+		9*day + 22*time.Hour:  "9.9d",
+		10*day - time.Hour:    "10d", // ten days ago across a clock change
+		10 * day:              "10d",
+		12*day + 13*time.Hour: "13d",
+	} {
+		if got := formatDaysCompact(d); got != want {
+			t.Errorf("formatDaysCompact(%v) = %q, want %q", d, got, want)
+		}
+	}
+}

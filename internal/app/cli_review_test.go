@@ -404,3 +404,19 @@ func TestListRejectsContradictoryTextFilters(t *testing.T) {
 		t.Errorf("search --word with --re: exit %d, want 2", code)
 	}
 }
+
+// Thirty days ago at this hour is thirty days ago, though a daylight saving
+// switch in between makes it thirty days less an hour.
+func TestStaleCountsCalendarDaysAcrossDST(t *testing.T) {
+	syd, err := time.LoadLocation("Australia/Sydney")
+	if err != nil {
+		t.Skip("no tz database:", err)
+	}
+	now := time.Date(2026, 10, 5, 10, 0, 0, 0, syd) // the day after clocks went forward
+	task := todo.New("Untouched since September")
+	task.ModifiedAt = now.AddDate(0, 0, -30)
+	rows := filterTopLevel([]todo.Todo{task}, listFilterOpts{staleFor: 30 * 24 * time.Hour, now: now})
+	if len(rows) != 1 {
+		t.Errorf("--stale=30d left out a task touched 30 days ago at this hour")
+	}
+}

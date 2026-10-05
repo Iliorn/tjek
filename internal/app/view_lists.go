@@ -792,7 +792,7 @@ func formatDaysCompact(d time.Duration) string {
 	switch {
 	case days < 1:
 		return "<1d"
-	case days < 10:
+	case math.Round(days*10) < 100: // by what it shows: 9.96 days is "10d", not "10.0d"
 		return fmt.Sprintf("%.1fd", days)
 	default:
 		return fmt.Sprintf("%.0fd", days)

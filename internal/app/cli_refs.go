@@ -239,7 +239,7 @@ func unblockedSet(todos []todo.Todo, within time.Duration, now time.Time) map[st
 	for i := range todos {
 		byID[todos[i].ID] = &todos[i]
 	}
-	cutoff := now.Add(-within)
+	cutoff := ageCutoff(now, within)
 	out := make(map[string]bool)
 	for i := range todos {
 		t := &todos[i]
@@ -325,7 +325,7 @@ func filterTopLevel(todos []todo.Todo, opts listFilterOpts) []todo.Todo {
 		if !opts.matchesText(&t) {
 			continue
 		}
-		if opts.staleFor > 0 && now.Sub(t.ModifiedAt) < opts.staleFor {
+		if opts.staleFor > 0 && t.ModifiedAt.After(ageCutoff(now, opts.staleFor)) {
 			continue
 		}
 		if opts.unblockedFor > 0 && !freed[t.ID] {
@@ -340,6 +340,18 @@ func filterTopLevel(todos []todo.Todo, opts listFilterOpts) []todo.Todo {
 		rows = append(rows, t)
 	}
 	return rows
+}
+
+// ageCutoff is the moment age before now. A whole number of days counts
+// calendar days, to the same time of day: across a daylight saving switch
+// thirty days are thirty days and an hour off, and a task touched thirty
+// days ago at this hour must count as thirty days old.
+func ageCutoff(now time.Time, age time.Duration) time.Time {
+	const day = 24 * time.Hour
+	if age%day == 0 {
+		return now.AddDate(0, 0, -int(age/day))
+	}
+	return now.Add(-age)
 }
 
 // parseAgeSpec parses the duration accepted by --stale and --unblocked-since:
