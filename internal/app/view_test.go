@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -409,11 +410,10 @@ func TestTagsPaneStacksAtEveryWidth(t *testing.T) {
 	}
 }
 
-// A selected overdue row must show both states: the overdue foreground and the
-// selection background. Before the combined styles, the status colour won the
-// style switch outright and the only cursor cue on an overdue-heavy list was
-// the arrow glyph.
-func TestSelectedOverdueRowKeepsSelectionBackground(t *testing.T) {
+// A selected overdue row must show both states: the selection's colour on
+// the title, which is what finds the cursor (the selection background alone is
+// too faint against a red row), and the overdue colour on the due cell.
+func TestSelectedOverdueRowShowsSelectionAndLateness(t *testing.T) {
 	before := lipgloss.ColorProfile()
 	lipgloss.SetColorProfile(termenv.TrueColor)
 	applyTheme(themes[0])
@@ -440,9 +440,12 @@ func TestSelectedOverdueRowKeepsSelectionBackground(t *testing.T) {
 	if selLine == "" || plainLine == "" {
 		t.Fatalf("both overdue rows should render; sel=%q plain=%q", selLine, plainLine)
 	}
-	wantPrefix := newFastStyle(selectedOverdueRowStyle).prefix
-	if !strings.Contains(selLine, wantPrefix) {
-		t.Errorf("selected overdue row should use overdue fg + sel bg (%q): %q", wantPrefix, selLine)
+	title := newFastStyle(selectedRowStyle).prefix
+	if !regexp.MustCompile(regexp.QuoteMeta(title) + "[^\x1b]*Pay the rent").MatchString(selLine) {
+		t.Errorf("selected overdue row's title should be in the selection style (%q): %q", title, selLine)
+	}
+	if late := newFastStyle(selectedOverdueRowStyle).prefix; !strings.Contains(selLine, late) {
+		t.Errorf("selected overdue row's due cell should keep the overdue colour on the selection background (%q): %q", late, selLine)
 	}
 	if strings.Contains(plainLine, "48;2;") {
 		t.Errorf("unselected overdue row should have no background: %q", plainLine)

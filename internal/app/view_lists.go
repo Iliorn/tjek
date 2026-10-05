@@ -1155,41 +1155,41 @@ func (r *rowBuf) String() string {
 	return r.out.String()
 }
 
-// rowPalette is the pair of styles one task row is painted with. status carries
+// rowPalette is the styles one task row is painted with. status carries
 // whatever the row's state is saying — normal, overdue, blocked by something
 // overdue, timer running — and meta is the dim tone the secondary columns are
-// drawn in. Both already carry the selection background when the row is the
-// one under the cursor, so a selected overdue row shows the selection and the
-// status at once instead of one masking the other.
+// drawn in. alert is the state's own colour, for the cell the state is about
+// (the due date of a late task).
 //
-// Splitting the row across two styles is the whole point: painting every cell
+// The row under the cursor takes the selection's colour, whatever its state:
+// the selection background alone is too faint to find a red row by, so a
+// late row that kept its red looked unselected. Its state still shows: a
+// late task's due cell keeps its colour (alert), and a running timer its ⧗.
+//
+// Splitting the row across styles is the whole point: painting every cell
 // in the status colour meant the score, the size and the project name shouted
 // as loudly as the title, and an overdue row coloured its project name red —
 // a cell that has nothing to do with being overdue.
 type rowPalette struct {
 	status fastStyle
 	meta   fastStyle
+	alert  fastStyle
 }
 
 func taskRowPalette(t *todo.Todo, hasOverdueDep, selected bool) rowPalette {
+	alert, selAlert := fastNormal, fastSelectedRow
 	switch {
-	case t.IsTimerRunning() && selected:
-		return rowPalette{fastSelectedTimer, fastSelectedDim}
 	case t.IsTimerRunning():
-		return rowPalette{fastTimer, fastDim}
-	case t.IsOverdue() && selected:
-		return rowPalette{fastSelectedOverdue, fastSelectedDim}
+		alert, selAlert = fastTimer, fastSelectedTimer
 	case t.IsOverdue():
-		return rowPalette{fastOverdue, fastDim}
-	case hasOverdueDep && selected:
-		return rowPalette{fastSelectedDepOverdue, fastSelectedDim}
+		alert, selAlert = fastOverdue, fastSelectedOverdue
 	case hasOverdueDep:
-		return rowPalette{fastDepOverdue, fastDim}
-	case selected:
-		return rowPalette{fastSelectedRow, fastSelectedDim}
-	default:
-		return rowPalette{fastNormal, fastDim}
+		alert, selAlert = fastDepOverdue, fastSelectedDepOverdue
 	}
+	if selected {
+		return rowPalette{fastSelectedRow, fastSelectedDim, selAlert}
+	}
+	return rowPalette{alert, fastDim, alert}
 }
 
 func (m *model) renderTaskLineWithSet(t *todo.Todo, index, cursor int, active bool, overdueSet map[string]bool, cols listCols) string {
@@ -1224,7 +1224,7 @@ func (m *model) renderTaskLineWithSet(t *todo.Todo, index, cursor int, active bo
 	// is the problem, instead of being one more cell in a uniformly red row.
 	dueStyle := pal.meta
 	if t.IsOverdue() || hasOverdueDep {
-		dueStyle = pal.status
+		dueStyle = pal.alert
 	}
 
 	prefix, text, badges := m.taskRowLabelIn(t, cols.deps)

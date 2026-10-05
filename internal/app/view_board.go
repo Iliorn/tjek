@@ -657,7 +657,9 @@ func boardBoxRestingColor(t *todo.Todo, doneCol bool) lipgloss.Color {
 // highlight is one block. Done-column cards are dim — history, not work.
 func (m model) renderBoardCard(t *todo.Todo, doneCol, selected bool, colW, maxLines int) []string {
 	text, badge := boardCardText(t, doneCol, colW-len([]rune(cursorGap)), maxLines)
-	style := taskRowPalette(t, false, selected).status
+	// The card keeps its state's colour when selected: the cursor mark
+	// before it shows the selection.
+	style := taskRowPalette(t, false, selected).alert
 	if doneCol {
 		style = fastDim
 		if selected {

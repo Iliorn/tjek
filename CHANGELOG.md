@@ -25,6 +25,7 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ### Fixed
 
+- The selected row stands out when its task is overdue; its due date stays red.
 - A monthly task on the 31st falls on a short month's last day, then the 31st again.
 - A recurring task's subtasks keep their due dates across a daylight saving change.
 - A repeating task with no due date gets its next one at midnight, not the closing time.
