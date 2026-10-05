@@ -13,6 +13,8 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+## [1.52.0] - 2026-10-05
+
 ### Added
 
 - Repeat on chosen weekdays, like `r:mon,thu`, or every other week: `r:2w:fri`.
