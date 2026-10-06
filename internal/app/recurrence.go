@@ -29,12 +29,12 @@ func parseRecurInput(s string) (string, bool) {
 	parts[0] = canonicalRecurBase(parts[0])
 	for i, p := range parts[1:] {
 		p = canonicalInputToken(p)
+		// A date as stored (yyyy-mm-dd) is left for todo.ParseRule, which
+		// reads it; parseDueDate takes the ones typed elsewhere in tjek.
 		if v, ok := strings.CutPrefix(p, "until:"); ok {
-			d, err := parseDueDate(v)
-			if err != nil {
-				return "", false
+			if d, err := parseDueDate(v); err == nil {
+				p = "until:" + d.Format("2006-01-02")
 			}
-			p = "until:" + d.Format("2006-01-02")
 		}
 		parts[i+1] = p
 	}

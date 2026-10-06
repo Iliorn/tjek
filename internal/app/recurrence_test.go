@@ -22,6 +22,7 @@ func TestParseRecurInput(t *testing.T) {
 		{"2w:fri", "every:2w:fri", true},
 		{"every:2w:fri", "every:2w:fri", true},
 		{"monthly/until:31-12-27", "monthly/until:2027-12-31", true},
+		{"monthly/until:2027-12-31", "monthly/until:2027-12-31", true}, // as stored
 		{"monthly/until:+1m", "monthly/until:" + inAMonth, true},
 		{"daily/10x", "daily/count:10", true},
 		{"monthly/until:someday", "", false},

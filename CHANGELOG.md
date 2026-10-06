@@ -16,6 +16,7 @@ belongs in the commit message, where it is kept next to the code it explains.
 ### Fixed
 
 - Shared projects with a repeating task no longer rewrite across time zones.
+- A repeat's end date can be typed as stored, like `r:weekly/until:2027-12-31`.
 
 ## [1.52.0] - 2026-10-05
 
