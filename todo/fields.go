@@ -35,8 +35,10 @@ var Fields = []Field{
 	{"project", func(a, b *Todo) bool { return a.Project == b.Project }, func(d, s *Todo) { d.Project = s.Project }},
 	{"parent", func(a, b *Todo) bool { return a.ParentID == b.ParentID }, func(d, s *Todo) { d.ParentID = s.ParentID }},
 	{"recurrence",
-		func(a, b *Todo) bool { return a.Recurrence == b.Recurrence && a.RecurFrom.Equal(b.RecurFrom) },
-		func(d, s *Todo) { d.Recurrence, d.RecurFrom = s.Recurrence, s.RecurFrom }},
+		func(a, b *Todo) bool {
+			return a.Recurrence == b.Recurrence && a.RecurFrom.Equal(b.RecurFrom) && a.RecurIndex == b.RecurIndex
+		},
+		func(d, s *Todo) { d.Recurrence, d.RecurFrom, d.RecurIndex = s.Recurrence, s.RecurFrom, s.RecurIndex }},
 	{"stage", func(a, b *Todo) bool { return a.Stage == b.Stage }, func(d, s *Todo) { d.Stage = s.Stage }},
 	{"due", func(a, b *Todo) bool { return a.DueDate.Equal(b.DueDate) }, func(d, s *Todo) { d.DueDate = s.DueDate }},
 	{"start", func(a, b *Todo) bool { return a.StartDate.Equal(b.StartDate) }, func(d, s *Todo) { d.StartDate = s.StartDate }},

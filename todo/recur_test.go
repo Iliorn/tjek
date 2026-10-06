@@ -17,15 +17,15 @@ func series(t *testing.T, rule string, from time.Time, n int) string {
 		t.Fatalf("ParseRule(%q) failed", rule)
 	}
 	var out []string
-	at := from
+	at, k := from, 0
 	for range n {
-		next, ok := r.Next(from, at)
+		next, nk, ok := r.Next(from, at, k)
 		if !ok {
 			out = append(out, "end")
 			break
 		}
 		out = append(out, next.Format("2006-01-02"))
-		at = next
+		at, k = next, nk
 	}
 	return strings.Join(out, " ")
 }
@@ -81,7 +81,7 @@ func TestRuleNextCountsFromTheAnchor(t *testing.T) {
 		// The anchor itself is never next, though it falls after the day.
 		{time.Date(2027, 1, 20, 0, 0, 0, 0, time.UTC), time.Date(2027, 2, 28, 0, 0, 0, 0, time.UTC)},
 	} {
-		if got, ok := r.Next(from, c.after); !ok || !got.Equal(c.want) {
+		if got, _, ok := r.Next(from, c.after, 0); !ok || !got.Equal(c.want) {
 			t.Errorf("Next(after %s) = %s, want %s", c.after.Format("2006-01-02"), got.Format("2006-01-02"), c.want.Format("2006-01-02"))
 		}
 	}
@@ -95,7 +95,7 @@ func TestRuleNextKeepsTheClockAcrossDST(t *testing.T) {
 	}
 	r, _ := ParseRule("weekly")
 	from := time.Date(2027, 3, 25, 0, 0, 0, 0, cph)
-	got, _ := r.Next(from, from)
+	got, _, _ := r.Next(from, from, 0)
 	if want := time.Date(2027, 4, 1, 0, 0, 0, 0, cph); !got.Equal(want) {
 		t.Errorf("Next = %s, want %s", got, want)
 	}
@@ -108,26 +108,38 @@ func TestNextRecurrence(t *testing.T) {
 		name            string
 		rule            string
 		due, from, done time.Time
+		index           int
 		want            time.Time
+		wantIndex       int
 		end             bool
 	}{
-		{name: "from the due date", rule: "weekly", due: day(5, 14), want: day(5, 21)},
-		{name: "from the anchor, not the moved due date", rule: "monthly", due: day(5, 3), from: day(1, 31), want: day(5, 31)},
-		{name: "overdue: not into the past", rule: "weekly", due: day(4, 1), want: day(5, 13)},
-		{name: "overdue: today is fine", rule: "daily", due: day(4, 1), want: day(5, 12)},
-		{name: "no due date: from the day it was done", rule: "weekly", done: now, want: day(5, 19)},
+		{name: "from the due date", rule: "weekly", due: day(5, 14), want: day(5, 21), wantIndex: 1},
+		{name: "from the anchor, not the moved due date", rule: "monthly", due: day(5, 3), from: day(1, 31), want: day(5, 31), wantIndex: 4},
+		// The 19 May instance, pulled forward to the 14th: the 19th is its
+		// own place, so the 26th is next.
+		{name: "moved earlier: not its own place again", rule: "weekly", due: day(5, 14), from: day(5, 5), index: 2, want: day(5, 26), wantIndex: 3},
+		// The 19 May instance, pushed back to the 22nd: the 26th is next.
+		{name: "moved later: after its due date", rule: "weekly", due: day(5, 22), from: day(5, 5), index: 2, want: day(5, 26), wantIndex: 3},
+		{name: "count: places, not dates", rule: "weekly/count:3", due: day(5, 14), from: day(5, 5), index: 2, end: true},
+		// A place on a task with no anchor is stray (a merge, an old peer):
+		// the task is the anchor.
+		{name: "no anchor: the task is the anchor", rule: "weekly", due: day(5, 14), index: 5, want: day(5, 21), wantIndex: 1},
+		// The weeks and days left behind count as places all the same.
+		{name: "overdue: not into the past", rule: "weekly", due: day(4, 1), want: day(5, 13), wantIndex: 6},
+		{name: "overdue: today is fine", rule: "daily", due: day(4, 1), want: day(5, 12), wantIndex: 41},
+		{name: "no due date: from the day it was done", rule: "weekly", done: now, want: day(5, 19), wantIndex: 1},
 		{name: "ended", rule: "weekly/until:2027-05-20", due: day(5, 14), end: true},
 	} {
-		td := Todo{Recurrence: c.rule, DueDate: c.due, RecurFrom: c.from, CompletedAt: c.done}
-		got, _, ok := td.NextRecurrence(now)
+		td := Todo{Recurrence: c.rule, DueDate: c.due, RecurFrom: c.from, RecurIndex: c.index, CompletedAt: c.done}
+		got, _, index, ok := td.NextRecurrence(now)
 		if c.end {
 			if ok {
 				t.Errorf("%s: next %s, want the series to end", c.name, got)
 			}
 			continue
 		}
-		if !ok || !got.Equal(c.want) {
-			t.Errorf("%s: next %s (ok %v), want %s", c.name, got, ok, c.want)
+		if !ok || !got.Equal(c.want) || index != c.wantIndex {
+			t.Errorf("%s: next %s #%d (ok %v), want %s #%d", c.name, got, index, ok, c.want, c.wantIndex)
 		}
 	}
 }
@@ -141,7 +153,7 @@ func BenchmarkNextOfALongSeries(b *testing.B) {
 		r, _ := ParseRule(rule)
 		b.Run(rule, func(b *testing.B) {
 			for b.Loop() {
-				r.Next(from, after)
+				r.Next(from, after, 0)
 			}
 		})
 	}

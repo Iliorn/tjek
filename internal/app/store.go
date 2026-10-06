@@ -536,7 +536,7 @@ func taskVersion(t *todo.Todo) uint64 {
 	for _, s := range []string{t.ID, t.Title, t.Notes, t.Project, t.ParentID, t.Recurrence, t.Stage} {
 		str(&h, s)
 	}
-	for _, n := range []int64{int64(t.Status), int64(t.Priority), int64(t.Size), int64(t.SeqRankAtDone), int64(len(t.History))} {
+	for _, n := range []int64{int64(t.Status), int64(t.Priority), int64(t.Size), int64(t.SeqRankAtDone), int64(t.RecurIndex), int64(len(t.History))} {
 		num(&h, n)
 	}
 	if t.Deleted {

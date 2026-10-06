@@ -215,25 +215,27 @@ func (r Rule) Weekdays() []time.Weekday {
 	return out
 }
 
-// Next is the date of the first instance of the series anchored at from
-// that falls on a later day than after, false when the series ends before
-// one does. The date keeps from's time of day and location. The anchor
-// itself is never next: it is the task the series was anchored on, wherever
-// its due date has since moved.
-func (r Rule) Next(from, after time.Time) (time.Time, bool) {
+// Next is the first instance of the series anchored at from that comes
+// after instance index and falls on a later day than after: its date and
+// its number in the series. False when the series ends before one does. The
+// date keeps from's time of day and location. Index is the instance the
+// task is, wherever its due date has since moved, so an instance moved
+// earlier than its place is not followed by that place again; the anchor is
+// instance 0.
+func (r Rule) Next(from, after time.Time, index int) (time.Time, int, bool) {
 	var next time.Time
-	found := false
+	n, found := 0, false
 	r.each(from, after, func(k int, at time.Time) bool {
 		if r.Count > 0 && k >= r.Count || !r.Until.IsZero() && laterDay(at, r.Until) {
 			return false
 		}
-		if k > 0 && laterDay(at, after) {
-			next, found = at, true
+		if k > index && laterDay(at, after) {
+			next, n, found = at, k, true
 			return false
 		}
 		return true
 	})
-	return next, found
+	return next, n, found
 }
 
 // each calls yield with each instance of the series anchored at from, in

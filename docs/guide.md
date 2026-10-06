@@ -201,8 +201,9 @@ one, the next appears with its due date, its subtasks reopened.
 | `…/until:31-12-27` · `…/10x` | and stops after that date, or after 10 in all |
 
 A series keeps to its days. A monthly task due on the 31st is due on 28
-February and on 31 March again. Moving one task's due date moves that one
-only, and the next falls where it would have anyway. To move the whole
+February and on 31 March again. Moving one task's due date, earlier or
+later, moves that one only, and the next falls where it would have anyway.
+To move the whole
 series, set its rule again: it then counts from the task's due date.
 
 ## Filtering

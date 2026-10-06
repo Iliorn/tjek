@@ -126,6 +126,26 @@ func TestMovingAnInstanceKeepsTheSeries(t *testing.T) {
 	}
 }
 
+// An instance pulled forward is followed by the instance after its place,
+// not by its place again.
+func TestPullingAnInstanceForwardSkipsItsPlace(t *testing.T) {
+	mon := time.Date(2027, 3, 1, 0, 0, 0, 0, time.Local) // a Monday
+	task := todo.New("gym")
+	task.SetDueDate(mon)
+	task.SetRecurrence("weekly")
+	m := modelWithTasks(t, task)
+
+	second := closeAndSpawn(t, &m, task.ID)
+	if second == nil || !second.DueDate.Equal(mon.AddDate(0, 0, 7)) {
+		t.Fatalf("second instance: %v, want due %v", second, mon.AddDate(0, 0, 7))
+	}
+	second.SetDueDate(mon.AddDate(0, 0, 4)) // the 8 March one, done on Friday the 5th
+	third := closeAndSpawn(t, &m, second.ID)
+	if want := mon.AddDate(0, 0, 14); third == nil || !third.DueDate.Equal(want) {
+		t.Errorf("after pulling the second forward: next = %v, want %v, not the 8th again", third, want)
+	}
+}
+
 func TestEndedSeriesSpawnsNothing(t *testing.T) {
 	task := todo.New("course")
 	task.SetDueDate(time.Date(2027, 3, 1, 0, 0, 0, 0, time.Local))
@@ -183,6 +203,7 @@ func TestRecurFromSurvivesTheStore(t *testing.T) {
 	a.SetDueDate(time.Date(2027, 1, 31, 0, 0, 0, 0, time.Local))
 	a.SetRecurrence("monthly")
 	a.SetDueDate(time.Date(2027, 2, 3, 0, 0, 0, 0, time.Local))
+	a.RecurIndex = 1
 	saveTodos(t, h, []todo.Todo{a})
 	for name, load := range map[string]func(querier) ([]todo.Todo, error){
 		"live": loadTodosFromDB, "sync": loadTodosForSync,
@@ -191,8 +212,8 @@ func TestRecurFromSurvivesTheStore(t *testing.T) {
 		if err != nil || len(got) != 1 {
 			t.Fatalf("%s load: %v, %d tasks", name, err, len(got))
 		}
-		if !got[0].RecurFrom.Equal(a.RecurFrom) {
-			t.Errorf("%s load: RecurFrom = %v, want %v", name, got[0].RecurFrom, a.RecurFrom)
+		if !got[0].RecurFrom.Equal(a.RecurFrom) || got[0].RecurIndex != a.RecurIndex {
+			t.Errorf("%s load: RecurFrom = %v #%d, want %v #%d", name, got[0].RecurFrom, got[0].RecurIndex, a.RecurFrom, a.RecurIndex)
 		}
 	}
 }

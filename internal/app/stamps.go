@@ -256,7 +256,7 @@ func loadStampBases(tx *sql.Tx, ids []string) (map[string]todo.Todo, error) {
 			args[i] = id
 		}
 		rows, err := tx.Query(`SELECT id, title, status, priority, size, project, parent_id,
-			created_at, modified_at, due_date, start_date, completed_at, notes, recurrence, recur_from,
+			created_at, modified_at, due_date, start_date, completed_at, notes, recurrence, recur_from, recur_index,
 			seq_rank_done, stage, deleted, deleted_at, stamps
 			FROM todos WHERE id IN `+in, args...)
 		if err != nil {
@@ -268,7 +268,7 @@ func loadStampBases(tx *sql.Tx, ids []string) (map[string]todo.Todo, error) {
 			var createdAt, modifiedAt, dueDate, startDate, completedAt, recurFrom, deletedAt, stamps string
 			if err := rows.Scan(&t.ID, &t.Title, &status, &priority, &size, &t.Project, &t.ParentID,
 				&createdAt, &modifiedAt, &dueDate, &startDate, &completedAt, &t.Notes, &t.Recurrence, &recurFrom,
-				&t.SeqRankAtDone, &t.Stage, &deleted, &deletedAt, &stamps); err != nil {
+				&t.RecurIndex, &t.SeqRankAtDone, &t.Stage, &deleted, &deletedAt, &stamps); err != nil {
 				rows.Close()
 				return nil, err
 			}

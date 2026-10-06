@@ -90,7 +90,7 @@ func cloneSubtreeResetFrom(children func(string) []string, get func(string) *tod
 			clone.Size = child.Size
 			clone.Project = child.Project
 			clone.Notes = child.Notes
-			clone.Recurrence, clone.RecurFrom = child.Recurrence, child.RecurFrom
+			clone.Recurrence, clone.RecurFrom, clone.RecurIndex = child.Recurrence, child.RecurFrom, child.RecurIndex
 			if len(child.Tags) > 0 {
 				clone.Tags = append([]string{}, child.Tags...)
 			}

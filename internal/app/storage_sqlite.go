@@ -294,8 +294,8 @@ func saveNormalizedIn(tx *sql.Tx, dirty []*todo.Todo, tombstones map[string]time
 		// `data` is the legacy blob column, still NOT NULL but never read.
 		// Write an empty string.
 		upsertTask, err := tx.Prepare(`INSERT INTO todos
-			(id,title,status,priority,size,project,parent_id,created_at,modified_at,due_date,start_date,notes,completed_at,sequence,recurrence,recur_from,seq_rank_done,stage,data,deleted,deleted_at,stamps)
-			VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'',?,?,?)
+			(id,title,status,priority,size,project,parent_id,created_at,modified_at,due_date,start_date,notes,completed_at,sequence,recurrence,recur_from,recur_index,seq_rank_done,stage,data,deleted,deleted_at,stamps)
+			VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'',?,?,?)
 			ON CONFLICT(id) DO UPDATE SET
 				title=excluded.title, status=excluded.status, priority=excluded.priority,
 				size=excluded.size, project=excluded.project, parent_id=excluded.parent_id,
@@ -303,6 +303,7 @@ func saveNormalizedIn(tx *sql.Tx, dirty []*todo.Todo, tombstones map[string]time
 				due_date=excluded.due_date, start_date=excluded.start_date,
 				notes=excluded.notes, completed_at=excluded.completed_at,
 				sequence=excluded.sequence, recurrence=excluded.recurrence, recur_from=excluded.recur_from,
+				recur_index=excluded.recur_index,
 				seq_rank_done=excluded.seq_rank_done, stage=excluded.stage,
 				deleted=excluded.deleted, deleted_at=excluded.deleted_at, stamps=excluded.stamps`)
 		if err != nil {
@@ -401,7 +402,7 @@ func saveNormalizedIn(tx *sql.Tx, dirty []*todo.Todo, tombstones map[string]time
 			if _, err := upsertTask.Exec(t.ID, t.Title, int(t.Status), int(t.Priority), int(t.Size),
 				t.Project, t.ParentID, fmtTime(t.CreatedAt), fmtTime(t.ModifiedAt),
 				fmtTime(t.DueDate), fmtTime(t.StartDate), t.Notes, fmtTime(t.CompletedAt),
-				score(t), t.Recurrence, fmtTime(t.RecurFrom), t.SeqRankAtDone, t.Stage, boolToInt(t.Deleted), fmtTime(t.DeletedAt),
+				score(t), t.Recurrence, fmtTime(t.RecurFrom), t.RecurIndex, t.SeqRankAtDone, t.Stage, boolToInt(t.Deleted), fmtTime(t.DeletedAt),
 				encodeStamps(t.Stamps)); err != nil {
 				return err
 			}
@@ -581,7 +582,7 @@ func loadTodosCore(h querier, includeDeleted bool) ([]todo.Todo, error) {
 		taskWhere, childWhere = "", ""
 	}
 	rows, err := h.Query(`SELECT id, title, status, priority, size, project, parent_id,
-		created_at, modified_at, due_date, start_date, completed_at, notes, recurrence, recur_from,
+		created_at, modified_at, due_date, start_date, completed_at, notes, recurrence, recur_from, recur_index,
 		seq_rank_done, stage, deleted, deleted_at, stamps
 		FROM todos ` + taskWhere)
 	if err != nil {
@@ -597,7 +598,7 @@ func loadTodosCore(h querier, includeDeleted bool) ([]todo.Todo, error) {
 		var createdAt, modifiedAt, dueDate, startDate, completedAt, recurFrom, deletedAt, stamps string
 		if err := rows.Scan(&t.ID, &t.Title, &status, &priority, &size, &t.Project,
 			&t.ParentID, &createdAt, &modifiedAt, &dueDate, &startDate,
-			&completedAt, &t.Notes, &t.Recurrence, &recurFrom, &t.SeqRankAtDone, &t.Stage, &deleted, &deletedAt, &stamps); err != nil {
+			&completedAt, &t.Notes, &t.Recurrence, &recurFrom, &t.RecurIndex, &t.SeqRankAtDone, &t.Stage, &deleted, &deletedAt, &stamps); err != nil {
 			return nil, err
 		}
 		// Only a merge reads stamps (saveStamped reads its own from the store),

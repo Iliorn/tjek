@@ -228,6 +228,11 @@ type Todo struct {
 	// yet (its rule set before any due date, or before anchors existed),
 	// which counts from its due date as it stands.
 	RecurFrom time.Time `json:"recur_from,omitzero"`
+	// RecurIndex is which instance of its series the task is, counted from
+	// the anchor (0), so a series goes on from this instance's place however
+	// far its due date has moved. Zero, too, for an instance spawned before
+	// the number was kept, whose place is read from its due date.
+	RecurIndex int `json:"recur_index,omitempty"`
 
 	// Stage is the kanban board column a pending top-level task sits in — one
 	// of the user-configured stage names (settings.json "stages"). Empty means
@@ -621,7 +626,8 @@ func (t *Todo) SetNotes(notes string) {
 //
 // A task with a non-empty Recurrence spawns its next instance when marked
 // Done: a fresh pending copy is added, and the original keeps its completion
-// history. The rule and the series' anchor (RecurFrom) are recur.go's.
+// history. The rule, the series' anchor (RecurFrom) and the instance's
+// place in it (RecurIndex) are recur.go's.
 
 func (t *Todo) IsRecurring() bool { return t.Recurrence != "" }
 
@@ -632,13 +638,13 @@ func (t *Todo) IsRecurring() bool { return t.Recurrence != "" }
 // the task is closed.
 func (t *Todo) SetRecurrence(rule string) {
 	t.Recurrence = rule
-	t.RecurFrom = t.DueDate
+	t.RecurFrom, t.RecurIndex = t.DueDate, 0
 	t.ModifiedAt = StampModified(t.ModifiedAt)
 }
 
 func (t *Todo) ClearRecurrence() {
 	t.Recurrence = ""
-	t.RecurFrom = time.Time{}
+	t.RecurFrom, t.RecurIndex = time.Time{}, 0
 	t.ModifiedAt = StampModified(t.ModifiedAt)
 }
 
@@ -656,15 +662,16 @@ func ParseRecurrence(s string) (string, bool) {
 	return r.String(), true
 }
 
-// NextRecurrence is the due date of the instance that follows t, and the
-// anchor of the series it belongs to, as of now; false when t does not
-// recur or its series has ended. It is the first date the rule gives, counted
-// from the anchor, after t's due date (its completion day when it has none)
+// NextRecurrence is the due date of the instance that follows t, the anchor
+// of the series it belongs to, and its number in that series, as of now;
+// false when t does not recur or its series has ended. It is the first date
+// the rule gives, counted from the anchor, after t's place in the series
+// (RecurIndex), after t's due date (its completion day when it has none),
 // and not before today, so an overdue series does not spawn into the past.
-func (t *Todo) NextRecurrence(now time.Time) (next, from time.Time, ok bool) {
+func (t *Todo) NextRecurrence(now time.Time) (next, from time.Time, index int, ok bool) {
 	r, ok := ParseRule(t.Recurrence)
 	if !ok {
-		return time.Time{}, time.Time{}, false
+		return time.Time{}, time.Time{}, 0, false
 	}
 	after := t.DueDate
 	if after.IsZero() {
@@ -674,15 +681,15 @@ func (t *Todo) NextRecurrence(now time.Time) (next, from time.Time, ok bool) {
 		}
 		after = time.Date(at.Year(), at.Month(), at.Day(), 0, 0, 0, 0, at.Location())
 	}
-	from = t.RecurFrom
+	from, index = t.RecurFrom, t.RecurIndex
 	if from.IsZero() {
-		from = after
+		from, index = after, 0 // a series not yet anchored starts at t
 	}
 	if yesterday := time.Date(now.Year(), now.Month(), now.Day()-1, 0, 0, 0, 0, now.Location()); after.Before(yesterday) {
 		after = yesterday
 	}
-	next, ok = r.Next(from, after)
-	return next, from, ok
+	next, index, ok = r.Next(from, after, index)
+	return next, from, index, ok
 }
 
 func parsePositiveInt(s string) (int, bool) {

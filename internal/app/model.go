@@ -1073,12 +1073,14 @@ func (m *model) followTask(taskID string) {
 // for a just-completed recurring task. Returns (zero, false) if the source
 // isn't recurring, the rule is unparseable, or its series has ended. The new
 // instance inherits identity-ish fields (title, priority, size, project,
-// notes, tags, recurrence rule and its anchor) but starts clean on history
-// (no time entries, comments, dependencies, subtasks).
+// notes, tags, recurrence rule and its anchor) and its own place in the
+// series, but starts clean on history (no time entries, comments,
+// dependencies, subtasks).
 //
 // Its due date is the series' next date (todo.NextRecurrence): counted from
-// the series' anchor, after the source's due date and not before today, so a
-// long-overdue "monthly" task doesn't reappear in the past. A recurring task
+// the series' anchor, after the source's place in the series and its due
+// date, and not before today, so a long-overdue "monthly" task doesn't
+// reappear in the past. A recurring task
 // with no due date still gets one, counted from the day it was closed, which
 // keeps urgency scoring meaningful rather than leaving the rule inert.
 // StartDate, if set on the source, is shifted by the days the due date moved
@@ -1088,7 +1090,7 @@ func (m *model) followTask(taskID string) {
 // task closed on two devices before they sync spawns one next instance, not
 // two, and closing it again after a reopen finds the one already there.
 func buildNextRecurrence(src todo.Todo) (todo.Todo, bool) {
-	next, from, ok := src.NextRecurrence(time.Now())
+	next, from, index, ok := src.NextRecurrence(time.Now())
 	if !ok {
 		return todo.Todo{}, false
 	}
@@ -1100,7 +1102,7 @@ func buildNextRecurrence(src todo.Todo) (todo.Todo, bool) {
 	clone.Size = src.Size
 	clone.Project = src.Project
 	clone.Notes = src.Notes
-	clone.Recurrence, clone.RecurFrom = src.Recurrence, from
+	clone.Recurrence, clone.RecurFrom, clone.RecurIndex = src.Recurrence, from, index
 	if len(src.Tags) > 0 {
 		clone.Tags = append([]string{}, src.Tags...)
 	}
