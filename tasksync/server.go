@@ -393,6 +393,7 @@ func canonicalizeForDigest(t *todo.Todo) {
 	t.CompletedAt = t.CompletedAt.UTC()
 	t.StartDate = t.StartDate.UTC()
 	t.DueDate = t.DueDate.UTC()
+	t.RecurFrom = t.RecurFrom.UTC()
 	t.DeletedAt = t.DeletedAt.UTC()
 	if len(t.Comments) > 0 {
 		c := append([]todo.Comment(nil), t.Comments...)

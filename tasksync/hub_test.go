@@ -1,6 +1,7 @@
 package tasksync
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -53,6 +54,41 @@ func TestStoreDigestLocationInsensitive(t *testing.T) {
 	}
 	if got, want := CanonicalJSON(a), CanonicalJSON(shifted); string(got) != string(want) {
 		t.Errorf("CanonicalJSON differs across zones:\n%s\n%s", got, want)
+	}
+}
+
+// TestCanonicalJSONCoversEveryTime sets every time on a task, its comments,
+// time entries and history, in two zones, so a time field added to any of
+// them that canonicalizeForDigest leaves in its zone fails here rather than
+// in two devices rewriting a shared project to each other for good.
+func TestCanonicalJSONCoversEveryTime(t *testing.T) {
+	at := time.Date(2026, 10, 5, 0, 0, 0, 0, time.UTC)
+	in := func(zone *time.Location) todo.Todo {
+		task := todo.Todo{ID: "a", Comments: make([]todo.Comment, 1),
+			TimeEntries: make([]todo.TimeEntry, 1), History: make([]todo.Event, 1)}
+		setTimes(reflect.ValueOf(&task).Elem(), at.In(zone))
+		return task
+	}
+	east, west := in(time.FixedZone("UTC+2", 2*3600)), in(time.FixedZone("UTC-4", -4*3600))
+	if got, want := CanonicalJSON(west), CanonicalJSON(east); string(got) != string(want) {
+		t.Errorf("CanonicalJSON differs across zones:\n%s\n%s", got, want)
+	}
+}
+
+// setTimes sets every time.Time in v, a struct, to at, through its structs
+// and the elements of its slices.
+func setTimes(v reflect.Value, at time.Time) {
+	for i := range v.NumField() {
+		switch f := v.Field(i); {
+		case f.Type() == reflect.TypeOf(time.Time{}):
+			f.Set(reflect.ValueOf(at))
+		case f.Kind() == reflect.Struct:
+			setTimes(f, at)
+		case f.Kind() == reflect.Slice && f.Type().Elem().Kind() == reflect.Struct:
+			for j := range f.Len() {
+				setTimes(f.Index(j), at)
+			}
+		}
 	}
 }
 
