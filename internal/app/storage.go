@@ -141,6 +141,10 @@ type appSettings struct {
 	// (exportsettings.go); empty means no auto-export.
 	ExportFolder string `json:"export_folder,omitempty"`
 
+	// PickerFolder is the folder the last path picker ended in, where the
+	// next one opens (pathpicker.go).
+	PickerFolder string `json:"picker_folder,omitempty"`
+
 	// Keys rebinds actions to keys: {"done": "D", "search": "s"}. Keyed by the
 	// action ids in keymap.go, which is why they exist — see keys.go for what
 	// can be rebound and how a broken entry is handled (dropped with a warning,

@@ -1179,7 +1179,7 @@ func TestScriptShareAndLeaveFromTheProjectsTab(t *testing.T) {
 	m.tab = tabProjects
 	m.refreshCaches()
 
-	m = sendKey(t, m, "S")
+	m = typePath(t, sendKey(t, m, "S"))
 	if m.mode != modeShareFolder {
 		t.Fatalf("S: mode = %v, want modeShareFolder", m.mode)
 	}
@@ -1242,7 +1242,7 @@ func TestScriptRenameASharedProject(t *testing.T) {
 	m.tab = tabProjects
 	m.refreshCaches()
 	m.projectCursor = slices.Index(m.allProjectsForList(), "Trip")
-	m = sendKey(t, m, "S")
+	m = typePath(t, sendKey(t, m, "S"))
 	m = script(t, m, folder, "enter")
 	if _, ok := m.shared.find("Trip"); !ok {
 		t.Fatalf("not shared: %s", m.err)
@@ -1313,7 +1313,7 @@ func TestARenameInTheAppKeepsTheOthersEdits(t *testing.T) {
 		m.tab = tabProjects
 		m.refreshCaches()
 		m.projectCursor = slices.Index(m.allProjectsForList(), "Trip")
-		m = sendKey(t, m, "S")
+		m = typePath(t, sendKey(t, m, "S"))
 		m = script(t, m, folder, "enter")
 		p, ok := m.shared.find("Trip")
 		if !ok {
@@ -1376,7 +1376,7 @@ func TestScriptJoinFromSettingsAsksFirst(t *testing.T) {
 	m.Store.add(mine)
 	m.refreshCaches()
 
-	m = openSetting(t, m, settingShareJoin)
+	m = typePath(t, openSetting(t, m, settingShareJoin))
 	if m.mode != modeShareJoin {
 		t.Fatalf("mode = %v, want modeShareJoin", m.mode)
 	}

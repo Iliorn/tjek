@@ -118,6 +118,11 @@ func dynamicUIStrings() []string {
 		out = append(out, sz.String())
 	}
 	out = append(out, "daily", "weekly", "monthly", "yearly", "weekdays")
+	// A path picker's heading and its typed prompt's placeholder are held in
+	// English on pathPickSpecs.
+	for _, s := range pathPickSpecs {
+		out = append(out, s.title, s.placeholder)
+	}
 	// A history row names its action and fields through maps.
 	for _, w := range historyActionWords {
 		out = append(out, w)

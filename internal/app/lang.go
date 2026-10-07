@@ -1006,6 +1006,17 @@ var daTranslations = map[string]string{
 
 	// Board card-view footer, kept apart so its long key does not realign the table.
 	"↑/↓ previous/next card · enter edit in Tasks · esc close": "↑/↓ forrige/næste kort · enter rediger i Opgaver · esc luk",
+
+	// The path picker (pathpicker.go).
+	"Folder to share '%s' in":            "Mappe at dele '%s' i",
+	"Folder to keep tjek-export.json in": "Mappe til tjek-export.json",
+	"A tjek export (.json)":              "En tjek-eksport (.json)",
+	"This folder is empty":               "Mappen er tom",
+	"Can't open %s":                      "Kan ikke åbne %s",
+	"Not a %s file: %s":                  "Ikke en %s-fil: %s",
+	"↑/↓ move · → open · ← up · enter picks the file · / type a path · esc cancels":                                                "↑/↓ flyt · → åbn · ← op · enter vælger filen · / skriv en sti · esc annullerer",
+	"↑/↓ move · → open · ← up · enter picks the marked folder · space this one · / type a path · esc cancels":                      "↑/↓ flyt · → åbn · ← op · enter vælger den markerede mappe · mellemrum denne · / skriv en sti · esc annullerer",
+	"↑/↓ move · → open · ← up · enter picks the marked folder · space this one · x turns export off · / type a path · esc cancels": "↑/↓ flyt · → åbn · ← op · enter vælger den markerede mappe · mellemrum denne · x slår eksport fra · / skriv en sti · esc annullerer",
 }
 var deTranslations = map[string]string{
 	// Header / chrome
@@ -1743,4 +1754,15 @@ var deTranslations = map[string]string{
 
 	// Board card-view footer, kept apart so its long key does not realign the table.
 	"↑/↓ previous/next card · enter edit in Tasks · esc close": "↑/↓ vorige/nächste Karte · Enter in Aufgaben bearbeiten · Esc schließen",
+
+	// The path picker (pathpicker.go).
+	"Folder to share '%s' in":            "Ordner, in dem '%s' geteilt wird",
+	"Folder to keep tjek-export.json in": "Ordner für tjek-export.json",
+	"A tjek export (.json)":              "Ein tjek-Export (.json)",
+	"This folder is empty":               "Dieser Ordner ist leer",
+	"Can't open %s":                      "Kann %s nicht öffnen",
+	"Not a %s file: %s":                  "Keine %s-Datei: %s",
+	"↑/↓ move · → open · ← up · enter picks the file · / type a path · esc cancels":                                                "↑/↓ bewegen · → öffnen · ← hoch · Enter wählt die Datei · / Pfad eingeben · Esc bricht ab",
+	"↑/↓ move · → open · ← up · enter picks the marked folder · space this one · / type a path · esc cancels":                      "↑/↓ bewegen · → öffnen · ← hoch · Enter wählt den markierten Ordner · Leertaste diesen · / Pfad eingeben · Esc bricht ab",
+	"↑/↓ move · → open · ← up · enter picks the marked folder · space this one · x turns export off · / type a path · esc cancels": "↑/↓ bewegen · → öffnen · ← hoch · Enter wählt den markierten Ordner · Leertaste diesen · x schaltet den Export aus · / Pfad eingeben · Esc bricht ab",
 }

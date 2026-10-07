@@ -69,7 +69,7 @@ func TestScriptAutoExport(t *testing.T) {
 	file := filepath.Join(folder, exportFileName)
 
 	m.settingsCursor = settingExportFolder
-	m = sendKey(t, m, "enter")
+	m = typePath(t, sendKey(t, m, "enter"))
 	if m.mode != modeEditExportFolder {
 		t.Fatalf("enter on the export row left mode %v", m.mode)
 	}
@@ -118,8 +118,7 @@ func TestScriptAutoExport(t *testing.T) {
 	}
 
 	m.mode = modeNormal
-	m = sendKey(t, m, "enter")
-	m.textInput.SetValue("")
+	m = typePath(t, sendKey(t, m, "enter"))
 	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = next.(model)
 	if m.exportFolder != "" || m.exportSoon() != nil {
@@ -131,7 +130,7 @@ func TestScriptExportFolderMustExist(t *testing.T) {
 	m := modelWithTasks(t)
 	m.tab = tabSettings
 	m.settingsCursor = settingExportFolder
-	m = sendKey(t, m, "enter")
+	m = typePath(t, sendKey(t, m, "enter"))
 	m.textInput.SetValue(filepath.Join(t.TempDir(), "missing"))
 	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = next.(model)
@@ -167,7 +166,7 @@ func TestScriptImportFromFile(t *testing.T) {
 	}
 
 	m.settingsCursor = settingImportFile
-	m = sendKey(t, m, "enter")
+	m = typePath(t, sendKey(t, m, "enter"))
 	if m.mode != modeImportFile {
 		t.Fatalf("enter on the import row left mode %v", m.mode)
 	}
@@ -215,7 +214,7 @@ func TestScriptImportRejectsANonExport(t *testing.T) {
 		t.Fatal(err)
 	}
 	m.settingsCursor = settingImportFile
-	m = sendKey(t, m, "enter")
+	m = typePath(t, sendKey(t, m, "enter"))
 	m.textInput.SetValue(file)
 	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = next.(model)

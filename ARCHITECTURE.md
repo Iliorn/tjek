@@ -313,6 +313,16 @@ everything.
   and records the path for `main` to print after `Run` returns. `msg` is
   formatted (`msgKind`) only on the panic path, keeping the guard
   allocation-neutral (`BenchmarkView`, `BenchmarkSearchKeystroke`).
+- **`pathpicker.go`**: the picker the four path prompts open with (the
+  share folder, the `.tjek` file to join, the export folder, the export to
+  import): bubbles' `filepicker` in the theme's colours, headed with its
+  folder, opening where the last one ended (`picker_folder`) or on the
+  Desktop (`desktopDir`, the known folder on Windows). A pick hands the path
+  to the typed prompt and presses its enter, so it is checked exactly as a
+  typed path is; `/` hands over to type one. The list cannot say which entry
+  is marked, so a folder pick takes enter itself and reads the folder it
+  opened; a folder that cannot be read is stepped back out of, since the list
+  would otherwise go on showing the one it left.
 - **`exportsettings.go`**: Settings → Export. The auto-export keeps
   `exportFileName` current in a folder: scheduled after a save or an
   external reload (`exportSoon`), soon after the first change and then at

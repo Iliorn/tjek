@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -131,7 +130,7 @@ func (m *model) runSharedNow() tea.Cmd {
 // ── Sharing and leaving from the Projects tab ───────────────────────────────
 
 // startShareOrLeave is S on a project row: a shared project asks whether to
-// stop sharing it, any other opens the folder prompt.
+// stop sharing it, any other opens a picker for the folder to share it in.
 func (m model) startShareOrLeave(name string) (tea.Model, tea.Cmd) {
 	if _, ok := m.shared.find(name); ok {
 		m.pendingProjectName = name
@@ -141,11 +140,7 @@ func (m model) startShareOrLeave(name string) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.pendingProjectName = name
-	m.mode = modeShareFolder
-	m.textInput.SetValue("")
-	m.textInput.Placeholder = fmt.Sprintf(tr("Folder to share '%s' in, e.g. in your OneDrive"), name)
-	m.textInput.Focus()
-	return m, textinput.Blink
+	return m.openPathPicker(pickShareFolder)
 }
 
 // refuseSharedProjectRemoval stops x from taking a shared project off all its
@@ -332,11 +327,7 @@ func (m model) updateShareFolder(msg tea.Msg) (tea.Model, tea.Cmd) {
 // ── Joining from Settings ────────────────────────────────────────────────────
 
 func (m model) openShareJoin() (tea.Model, tea.Cmd) {
-	m.mode = modeShareJoin
-	m.textInput.SetValue("")
-	m.textInput.Placeholder = tr("The .tjek file of a shared project")
-	m.textInput.Focus()
-	return m, textinput.Blink
+	return m.openPathPicker(pickJoinFile)
 }
 
 // updateShareJoin takes the file to join; tab completes files and folders.

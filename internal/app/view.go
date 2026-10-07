@@ -871,6 +871,8 @@ func (m model) footerContentFor(w int) string {
 		return b.String()
 	case modePalette:
 		return m.renderPalette(w)
+	case modePickPath:
+		return m.renderPathPicker(w)
 	case modeConfirm:
 		return confirmStyle.Render("    " + m.confirmMsg)
 	case modeBoardCarry:

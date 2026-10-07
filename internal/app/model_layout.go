@@ -651,6 +651,8 @@ func (m model) extraOverheadLines() int {
 		return 8
 	case modePalette:
 		return 3 + maxPaletteResults
+	case modePickPath:
+		return m.pickerOverheadLines()
 	case modeSearchTagTab:
 		return 3
 	case modeConfirm, modeConfirmUpdate, modeIdlePrompt, modeCaptureKey:

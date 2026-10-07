@@ -151,6 +151,9 @@ const (
 	modeEditStages
 	modeEditExportFolder
 	modeImportFile
+	// modePickPath browses for a file or folder in place of typing its path
+	// (pathpicker.go).
+	modePickPath
 	modePalette
 	// modeExplain is the "why this rank" overlay: a read-only screen over the
 	// current task, like modeHelp, that any key dismisses.
@@ -447,6 +450,10 @@ type model struct {
 	exportDirty     bool
 	exportScheduled bool
 	lastExport      time.Time
+	// picker is the open path picker; pickerFolder is the folder the last
+	// one ended in, where the next one opens (pathpicker.go).
+	picker       pathPicker
+	pickerFolder string
 
 	// Persistence
 	dirty         bool
@@ -689,6 +696,7 @@ func initialModel(repo Repository) model {
 	// session wrote it (a sync, a CLI edit). Init schedules the write.
 	m.exportFolder = settings.ExportFolder
 	m.exportDirty = m.exportFolder != ""
+	m.pickerFolder = settings.PickerFolder
 	if t := m.runningTask(); t != nil {
 		m.timerTickOn = true
 		if e := m.runningEntry(t); e != nil && time.Since(e.StartedAt) > idleThreshold {

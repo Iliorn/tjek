@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/Iliorn/tjek/todo"
@@ -110,25 +109,11 @@ func writeExport(path string, tasks []todo.Todo) error {
 // ── The Settings rows ────────────────────────────────────────────────────────
 
 func (m model) openExportFolderEditor() (tea.Model, tea.Cmd) {
-	m.mode = modeEditExportFolder
-	m.textInput.SetValue(m.exportFolder)
-	m.textInput.CursorEnd()
-	m.textInput.Placeholder = tr("Folder to keep tjek-export.json in (blank turns it off)")
-	m.textInput.Focus()
-	return m, textinput.Blink
+	return m.openPathPicker(pickExportFolder)
 }
 
 func (m model) openImportPrompt() (tea.Model, tea.Cmd) {
-	m.mode = modeImportFile
-	start := ""
-	if m.exportFolder != "" {
-		start = m.exportFolder + string(filepath.Separator)
-	}
-	m.textInput.SetValue(start)
-	m.textInput.CursorEnd()
-	m.textInput.Placeholder = tr("Path to a tjek export (.json)")
-	m.textInput.Focus()
-	return m, textinput.Blink
+	return m.openPathPicker(pickImportFile)
 }
 
 // updateEditExportFolder edits the auto-export folder: tab completes a folder

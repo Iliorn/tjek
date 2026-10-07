@@ -44,14 +44,13 @@ A project can be shared with other people through one file you can all
 reach, in a shared OneDrive, Dropbox or network folder. There is no server
 to set up.
 
-- **Share**: on the Projects tab, select the project and press `S`, then type
-  the folder to put it in (`tab` completes the name). tjek makes the file
-  there, `Trip.tjek` for a project called Trip, and the project gets a `⇄`
-  mark.
-- **Join**: Settings → Shared projects → "Join a project", and type the path
-  of the `.tjek` file (or of the folder, if it holds just one). If you
-  already have tasks in a project with that name, tjek asks before sharing
-  them, since everyone sharing it gets them.
+- **Share**: on the Projects tab, select the project and press `S`, then pick
+  the folder to put it in (see [Picking a file or folder](#picking-a-file-or-folder)).
+  tjek makes the file there, `Trip.tjek` for a project called Trip, and the
+  project gets a `⇄` mark.
+- **Join**: Settings → Shared projects → "Join a project", and pick the
+  `.tjek` file. If you already have tasks in a project with that name, tjek
+  asks before sharing them, since everyone sharing it gets them.
 - **Leave**: `S` on the shared project again. Its tasks are removed from
   this device, and the others keep theirs. Joining again brings everything
   back, comments and history included.
@@ -277,14 +276,32 @@ Settings → Export keeps a copy of all your tasks, finished ones included, in
 a folder you choose. In a OneDrive or Dropbox folder it doubles as a backup,
 and another tool can read it.
 
-- **Auto-export folder**: press enter, type or paste the folder (`tab`
-  completes folder names), and enter again. tjek writes
+- **Auto-export folder**: press enter and pick the folder. tjek writes
   `tjek-export.json` there straight away, then keeps it current: within a
-  minute of a change, and again when you quit. Clear the path to turn it off.
-- **Import from file**: press enter and give the path to a tjek export
-  (`tab` completes). Its tasks are merged in: new ones are added, ones you
-  already have take the newer version, and nothing is deleted, so importing
-  the same file twice changes nothing. `u` takes the whole import back.
+  minute of a change, and again when you quit. `x` in the picker turns it
+  off.
+- **Import from file**: press enter and pick a tjek export. Its tasks are
+  merged in: new ones are added, ones you already have take the newer
+  version, and nothing is deleted, so importing the same file twice changes
+  nothing. `u` takes the whole import back.
+
+### Picking a file or folder
+
+Where tjek needs a file or folder, it opens a picker under the panes, headed
+with the folder it is in. It opens where you last picked something, and the
+first time on your Desktop.
+
+| Key | Does |
+|---|---|
+| `↑`/`↓` | Move |
+| `→` | Open the marked folder |
+| `←` | Go up a folder |
+| `enter` | Pick the marked file, or in a folder pick, the marked folder |
+| `space` | In a folder pick, pick the folder you are in |
+| `/` | Type or paste a path instead (`tab` completes names) |
+| `esc` | Cancel |
+
+Only the files that fit are picked; the rest show in grey.
 
 The file is the same one `tjek export --include-done` prints, so the
 [command line](cli.md#export-and-import) reads and writes it too.

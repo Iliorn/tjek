@@ -127,6 +127,8 @@ func (m model) updateForMode(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateEditExportFolder(msg)
 	case modeImportFile:
 		return m.updateImportFile(msg)
+	case modePickPath:
+		return m.updatePathPicker(msg)
 	case modeEditSyncURL:
 		return m.updateEditSyncURL(msg)
 	case modeEditName:
@@ -1598,6 +1600,7 @@ func (m *model) persistSettings() {
 
 		SubtaskTagsDisabled: !m.subtaskTags,
 		ExportFolder:        m.exportFolder,
+		PickerFolder:        m.pickerFolder,
 		Name:                m.userName,
 	}); err != nil {
 		m.flashError(fmt.Sprintf(tr("Error saving settings: %v"), err))
