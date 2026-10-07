@@ -13,6 +13,8 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+## [1.54.0] - 2026-10-07
+
 ### Added
 
 - Sharing, joining, export and import pick their file or folder from a list.
