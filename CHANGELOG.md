@@ -13,6 +13,10 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+### Added
+
+- `tjek.exe` has an icon, a pixel-art `[✓]`, in Explorer, Start and the taskbar.
+
 ## [1.52.1] - 2026-10-07
 
 ### Fixed

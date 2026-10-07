@@ -64,6 +64,12 @@ git push origin v1.10.0       # ← triggers the build + release
   changed: `tjek` (Linux x64), `tjek-linux-arm64`, `tjek.exe` (Windows
   x64), plus `SHA256SUMS`. `selfUpdateAsset(goos, goarch)` is the one map
   from platform to asset; a new build target needs a case there.
+- **The Windows icon** is `rsrc_windows_amd64.syso` in the module root,
+  which `go build` links into a Windows amd64 binary by itself, so the
+  release workflow needs no step for it. It is drawn as a pixel grid in
+  `scripts/icon/main.go`; after changing the grid, `go run ./scripts/icon`
+  rewrites the `.syso` and `packaging/icon/`, and all of them are committed.
+  The `.syso` holds the icon alone, no manifest.
 - **macOS ships from source** through the `Iliorn/homebrew-tap` repository
   (`brew install iliorn/tap/tjek`). The release workflow's `homebrew` job
   bumps the formula's tarball and checksum, pushing with a deploy key scoped
