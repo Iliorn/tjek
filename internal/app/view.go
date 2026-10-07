@@ -1348,7 +1348,7 @@ func (m model) projectPaneRows(tasks []todo.Todo, start, shown, sel int) []strin
 	}
 	left := lm.renderGroupTaskRows(tasks, start, shown, sel, false)
 	right := m.renderGanttStrip(tasks, stripW, start, shown, sel)
-	sep := dimStyle.Render(" │ ")
+	sep := ruleStyle.Render(" │ ")
 	out := make([]string, max(len(left), len(right)))
 	for i := range out {
 		l, r := "", ""

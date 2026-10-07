@@ -73,7 +73,7 @@ func sectionBar(labels []string, cur int, focused bool, width int) string {
 	}
 	for i := lo; i <= hi; i++ {
 		if i > lo {
-			b.WriteString(dimStyle.Render(sep))
+			b.WriteString(ruleStyle.Render(sep))
 		}
 		if i == cur && focused {
 			b.WriteString(sectionCurrentStyle.Render(labels[i]))
@@ -790,7 +790,7 @@ func writeGanttBar(b *strings.Builder, barRunes []rune, barColors []int) {
 		case colorIdx == ganttCellToday:
 			b.WriteString(ganttTodayStyle.Render(group))
 		case colorIdx == ganttCellGuide:
-			b.WriteString(dimStyle.Render(group))
+			b.WriteString(ruleStyle.Render(group))
 		case colorIdx == ganttCellDone:
 			b.WriteString(ganttDoneStyle.Render(group))
 		case colorIdx >= 200:
@@ -929,7 +929,7 @@ func (m model) renderGanttAxis(minDate, maxDate, today time.Time, chartW, todayP
 		case ganttCellEmpty:
 			b.WriteString(headerStyle.Render(group))
 		default:
-			b.WriteString(dimStyle.Render(group))
+			b.WriteString(ruleStyle.Render(group))
 		}
 	}
 	return b.String()

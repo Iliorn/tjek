@@ -256,7 +256,7 @@ func (m model) explainBodyRows(e rank.Explanation, width int) []string {
 		add(row)
 		add("      " + helpStyle.Render(truncate(trSeqReason(f), width-6)))
 	}
-	add("  " + strings.Repeat(" ", nameW+seqMathColW-6) + dimStyle.Render("──────"))
+	add("  " + strings.Repeat(" ", nameW+seqMathColW-6) + ruleStyle.Render("──────"))
 	add("  " + detailLabelStyle.Render(padRight(tr("Total"), nameW)) +
 		activeCountStyle.Render(padLeft(fmt.Sprintf("%.1f", e.Total), seqMathColW)))
 

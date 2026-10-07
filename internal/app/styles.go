@@ -27,11 +27,17 @@ type theme struct {
 	teal     lipgloss.Color
 	red      lipgloss.Color
 
-	fg   lipgloss.Color // primary text
-	dim  lipgloss.Color // borders, completed/muted text
-	help lipgloss.Color // hint text
-	bg   lipgloss.Color // dark base — used as fg on colored backgrounds
-	sel  lipgloss.Color // selected-row background — subtle, must keep every row foreground readable
+	fg lipgloss.Color // primary text
+	// dim is structure: borders, rules, guides. It may be faint, as it is
+	// never read.
+	dim lipgloss.Color
+	// muted is secondary text: counts, dates, scores, empty states, finished
+	// tasks. Quieter than fg, but text all the same, so it keeps a contrast
+	// of at least 4.5:1 on bg (TestThemeTextIsLegible).
+	muted lipgloss.Color
+	help  lipgloss.Color // hint text, as legible as muted
+	bg    lipgloss.Color // dark base — used as fg on colored backgrounds
+	sel   lipgloss.Color // selected-row background — subtle, must keep every row foreground readable
 }
 
 // themes holds the built-in palettes. The first entry is the default.
@@ -50,6 +56,7 @@ var themes = []theme{
 		red:      "#FF0000",
 		fg:       "#FFFFFF",
 		dim:      "#555555",
+		muted:    "#8a8a8a",
 		help:     "#888888",
 		bg:       "#1a1a1a",
 		sel:      "#292e42",
@@ -71,7 +78,8 @@ var themes = []theme{
 		red:      "#f38ba8",
 		fg:       "#cdd6f4",
 		dim:      "#585b70",
-		help:     "#6c7086",
+		muted:    "#9399b2", // Overlay 2
+		help:     "#9399b2",
 		bg:       "#1e1e2e",
 		sel:      "#313244",
 	},
@@ -89,7 +97,8 @@ var themes = []theme{
 		red:      "#fb4934",
 		fg:       "#ebdbb2",
 		dim:      "#665c54",
-		help:     "#928374",
+		muted:    "#a89984", // fg4
+		help:     "#a89984",
 		bg:       "#1d2021",
 		sel:      "#3c3836",
 	},
@@ -107,7 +116,8 @@ var themes = []theme{
 		red:      "#bf616a",
 		fg:       "#eceff4",
 		dim:      "#4c566a",
-		help:     "#616e88",
+		muted:    "#9aa5bc", // Nord has no grey light enough to read on bg; this is its blue-grey
+		help:     "#9aa5bc",
 		bg:       "#2e3440",
 		sel:      "#3b4252",
 	},
@@ -179,7 +189,9 @@ var (
 	inputStyle   lipgloss.Style
 	confirmStyle lipgloss.Style
 	searchStyle  lipgloss.Style
-	dimStyle     lipgloss.Style
+	dimStyle     lipgloss.Style // secondary text, in muted
+	// ruleStyle draws structure in dim: rules, separators, guides.
+	ruleStyle lipgloss.Style
 	// barTrackStyle paints the unfilled part of a progress bar: a background
 	// a small step from the base towards dim — see barTrack.
 	barTrackStyle lipgloss.Style
@@ -289,7 +301,8 @@ func applyTheme(t theme) {
 	toastSuccessStyle = lipgloss.NewStyle().Foreground(t.green).Bold(true)
 	toastInfoStyle = lipgloss.NewStyle().Foreground(t.blue).Bold(true)
 	searchStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.green).Padding(0, 1).MarginLeft(2)
-	dimStyle = lipgloss.NewStyle().Foreground(t.dim)
+	dimStyle = lipgloss.NewStyle().Foreground(t.muted)
+	ruleStyle = lipgloss.NewStyle().Foreground(t.dim)
 	barTrackStyle = lipgloss.NewStyle().Background(mixHex(t.bg, t.dim, 0.3))
 	selectedDimRowStyle = dimStyle.Background(t.sel)
 
@@ -320,7 +333,7 @@ func applyTheme(t theme) {
 
 	overdueCountStyle = lipgloss.NewStyle().Foreground(t.red).Bold(true)
 	activeCountStyle = lipgloss.NewStyle().Foreground(t.green).Bold(true)
-	doneCountStyle = lipgloss.NewStyle().Foreground(t.dim)
+	doneCountStyle = lipgloss.NewStyle().Foreground(t.muted)
 
 	pageIndicatorStyle = lipgloss.NewStyle().Foreground(t.orange).Bold(true)
 

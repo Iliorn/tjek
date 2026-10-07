@@ -427,7 +427,7 @@ func (m model) renderBoardColumn(cards []todo.Todo, title string, doneCol bool, 
 	} else if cursor != -1 {
 		lines = append(lines, selectedStyle.Render(rule))
 	} else {
-		lines = append(lines, dimStyle.Render(rule))
+		lines = append(lines, ruleStyle.Render(rule))
 	}
 	if len(cards) == 0 {
 		lines = append(lines, dimStyle.Render(indent+tr("empty")))

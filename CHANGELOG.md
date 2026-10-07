@@ -17,6 +17,10 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 - `tjek.exe` has an icon, a pixel-art `[✓]`, in Explorer, Start and the taskbar.
 
+### Fixed
+
+- Grey text such as dates, scores and counts is easier to read in every theme.
+
 ## [1.52.1] - 2026-10-07
 
 ### Fixed

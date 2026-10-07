@@ -615,7 +615,7 @@ func (m model) renderTimelineLines(innerW, innerH int) []string {
 	}
 
 	if clippedTop {
-		lines = append(lines, dimStyle.Render("  ⋮"))
+		lines = append(lines, ruleStyle.Render("  ⋮"))
 	}
 	for i := start; i < end; i++ {
 		lines = append(lines, m.renderTimelineEntry(acts[i], i, innerW))
@@ -624,11 +624,11 @@ func (m model) renderTimelineLines(innerW, innerH int) []string {
 			lines = append(lines, sub)
 		}
 		if i < end-1 {
-			lines = append(lines, dimStyle.Render("  │"))
+			lines = append(lines, ruleStyle.Render("  │"))
 		}
 	}
 	if clippedBot {
-		lines = append(lines, dimStyle.Render("  ⋮"))
+		lines = append(lines, ruleStyle.Render("  ⋮"))
 	}
 	return lines
 }
@@ -720,7 +720,7 @@ func (m model) renderTimelineSub(a dayActivity, innerW int, hasNext bool) string
 	const indentW = 4 // visual cells: "  │ " or "    "
 	indent := "    "
 	if hasNext {
-		indent = "  " + dimStyle.Render("│") + " "
+		indent = "  " + ruleStyle.Render("│") + " "
 	}
 	avail := innerW - indentW
 	if avail < 4 {
