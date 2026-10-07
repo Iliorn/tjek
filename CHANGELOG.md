@@ -13,6 +13,8 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+## [1.52.1] - 2026-10-07
+
 ### Fixed
 
 - Shared projects with a repeating task no longer rewrite across time zones.
