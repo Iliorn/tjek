@@ -13,6 +13,10 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+### Changed
+
+- The file and folder picker has a blank row above and below its list, as the panes do.
+
 ## [1.54.0] - 2026-10-07
 
 ### Added

@@ -110,9 +110,10 @@ func (m model) pickerRows() int {
 }
 
 // pickerOverheadLines is the picker's height below the panes: its box (two
-// borders, the heading and the rows) and the hint line under it.
+// borders, a blank row inside each, the heading and the rows) and the hint
+// line under it.
 func (m model) pickerOverheadLines() int {
-	return 2 + 1 + m.pickerRows() + 1
+	return 4 + 1 + m.pickerRows() + 1
 }
 
 func pickerStyles(folder bool) filepicker.Styles {
@@ -257,7 +258,8 @@ func (m model) renderPathPicker(w int) string {
 		}
 		body = append(body, line)
 	}
-	box := inputStyle.Width(w).Render(strings.Join(body, "\n"))
+	// A blank row above and below the list, as the panes have.
+	box := inputStyle.Padding(1, 1).Width(w).Render(strings.Join(body, "\n"))
 	box = withBorderTitle(box, sprintfName(tr(spec.title), m.pendingProjectName), w, true)
 	hint := tr("↑/↓ move · → open · ← up · enter picks the file · / type a path · esc cancels")
 	switch {
