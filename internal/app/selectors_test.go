@@ -2,8 +2,12 @@ package app
 
 import (
 	"reflect"
+	"slices"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/Iliorn/tjek/rank"
 	"github.com/Iliorn/tjek/todo"
@@ -789,6 +793,103 @@ func TestBareSigilMatchesAnyTagOrProject(t *testing.T) {
 			if got := match(task); got != c.want[i] {
 				t.Errorf("compileSearch(%q)(%q) = %v, want %v", c.q, task.Title, got, c.want[i])
 			}
+		}
+	}
+}
+
+// The filter grammar end to end: exact tags when the tag exists, a prefix
+// otherwise; commas for alternatives; - and ! for not; "or" between groups;
+// the status words; and the half-typed forms adding nothing.
+func TestFilterGrammar(t *testing.T) {
+	mk := func(title, project string, p todo.Priority, tags ...string) todo.Todo {
+		x := todo.New(title)
+		x.Project, x.Priority, x.Tags = project, p, tags
+		return x
+	}
+	login := mk("fix login", "Work", todo.PriorityHigh, "bug")
+	login.DueDate = time.Now().AddDate(0, 0, -1)
+	homework := mk("write essay", "Home", todo.PriorityLow, "homework")
+	workshop := mk("plan workshop", "Work", todo.PriorityMedium, "workshop")
+	plumber := mk("call plumber", "Home", todo.PriorityMedium, "urgent")
+	book := mk("read book", "", todo.PriorityMedium)
+	book.StartTimerBy("")
+	milk := mk("buy milk", "", todo.PriorityMedium, "work")
+	all := []todo.Todo{login, homework, workshop, plumber, book, milk}
+
+	tags := map[string]bool{"bug": true, "homework": true, "workshop": true, "urgent": true, "work": true}
+	env := filterEnv{
+		tagExists: func(tag string) bool { return tags[tag] },
+		blocked:   func(id string) bool { return id == plumber.ID },
+	}
+	run := func(query string, env filterEnv) []string {
+		match := compileSearchWith(query, env)
+		var got []string
+		for _, x := range all {
+			if match(x) {
+				got = append(got, x.Title)
+			}
+		}
+		return got
+	}
+	everyone := run("", env)
+	without := func(titles ...string) []string {
+		var out []string
+		for _, x := range everyone {
+			if !slices.Contains(titles, x) {
+				out = append(out, x)
+			}
+		}
+		return out
+	}
+
+	for query, want := range map[string][]string{
+		"#work":               {"Buy milk"},
+		"#wor":                {"Plan workshop", "Buy milk"},
+		"#bug,urgent":         {"Fix login", "Call plumber"},
+		"#bug,":               {"Fix login"},
+		"-#work":              without("Buy milk"),
+		"-#":                  {"Read book"},
+		"@work":               {"Fix login", "Plan workshop"},
+		"@work,home":          {"Fix login", "Write essay", "Plan workshop", "Call plumber"},
+		"p:high,low":          {"Fix login", "Write essay"},
+		"-overdue":            without("Fix login"),
+		"!overdue":            without("Fix login"),
+		"blocked":             {"Call plumber"},
+		"ready":               without("Call plumber"),
+		"active":              {"Read book"},
+		"#bug or #urgent":     {"Fix login", "Call plumber"},
+		"#bug or @home p:low": {"Fix login", "Write essay"},
+		"milk or":             {"Buy milk"},
+		"-milk":               without("Buy milk"),
+		"-":                   everyone,
+		"@work -#bug":         {"Plan workshop"},
+	} {
+		if got := run(query, env); !slices.Equal(got, want) {
+			t.Errorf("%q matched %v, want %v", query, got, want)
+		}
+	}
+
+	// Without the model's caches every tag is a prefix and nothing is blocked.
+	if got := run("#work", filterEnv{}); !slices.Equal(got, []string{"Plan workshop", "Buy milk"}) {
+		t.Errorf("#work without an env matched %v", got)
+	}
+
+	withLang(t, langDA, func() {
+		if got := run("#bug eller #urgent", env); !slices.Equal(got, []string{"Fix login", "Call plumber"}) {
+			t.Errorf("Danish eller matched %v", got)
+		}
+		if got := run("-forfalden", env); !slices.Equal(got, without("Fix login")) {
+			t.Errorf("Danish -forfalden matched %v", got)
+		}
+	})
+}
+
+// The preview reads the query the way the filter does.
+func TestSearchPreviewShowsNotAndOr(t *testing.T) {
+	got := ansi.Strip(renderSearchPreview("#bug -@home or overdue -milk", 200))
+	for _, want := range []string{"#bug", "not @home", "or", "overdue", `not title~ "milk"`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("preview %q lacks %q", got, want)
 		}
 	}
 }

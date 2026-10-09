@@ -477,6 +477,10 @@ var daTranslations = map[string]string{
 	"wait:":      "vent:",
 	"someday":    "en dag",
 	"waiting":    "venter",
+	"blocked":    "blokeret",
+	"ready":      "klar",
+	"active":     "aktiv",
+	"or":         "eller",
 
 	// Spelled-out periods (periodPhrases), "end of month" for eom.
 	"start of week":         "start på ugen",
@@ -870,6 +874,7 @@ var daTranslations = map[string]string{
 	"due ":                                  "forfald ",
 	"overdue":                               "forfalden",
 	"title~":                                "titel~",
+	"not %s":                                "ikke %s",
 
 	// ── Calendar entries ──
 	"✓ done at ": "✓ færdig kl. ",
@@ -919,6 +924,12 @@ var daTranslations = map[string]string{
 	"due before a date (also >, <=, >= and an exact date)":              "forfalder før en dato (også >, <=, >= og en præcis dato)",
 	"only overdue tasks":                                                "kun forfaldne opgaver",
 	"only tasks hidden until their start date":                          "kun opgaver skjult indtil deres startdato",
+	"only tasks waiting on another task":                                "kun opgaver der venter på en anden opgave",
+	"only tasks you can start now":                                      "kun opgaver du kan gå i gang med nu",
+	"only tasks with a running timer":                                   "kun opgaver med et kørende ur",
+	"either one: a comma lists alternatives (@ and p: too)":             "en af dem: et komma giver valgmuligheder (også @ og p:)",
+	"leave out what a word matches":                                     "udelad det et ord rammer",
+	"either side; words beside each other must all hold":                "en af siderne; ord ved siden af hinanden skal alle passe",
 	"start date, hidden until then (or %s)":                             "startdato, skjult indtil da (eller %s)",
 	"hidden until %s":                                                   "skjult indtil %s",
 	"%d waiting":                                                        "%d venter",
@@ -1259,6 +1270,10 @@ var deTranslations = map[string]string{
 	"wait:":      "warten:",
 	"someday":    "später",
 	"waiting":    "wartend",
+	"blocked":    "blockiert",
+	"ready":      "bereit",
+	"active":     "aktiv",
+	"or":         "oder",
 
 	// Spelled-out periods (periodPhrases), "end of month" for eom.
 	"start of week":         "Wochenanfang",
@@ -1652,6 +1667,7 @@ var deTranslations = map[string]string{
 	"due ":                                  "fällig ",
 	"overdue":                               "überfällig",
 	"title~":                                "Titel~",
+	"not %s":                                "nicht %s",
 
 	// ── Calendar entries ──
 	"✓ done at ": "✓ fertig am ",
@@ -1701,6 +1717,12 @@ var deTranslations = map[string]string{
 	"due before a date (also >, <=, >= and an exact date)":              "fällig vor einem Datum (auch >, <=, >= und ein genaues Datum)",
 	"only overdue tasks":                                                "nur überfällige Aufgaben",
 	"only tasks hidden until their start date":                          "nur bis zum Startdatum ausgeblendete Aufgaben",
+	"only tasks waiting on another task":                                "nur Aufgaben, die auf eine andere warten",
+	"only tasks you can start now":                                      "nur Aufgaben, die jetzt beginnen können",
+	"only tasks with a running timer":                                   "nur Aufgaben mit laufendem Timer",
+	"either one: a comma lists alternatives (@ and p: too)":             "eines davon: ein Komma listet Alternativen (auch @ und p:)",
+	"leave out what a word matches":                                     "weglassen, was ein Wort trifft",
+	"either side; words beside each other must all hold":                "eine Seite; nebeneinanderstehende Wörter müssen alle zutreffen",
 	"start date, hidden until then (or %s)":                             "Startdatum, bis dahin ausgeblendet (oder %s)",
 	"hidden until %s":                                                   "ausgeblendet bis %s",
 	"%d waiting":                                                        "%d wartend",

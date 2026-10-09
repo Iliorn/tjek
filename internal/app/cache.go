@@ -102,15 +102,16 @@ func (m *model) refreshCaches() {
 	}
 
 	m.rebuildDependencySets(all)
+	// Before the lists: a #tag filter asks it which tags exist (searchEnv).
+	m.refreshUsageRecency(all)
 
 	m.cache.waiting, m.cache.waitingTop = nil, 0
 	if m.hideWaiting {
 		m.cache.waiting, m.cache.waitingTop = waitingSet(all, m.frameTime)
 	}
 
-	m.cache.active, m.cache.done = selectActiveDoneRanked(all, m.cache.rankScore, m.frameTime, m.rank.ScoreAt(m.frameTime), m.searchQuery, m.focusFilter, m.taskSort, m.historySort, m.listHidden())
+	m.cache.active, m.cache.done = selectActiveDoneRanked(all, m.cache.rankScore, m.frameTime, m.rank.ScoreAt(m.frameTime), m.searchQuery, m.searchEnv(), m.focusFilter, m.taskSort, m.historySort, m.listHidden())
 
-	m.refreshUsageRecency(all)
 	m.refreshGroups(withoutHidden(all, m.cache.waiting))
 
 	// subtaskOf is maintained incrementally by Store.add / Store.remove, so
@@ -125,6 +126,18 @@ func (m *model) refreshCaches() {
 
 	m.cache.dirty = false
 	m.cache.filterDirty = false
+}
+
+// searchEnv is what the search reads from the caches: which tags exist
+// (tagLastUsed holds every tag any task carries) and which tasks are blocked.
+// Both are built before the lists in refreshCaches, and a keystroke's
+// refreshFilteredCaches finds them warm.
+func (m *model) searchEnv() filterEnv {
+	tags, blocked := m.cache.tagLastUsed, m.cache.blockedSet
+	return filterEnv{
+		tagExists: func(tag string) bool { _, ok := tags[tag]; return ok },
+		blocked:   func(id string) bool { return blocked[id] },
+	}
 }
 
 // listHidden is the waiting set the lists leave out: none while the search
@@ -265,7 +278,7 @@ func (m model) rankedScore(t *todo.Todo) float64 {
 // entire task set on every keypress for no reason.
 func (m *model) refreshFilteredCaches() {
 	all := m.allTodos()
-	m.cache.active, m.cache.done = selectActiveDoneRanked(all, m.cache.rankScore, m.frameTime, m.rank.ScoreAt(m.frameTime), m.searchQuery, m.focusFilter, m.taskSort, m.historySort, m.listHidden())
+	m.cache.active, m.cache.done = selectActiveDoneRanked(all, m.cache.rankScore, m.frameTime, m.rank.ScoreAt(m.frameTime), m.searchQuery, m.searchEnv(), m.focusFilter, m.taskSort, m.historySort, m.listHidden())
 	m.refreshTagRenderCache()
 	m.refreshTaskColMetrics()
 	m.refreshClosedToday()

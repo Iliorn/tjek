@@ -1467,6 +1467,12 @@ func (m model) helpBodyLines() []string {
 		{inputWord("due:") + "<" + strings.ToLower(localizedWeekday(time.Friday)), tr("due before a date (also >, <=, >= and an exact date)")},
 		{inputWord("overdue"), tr("only overdue tasks")},
 		{inputWord("waiting"), tr("only tasks hidden until their start date")},
+		{inputWord("blocked"), tr("only tasks waiting on another task")},
+		{inputWord("ready"), tr("only tasks you can start now")},
+		{inputWord("active"), tr("only tasks with a running timer")},
+		{"#bug,urgent", tr("either one: a comma lists alternatives (@ and p: too)")},
+		{"-#tag / !" + inputWord("overdue"), tr("leave out what a word matches")},
+		{"#bug " + inputWord("or") + " p:" + inputWord("high"), tr("either side; words beside each other must all hold")},
 		{"grcrs", tr("anything else fuzzy-matches the title, or the description as text")},
 	}})
 

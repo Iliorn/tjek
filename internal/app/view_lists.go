@@ -310,7 +310,7 @@ func (m model) statsScopedTodos() []*todo.Todo {
 	if m.searchQuery == "" {
 		return all
 	}
-	match := compileSearch(m.searchQuery)
+	match := compileSearchWith(m.searchQuery, m.searchEnv())
 	scoped := make([]*todo.Todo, 0, len(all))
 	for _, t := range all {
 		if t.ParentID == "" && match(*t) {

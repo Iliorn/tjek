@@ -57,8 +57,8 @@ var inputKeywords = []string{
 	"small", "large",
 	// Recurrence rules (r:, recur:).
 	"daily", "weekdays", "weekly", "monthly", "yearly",
-	// Bare search keywords.
-	"overdue", "waiting",
+	// Bare search keywords, and the word between alternatives (parseFilter).
+	"overdue", "waiting", "blocked", "ready", "active", "or",
 	// Field prefixes whose English form is a word rather than an initial.
 	"due:", "size:", "recur:", "dep:", "wait:",
 	// A recurrence rule's end (r:weekly/until:…).

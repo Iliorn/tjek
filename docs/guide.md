@@ -249,15 +249,28 @@ adding:
 ```
 @work p:high due:<friday        # high-priority Work tasks due before Friday
 #urgent overdue                 # overdue tasks tagged urgent
+#bug,urgent -@home              # tagged bug or urgent, outside Home
+ready or active                 # what you can start now, or are timing
 grcrs                           # finds "Buy groceries"
 ```
 
 Supported: `#tag`, `@project`, `p:high/medium/low`, `due:<date`,
-`due:>date`, `due:date` (`<=` and `>=` too), the word `overdue`, and the word
-`waiting` for the tasks put away until a later start date. A `#` on
-its own shows every tagged task, and an `@` every task in a project. Anything
-else matches the title loosely (every letter in order, so `dply` finds
-"Deploy release") or the description as plain text.
+`due:>date`, `due:date` (`<=` and `>=` too), and the words `overdue`,
+`waiting` (put away until a later start date), `blocked` (waiting on another
+task), `ready` (you can start it now) and `active` (its timer is running). A
+`#` on its own shows every tagged task, and an `@` every task in a project.
+Anything else matches the title loosely (every letter in order, so `dply`
+finds "Deploy release") or the description as plain text.
+
+- **Tags match exactly** once you have typed a whole tag: `#work` finds
+  `#work`, not `#homework` or `#workshop`. Until then `#wo` finds every tag
+  starting with it, so the list narrows as you type.
+- **A comma means either**: `#bug,urgent`, `@work,home`, `p:high,medium`.
+- **`-` or `!` means not**: `-#work`, `!overdue`, `-milk` (a title or
+  description containing "milk"). `-#` is every untagged task.
+- **`or` splits the filter**: `#bug overdue or p:high` is overdue bugs, or
+  anything high priority. Words beside each other must all hold, and `or`
+  joins those groups, as in Taskwarrior.
 
 ## In your own language
 

@@ -84,42 +84,35 @@ func renderQuickAddSuggestions(sigil string, matches []string, sel, w int) strin
 	return ansi.Truncate(line, w, "…")
 }
 
-// renderSearchPreview mirrors compileSearch's tokenisation to show the active
-// filters as the user types: recognised tokens become chips, and any leftover
-// (including a mistyped p:/due:) is shown as the fuzzy title-match query.
+// renderSearchPreview shows the filter as parseFilter reads it, while the
+// user types: each term a chip, negated ones as "not …", the groups joined by
+// "or", and leftover words (a mistyped p:/due: included) as the loose
+// title match.
 func renderSearchPreview(query string, w int) string {
-	var filters []string
-	var titleWords []string
-
-	for _, tok := range strings.Fields(query) {
-		lower := canonicalInputToken(strings.ToLower(tok))
-		switch {
-		case strings.HasPrefix(tok, "#") && len(tok) > 1:
-			filters = append(filters, tagStyle.Render(tok))
-		case strings.HasPrefix(tok, "@") && len(tok) > 1:
-			filters = append(filters, projLabelStyle.Render(tok))
-		case strings.HasPrefix(lower, "p:"):
-			if p, ok := parsePriorityFilter(strings.TrimPrefix(lower, "p:")); ok {
-				filters = append(filters, normalStyle.Render("p:"+trPriority(p)))
-			} else {
-				titleWords = append(titleWords, tok)
-			}
-		case strings.HasPrefix(lower, "due:"):
-			if desc, ok := describeDueFilter(strings.TrimPrefix(lower, "due:")); ok {
-				filters = append(filters, normalStyle.Render(desc))
-			} else {
-				titleWords = append(titleWords, tok)
-			}
-		case canonicalInputWord(lower) == "overdue":
-			filters = append(filters, overdueStyle.Render(tr("overdue")))
-		default:
-			titleWords = append(titleWords, tok)
+	var parts []string
+	for i, group := range parseFilter(query, filterEnv{}) {
+		if i > 0 {
+			parts = append(parts, dimStyle.Render(tr("or")))
 		}
-	}
-
-	parts := filters
-	if len(titleWords) > 0 {
-		parts = append(parts, dimStyle.Render(tr("title~")+` "`+strings.Join(titleWords, " ")+`"`))
+		for _, term := range group {
+			label, style := term.label, normalStyle
+			switch term.kind {
+			case termTag:
+				style = tagStyle
+			case termProject:
+				style = projLabelStyle
+			case termText:
+				label, style = tr("title~")+` "`+label+`"`, dimStyle
+			case termWord:
+				if label == tr("overdue") {
+					style = overdueStyle
+				}
+			}
+			if term.neg {
+				label = fmt.Sprintf(tr("not %s"), label)
+			}
+			parts = append(parts, style.Render(label))
+		}
 	}
 
 	line := helpStyle.Render("    → ") + strings.Join(parts, "  ")

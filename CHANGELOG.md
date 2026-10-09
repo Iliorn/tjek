@@ -19,10 +19,13 @@ belongs in the commit message, where it is kept next to the code it explains.
 - Tasks with a later start date stay hidden until then; `/waiting` shows them.
 - Add with `wait:date`, or `wait:someday` to put a task away until you bring it back.
 - `tjek import` and Settings → Import read Taskwarrior's `task export`.
+- Filters take `-` or `!` for not, commas and `or` for either: `#bug,urgent -@home`.
+- Filters take the words `blocked`, `ready` and `active`.
 
 ### Changed
 
 - Starting the timer on a task with a later start date moves its start to now.
+- A filter's `#work` matches that tag exactly once it exists, not `#homework`.
 
 ### Fixed
 

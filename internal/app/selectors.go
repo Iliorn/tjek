@@ -1,6 +1,7 @@
 package app
 
 import (
+	"slices"
 	"strings"
 	"time"
 
@@ -20,107 +21,258 @@ func todoMatchesSearch(t todo.Todo, search string) bool {
 	return compileSearch(search)(t)
 }
 
-// compileSearch lowers the query once and returns a per-task predicate, so the
-// active/done scan doesn't re-lower the (constant) search string for every task.
-// todoMatchesSearch is the single-shot form; both share this one definition.
-//
-// The query is tokenised on whitespace and the tokens are ANDed together,
-// reusing the quick-add vocabulary: `#tag` (tag substring), `@project` (project
-// substring), a bare `#` or `@` (has any tag / a project), `p:high|med|low`, `due:<date` / `due:>date` / `due:date`
-// (comparison, "<"/">"/"<="/">=" or exact day), and the bare keyword `overdue`.
-// Any leftover bare words are joined and fuzzy-matched against the title
-// (subsequence, so "grcrs" finds "Buy groceries") or matched as a substring of
-// the notes. The two click-driven sentinels
-// — empty (match all) and untaggedKey (no tags) — keep their exact-string meaning.
+// filterEnv is what a filter needs beyond the task in hand. The model fills it
+// from its caches (searchEnv); the zero value still filters, with every #tag
+// matched as a prefix and nothing counted as blocked.
+type filterEnv struct {
+	// tagExists reports whether some task carries exactly this tag. A #tag
+	// naming one matches only it; anything else matches the tags starting
+	// with it, so the list narrows as the tag is typed.
+	tagExists func(tag string) bool
+	// blocked reports whether a task waits on an unfinished dependency.
+	blocked func(id string) bool
+}
+
+// filterKind is what a term tests, for the preview's chips.
+type filterKind int
+
+const (
+	termText filterKind = iota
+	termTag
+	termProject
+	termPriority
+	termDue
+	termWord
+)
+
+// filterTerm is one word of a filter: what it matches, whether it is negated,
+// and how the preview names it.
+type filterTerm struct {
+	kind  filterKind
+	neg   bool
+	label string
+	match func(todo.Todo) bool
+}
+
+// compileSearch is compileSearchWith without the model's caches.
 func compileSearch(search string) func(todo.Todo) bool {
+	return compileSearchWith(search, filterEnv{})
+}
+
+// compileSearchWith reads the query once and returns a per-task predicate, so
+// the active/done scan doesn't re-parse the (constant) search string for every
+// task. The grammar is parseFilter's. The two click-driven sentinels — empty
+// (match all) and untaggedKey (no tags) — keep their exact-string meaning.
+func compileSearchWith(search string, env filterEnv) func(todo.Todo) bool {
 	switch search {
 	case "":
 		return func(todo.Todo) bool { return true }
 	case untaggedKey:
 		return func(t todo.Todo) bool { return len(t.Tags) == 0 }
 	}
-
-	var preds []func(todo.Todo) bool
-	var titleWords []string
-
-	for _, tok := range strings.Fields(search) {
-		// Same two-step as parseQuickAdd: lower once, then fold a localized
-		// field prefix back to English so the branches know one spelling.
-		lower := canonicalInputToken(strings.ToLower(tok))
-		switch {
-		case tok == "#":
-			// The sigil alone, as typed on the way to a tag: every tagged
-			// task, and a title that has the character itself.
-			preds = append(preds, func(t todo.Todo) bool {
-				return len(t.Tags) > 0 || strings.Contains(t.Title, "#")
-			})
-		case tok == "@":
-			preds = append(preds, func(t todo.Todo) bool {
-				return t.Project != "" || strings.Contains(t.Title, "@")
-			})
-		case strings.HasPrefix(tok, "#") && len(tok) > 1:
-			q := strings.ToLower(tok[1:])
-			preds = append(preds, func(t todo.Todo) bool {
-				for _, tag := range t.Tags {
-					if strings.Contains(strings.ToLower(tag), q) {
-						return true
-					}
-				}
-				return false
-			})
-		case strings.HasPrefix(tok, "@") && len(tok) > 1:
-			q := strings.ToLower(tok[1:])
-			preds = append(preds, func(t todo.Todo) bool {
-				return strings.Contains(strings.ToLower(t.Project), q)
-			})
-		case strings.HasPrefix(lower, "p:"):
-			if p, ok := parsePriorityFilter(strings.TrimPrefix(lower, "p:")); ok {
-				preds = append(preds, func(t todo.Todo) bool { return t.Priority == p })
-			} else {
-				titleWords = append(titleWords, tok)
-			}
-		case strings.HasPrefix(lower, "due:"):
-			if f, ok := parseDueFilter(strings.TrimPrefix(lower, "due:")); ok {
-				preds = append(preds, f)
-			} else {
-				titleWords = append(titleWords, tok)
-			}
-		case canonicalInputWord(lower) == "overdue":
-			preds = append(preds, func(t todo.Todo) bool { return t.IsOverdue() })
-		case canonicalInputWord(lower) == "waiting":
-			now := time.Now()
-			preds = append(preds, func(t todo.Todo) bool { return rank.StartsLater(&t, now) })
-		default:
-			titleWords = append(titleWords, tok)
-		}
-	}
-
-	if len(titleWords) > 0 {
-		titleQuery := strings.ToLower(strings.Join(titleWords, " "))
-		preds = append(preds, func(t todo.Todo) bool {
-			if subsequenceFold(t.Title, titleQuery) {
-				return true
-			}
-			// Notes are matched as a plain substring, not a subsequence: a
-			// note is long enough that a fuzzy match over it would hit
-			// almost anything. This is what keeps written-down detail
-			// findable — migration 011 folded the old per-task learnings
-			// into notes, and recall was the point of having them.
-			return strings.Contains(strings.ToLower(t.Notes), titleQuery)
-		})
-	}
-
-	if len(preds) == 0 {
+	groups := parseFilter(search, env)
+	if len(groups) == 0 {
 		return func(todo.Todo) bool { return true }
 	}
 	return func(t todo.Todo) bool {
-		for _, p := range preds {
-			if !p(t) {
-				return false
+	group:
+		for _, terms := range groups {
+			for _, term := range terms {
+				if term.match(t) == term.neg {
+					continue group
+				}
 			}
+			return true
 		}
-		return true
+		return false
 	}
+}
+
+// parseFilter reads a query into groups of terms: a task matches when every
+// term of some group holds. The word "or" (in any shipped language) separates
+// the groups, and the words of a group are ANDed, so AND binds tighter, as in
+// Taskwarrior. It reuses the quick-add vocabulary:
+//
+//   - #tag, @project, p:high, due:<date (comparison "<", ">", "<=", ">=" or an
+//     exact day), and the words overdue, waiting, blocked, ready and active;
+//   - a comma lists alternatives inside one term: #bug,urgent, @work,home,
+//     p:high,medium;
+//   - a leading - or ! negates a term: -#work, !overdue, -milk;
+//   - a bare # or @ is any tag / any project, so -# is untagged;
+//   - anything else is title text. A group's plain words are joined and
+//     matched loosely against the title (every letter in order, "grcrs" finds
+//     "Buy groceries") or as a substring of the notes; a negated word is
+//     matched as a plain substring, since leaving out every loose match would
+//     leave out far too much.
+//
+// A lone "-", "!" or "or", as typed on the way to more, adds nothing, and an
+// empty group is dropped, so the list does not jump while the query is typed.
+func parseFilter(search string, env filterEnv) [][]filterTerm {
+	var groups [][]filterTerm
+	var terms []filterTerm
+	var text []string
+	flush := func() {
+		if len(text) > 0 {
+			q := strings.ToLower(strings.Join(text, " "))
+			terms = append(terms, filterTerm{kind: termText, label: strings.Join(text, " "), match: func(t todo.Todo) bool {
+				// Notes are matched as a plain substring, not a subsequence:
+				// a note is long enough that a fuzzy match over it would hit
+				// almost anything.
+				return subsequenceFold(t.Title, q) || strings.Contains(strings.ToLower(t.Notes), q)
+			}})
+			text = nil
+		}
+		if len(terms) > 0 {
+			groups = append(groups, terms)
+			terms = nil
+		}
+	}
+	for _, tok := range strings.Fields(search) {
+		if canonicalInputWord(strings.ToLower(tok)) == "or" {
+			flush()
+			continue
+		}
+		neg := false
+		if len(tok) > 1 && (tok[0] == '-' || tok[0] == '!') {
+			neg, tok = true, tok[1:]
+		} else if tok == "-" || tok == "!" {
+			continue
+		}
+		term, ok := parseFilterTerm(tok, env)
+		switch {
+		case ok:
+			term.neg = neg
+			terms = append(terms, term)
+		case neg:
+			q := strings.ToLower(tok)
+			terms = append(terms, filterTerm{kind: termText, neg: true, label: tok, match: func(t todo.Todo) bool {
+				return strings.Contains(strings.ToLower(t.Title), q) || strings.Contains(strings.ToLower(t.Notes), q)
+			}})
+		default:
+			text = append(text, tok)
+		}
+	}
+	flush()
+	return groups
+}
+
+// parseFilterTerm reads one token that is not plain text, reporting false for
+// anything else, a mistyped p: or due: value included, which the caller then
+// treats as title text.
+func parseFilterTerm(tok string, env filterEnv) (filterTerm, bool) {
+	// Same two-step as parseQuickAdd: lower once, then fold a localized field
+	// prefix back to English so the branches know one spelling.
+	lower := canonicalInputToken(strings.ToLower(tok))
+	switch {
+	case tok == "#":
+		// The sigil alone, as typed on the way to a tag: every tagged task,
+		// and a title that has the character itself.
+		return filterTerm{kind: termTag, label: "#", match: func(t todo.Todo) bool {
+			return len(t.Tags) > 0 || strings.Contains(t.Title, "#")
+		}}, true
+	case tok == "@":
+		return filterTerm{kind: termProject, label: "@", match: func(t todo.Todo) bool {
+			return t.Project != "" || strings.Contains(t.Title, "@")
+		}}, true
+	case strings.HasPrefix(tok, "#"):
+		type want struct {
+			q     string
+			exact bool
+		}
+		var wants []want
+		for _, q := range filterValues(tok[1:]) {
+			wants = append(wants, want{q, env.tagExists != nil && env.tagExists(q)})
+		}
+		if len(wants) == 0 {
+			return filterTerm{}, false
+		}
+		return filterTerm{kind: termTag, label: tok, match: func(t todo.Todo) bool {
+			for _, tag := range t.Tags {
+				tag = strings.ToLower(tag)
+				for _, w := range wants {
+					if tag == w.q || !w.exact && strings.HasPrefix(tag, w.q) {
+						return true
+					}
+				}
+			}
+			return false
+		}}, true
+	case strings.HasPrefix(tok, "@"):
+		qs := filterValues(tok[1:])
+		if len(qs) == 0 {
+			return filterTerm{}, false
+		}
+		return filterTerm{kind: termProject, label: tok, match: func(t todo.Todo) bool {
+			project := strings.ToLower(t.Project)
+			for _, q := range qs {
+				if strings.Contains(project, q) {
+					return true
+				}
+			}
+			return false
+		}}, true
+	case strings.HasPrefix(lower, "p:"):
+		var ps []todo.Priority
+		for _, v := range filterValues(strings.TrimPrefix(lower, "p:")) {
+			p, ok := parsePriorityFilter(v)
+			if !ok {
+				return filterTerm{}, false
+			}
+			ps = append(ps, p)
+		}
+		if len(ps) == 0 {
+			return filterTerm{}, false
+		}
+		labels := make([]string, len(ps))
+		for i, p := range ps {
+			labels[i] = trPriority(p)
+		}
+		return filterTerm{kind: termPriority, label: "p:" + strings.Join(labels, ","), match: func(t todo.Todo) bool {
+			return slices.Contains(ps, t.Priority)
+		}}, true
+	case strings.HasPrefix(lower, "due:"):
+		spec := strings.TrimPrefix(lower, "due:")
+		f, ok := parseDueFilter(spec)
+		if !ok {
+			return filterTerm{}, false
+		}
+		desc, _ := describeDueFilter(spec)
+		return filterTerm{kind: termDue, label: desc, match: f}, true
+	}
+	now := time.Now()
+	var match func(todo.Todo) bool
+	word := canonicalInputWord(lower)
+	switch word {
+	case "overdue":
+		match = func(t todo.Todo) bool { return t.IsOverdue() }
+	case "waiting":
+		match = func(t todo.Todo) bool { return rank.StartsLater(&t, now) }
+	case "blocked":
+		match = func(t todo.Todo) bool { return env.blocked != nil && env.blocked(t.ID) }
+	case "ready":
+		// What can be picked up now: open, nothing holding it up, and not
+		// waiting for a later start.
+		match = func(t todo.Todo) bool {
+			return t.Status == todo.Pending && !(env.blocked != nil && env.blocked(t.ID)) && !rank.StartsLater(&t, now)
+		}
+	case "active":
+		match = func(t todo.Todo) bool { return t.RunningEntry() != nil }
+	default:
+		return filterTerm{}, false
+	}
+	return filterTerm{kind: termWord, label: tr(word), match: match}, true
+}
+
+// filterValues splits a term's value on commas into its lower-cased
+// alternatives, dropping the empty ones a trailing comma leaves while typing.
+func filterValues(s string) []string {
+	var out []string
+	for _, v := range strings.Split(strings.ToLower(s), ",") {
+		if v = strings.TrimSpace(v); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 // searchShowsWaiting reports whether a query asks for the tasks waiting for
@@ -271,7 +423,7 @@ func selectActiveDone(todos []*todo.Todo, now time.Time, score func(*todo.Todo) 
 	if sortMode == taskSortSequence {
 		rollup = rank.Lifts(todos, score)
 	}
-	return selectActiveDoneRanked(todos, rollup, now, score, search, focus, sortMode, historyMode, nil)
+	return selectActiveDoneRanked(todos, rollup, now, score, search, filterEnv{}, focus, sortMode, historyMode, nil)
 }
 
 // selectActiveDoneRanked takes the lift map from its caller. The model computes
@@ -282,8 +434,8 @@ func selectActiveDone(todos []*todo.Todo, now time.Time, score func(*todo.Todo) 
 // hidden is the waitingSet the active list leaves out, nil to hide nothing. It
 // is applied here rather than by narrowing todos, since a hidden task still
 // blocks the visible ones that depend on it.
-func selectActiveDoneRanked(todos []*todo.Todo, rollup map[string]float64, now time.Time, score func(*todo.Todo) float64, search string, focus bool, sortMode taskSortMode, historyMode historySortMode, hidden map[string]bool) (active, done []todo.Todo) {
-	match := compileSearch(search)
+func selectActiveDoneRanked(todos []*todo.Todo, rollup map[string]float64, now time.Time, score func(*todo.Todo) float64, search string, env filterEnv, focus bool, sortMode taskSortMode, historyMode historySortMode, hidden map[string]bool) (active, done []todo.Todo) {
+	match := compileSearchWith(search, env)
 	// Split and sort as pointers, then materialize once at the end. The caches
 	// hold values — they outlive this call and are read while the store mutates
 	// — but sorting them as values meant every swap moved a 416-byte struct,

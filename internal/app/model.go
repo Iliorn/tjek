@@ -1646,7 +1646,7 @@ func (m *model) toggleSubtask(parentID string, subtaskCursor int) []string {
 // ── Search/filter helpers ─────────────────────────────────────────────────────
 
 func (m model) matchesSearch(t todo.Todo) bool {
-	return todoMatchesSearch(t, m.searchQuery)
+	return compileSearchWith(m.searchQuery, m.searchEnv())(t)
 }
 
 // loopingDepCandidates returns the task IDs that must not be offered as a new
