@@ -185,6 +185,12 @@ picker. Tags are lowercase, and spaces become `-` (`Deep Work` becomes
 Dates: `today` · `tomorrow` · `next week` · `monday` · `15-06-25` · `+3d` ·
 `+2w` · `+1m` · `-2d` (counting back)
 
+Taskwarrior's period names work too, in every language: `sow`/`eow`,
+`som`/`eom`, `soq`/`eoq` and `soy`/`eoy` are the first and last day of this
+week, month, quarter and year, `eoww` is this Friday, and `sonw`, `sonm`,
+`sonq` and `sony` the first day of the next one. Weeks start on Monday. Any
+date word takes a count after it: `eom-2d`, `friday+1w`.
+
 ## Repeating tasks
 
 `r:` in the add field, or `r` on a task's **Recurrence** field, makes it

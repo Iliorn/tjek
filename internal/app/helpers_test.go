@@ -1397,6 +1397,45 @@ func TestParseDueDateCountsBack(t *testing.T) {
 	}
 }
 
+// Taskwarrior's period names, counted from a Thursday in the middle of a
+// quarter, and a date word moved by a count.
+func TestParseDueDatePeriodEdges(t *testing.T) {
+	now := time.Date(2026, 8, 13, 10, 0, 0, 0, time.Local) // Thursday
+	for in, want := range map[string]string{
+		"sow": "10-08-26", "eoww": "14-08-26", "eow": "16-08-26", "sonw": "17-08-26",
+		"som": "01-08-26", "eom": "31-08-26", "sonm": "01-09-26",
+		"soq": "01-07-26", "eoq": "30-09-26", "sonq": "01-10-26",
+		"soy": "01-01-26", "eoy": "31-12-26", "sony": "01-01-27",
+		"eom-2d": "29-08-26", "friday+1w": "21-08-26", "eoq+1m": "30-10-26",
+		"15-06-25+2d": "17-06-25", "tomorrow-1d": "13-08-26",
+	} {
+		got, err := parseDueDateAt(in, now)
+		if err != nil || got.Format("02-01-06") != want {
+			t.Errorf("parseDueDateAt(%q) = %v, %v; want %s", in, got.Format("02-01-06"), err, want)
+		}
+	}
+	// A Sunday is the end of its own week, not the start of the next.
+	sunday := time.Date(2026, 8, 16, 10, 0, 0, 0, time.Local)
+	if got, _ := parseDueDateAt("sow", sunday); got.Format("02-01-06") != "10-08-26" {
+		t.Errorf("sow on a Sunday = %s, want 10-08-26", got.Format("02-01-06"))
+	}
+	// February's end, in a leap year and out of one.
+	for in, want := range map[int]string{2028: "29-02-28", 2027: "28-02-27"} {
+		feb := time.Date(in, 2, 10, 0, 0, 0, 0, time.Local)
+		if got, _ := parseDueDateAt("eom", feb); got.Format("02-01-06") != want {
+			t.Errorf("eom in February %d = %s, want %s", in, got.Format("02-01-06"), want)
+		}
+	}
+	for _, bad := range []string{"eom-0d", "eom-2x", "nonsense+2d", "someday"} {
+		if _, err := parseDueDateAt(bad, now); err == nil {
+			t.Errorf("parseDueDateAt(%q) should fail", bad)
+		}
+	}
+	if p := parseQuickAdd("Pay rent due:eom-2d"); p.title != "Pay rent" || p.dueDate.IsZero() {
+		t.Errorf("quick-add should take due:eom-2d as a date, got title %q", p.title)
+	}
+}
+
 // A column heading much wider than its values strands cells on every row. In
 // Danish "Størrelse" over a single s/m/l pushed Project off the list at a
 // width where English still shows it.

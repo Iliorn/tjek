@@ -1504,6 +1504,11 @@ func (m model) helpBodyLines() []string {
 		{inputWord("next month"), tr("1 month from now")},
 		{strings.ToLower(localizedWeekday(time.Monday)) + ".." + strings.ToLower(localizedWeekday(time.Sunday)), tr("next occurrence of weekday")},
 		{"+3d / +2w / +1m", tr("relative days/weeks/months")},
+		{"sow / eow / eoww", tr("start/end of this week, end of the work week")},
+		{"som / eom · soq / eoq", tr("start/end of this month · quarter")},
+		{"soy / eoy", tr("start/end of this year")},
+		{"sonw/sonm/sonq/sony", tr("start of the next week/month/quarter/year")},
+		{"eom-2d / friday+1w", tr("any date word, moved by a count")},
 	}})
 
 	// A filter narrows the rows and drops the sections left empty, so a query

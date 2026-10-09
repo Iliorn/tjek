@@ -396,6 +396,11 @@ var daTranslations = map[string]string{
 	"1 month from now":                                    "1 måned fra nu",
 	"next occurrence of weekday":                          "næste forekomst af ugedag",
 	"relative days/weeks/months":                          "relative dage/uger/måneder",
+	"start/end of this week, end of the work week":        "start/slut på denne uge, slut på arbejdsugen",
+	"start/end of this month · quarter":                   "start/slut på denne måned · dette kvartal",
+	"start/end of this year":                              "start/slut på dette år",
+	"start of the next week/month/quarter/year":           "start på næste uge/måned/kvartal/år",
+	"any date word, moved by a count":                     "et datoord, flyttet et antal",
 
 	// Stats detail
 	"Last 30 days":                  "Sidste 30 dage",
@@ -1144,6 +1149,11 @@ var deTranslations = map[string]string{
 	"1 month from now":                                    "in 1 Monat",
 	"next occurrence of weekday":                          "nächster dieser Wochentage",
 	"relative days/weeks/months":                          "relative Tage/Wochen/Monate",
+	"start/end of this week, end of the work week":        "Anfang/Ende dieser Woche, Ende der Arbeitswoche",
+	"start/end of this month · quarter":                   "Anfang/Ende dieses Monats · Quartals",
+	"start/end of this year":                              "Anfang/Ende dieses Jahres",
+	"start of the next week/month/quarter/year":           "Anfang der nächsten Woche/des nächsten Monats/Quartals/Jahres",
+	"any date word, moved by a count":                     "ein Datumswort, um eine Anzahl verschoben",
 
 	// Stats detail
 	"Last 30 days":                  "Letzte 30 Tage",

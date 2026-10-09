@@ -1695,6 +1695,20 @@ func parseDueDateAt(s string, now time.Time) (time.Time, error) {
 		return today.AddDate(0, 1, 0), nil
 	}
 
+	if d, ok := periodEdge(lower, today); ok {
+		return d, nil
+	}
+
+	// A date word moved by a count, "eom-2d" or "friday+1w": the word is
+	// parsed on its own and the count applied to it, as "+3d" is to today.
+	if base, n, unit, ok := splitDateOffset(lower); ok {
+		d, err := parseDueDateAt(base, now)
+		if err != nil {
+			return time.Time{}, err
+		}
+		return addDateUnit(d, n, unit), nil
+	}
+
 	if dayName, ok := splitNextPrefix(lower); ok {
 		if weekday, ok := parseWeekday(dayName); ok {
 			return nextWeekday(today, weekday), nil
@@ -1714,13 +1728,8 @@ func parseDueDateAt(s string, now time.Time) (time.Time, error) {
 			if lower[0] == '-' {
 				n = -n
 			}
-			switch unit {
-			case 'd':
-				return today.AddDate(0, 0, n), nil
-			case 'w':
-				return today.AddDate(0, 0, n*7), nil
-			case 'm':
-				return today.AddDate(0, n, 0), nil
+			if unit == 'd' || unit == 'w' || unit == 'm' {
+				return addDateUnit(today, n, unit), nil
 			}
 		}
 	}
@@ -1731,8 +1740,85 @@ func parseDueDateAt(s string, now time.Time) (time.Time, error) {
 	if t, err := time.ParseInLocation("02-01-2006", s, now.Location()); err == nil {
 		return t, nil
 	}
-	return time.Time{}, fmt.Errorf("invalid date: use dd-mm-yy, %q, %q, %q, %q, or '+Nd/+Nw/+Nm' (- counts back)",
+	return time.Time{}, fmt.Errorf("invalid date: use dd-mm-yy, %q, %q, %q, %q, eom, or '+Nd/+Nw/+Nm' (- counts back)",
 		inputWord("today"), inputWord("tomorrow"), inputWord("next week"), strings.ToLower(localizedWeekday(time.Monday)))
+}
+
+// addDateUnit moves d by n days, weeks or months.
+func addDateUnit(d time.Time, n int, unit byte) time.Time {
+	switch unit {
+	case 'w':
+		return d.AddDate(0, 0, n*7)
+	case 'm':
+		return d.AddDate(0, n, 0)
+	}
+	return d.AddDate(0, 0, n)
+}
+
+// splitDateOffset splits "eom-2d" into the date word and a signed count of a
+// unit. The word must be there: a bare "+3d" is counted from today by the
+// caller, and "15-06-25" has no unit letter, so its dashes are left alone.
+func splitDateOffset(s string) (base string, n int, unit byte, ok bool) {
+	if len(s) < 4 {
+		return "", 0, 0, false
+	}
+	unit = s[len(s)-1]
+	if unit != 'd' && unit != 'w' && unit != 'm' {
+		return "", 0, 0, false
+	}
+	i := strings.LastIndexAny(s, "+-")
+	if i <= 0 {
+		return "", 0, 0, false
+	}
+	n, ok = parsePositiveInt(s[i+1 : len(s)-1])
+	if !ok || n == 0 {
+		return "", 0, 0, false
+	}
+	if s[i] == '-' {
+		n = -n
+	}
+	return s[:i], n, unit, true
+}
+
+// periodEdge reads Taskwarrior's names for the first and last day of the
+// current week, month, quarter or year (sow/eow, som/eom, soq/eoq, soy/eoy),
+// the first day of the next one (sonw, sonm, sonq, sony), and eoww, the end
+// of the working week. Weeks run Monday to Sunday, as the calendar draws them.
+// They are English abbreviations in every language: a borrowed shorthand has
+// no Danish or German spelling to translate to.
+func periodEdge(word string, today time.Time) (time.Time, bool) {
+	y, m, loc := today.Year(), today.Month(), today.Location()
+	monday := today.AddDate(0, 0, -((int(today.Weekday()) + 6) % 7))
+	quarter := time.Date(y, m-(m-1)%3, 1, 0, 0, 0, 0, loc)
+	switch word {
+	case "sow":
+		return monday, true
+	case "eoww":
+		return monday.AddDate(0, 0, 4), true
+	case "eow":
+		return monday.AddDate(0, 0, 6), true
+	case "sonw":
+		return monday.AddDate(0, 0, 7), true
+	case "som":
+		return time.Date(y, m, 1, 0, 0, 0, 0, loc), true
+	case "eom":
+		return time.Date(y, m+1, 0, 0, 0, 0, 0, loc), true
+	case "sonm":
+		return time.Date(y, m+1, 1, 0, 0, 0, 0, loc), true
+	case "soq":
+		return quarter, true
+	case "eoq":
+		return quarter.AddDate(0, 3, -1), true
+	case "sonq":
+		return quarter.AddDate(0, 3, 0), true
+	case "soy":
+		return time.Date(y, 1, 1, 0, 0, 0, 0, loc), true
+	case "eoy":
+		return time.Date(y, 12, 31, 0, 0, 0, 0, loc), true
+	case "sony":
+		return time.Date(y+1, 1, 1, 0, 0, 0, 0, loc), true
+	}
+	return time.Time{}, false
 }
 
 // parseWeekday takes the English day names and their three-letter forms, plus
