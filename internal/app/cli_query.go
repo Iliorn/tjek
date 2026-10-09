@@ -192,7 +192,8 @@ func cliSearch(args []string) int {
 
 // cliTags / cliProjects: discovery commands. Counts only count pending
 // top-level tasks so the listing reflects what's in flight, not historical
-// fragments. Sort by count desc, then name asc, for stable output.
+// fragments, and leave out the tasks waiting for a later start date, as the
+// app's Tags and Projects tabs do. Sort by count desc, then name asc, for stable output.
 
 type nameCount struct {
 	Name  string `json:"name"`
@@ -224,8 +225,9 @@ func cliTags(args []string) int {
 		return 1
 	}
 	counts := map[string]int{}
+	hide, now := storedHideWaiting(), time.Now()
 	for _, t := range todos {
-		if t.ParentID != "" || t.Status != todo.Pending {
+		if t.ParentID != "" || t.Status != todo.Pending || hide && rank.StartsLater(&t, now) {
 			continue
 		}
 		for _, tag := range t.Tags {
@@ -266,8 +268,9 @@ func cliProjects(args []string) int {
 		return 1
 	}
 	counts := map[string]int{}
+	hide, now := storedHideWaiting(), time.Now()
 	for _, t := range todos {
-		if t.ParentID != "" || t.Status != todo.Pending {
+		if t.ParentID != "" || t.Status != todo.Pending || hide && rank.StartsLater(&t, now) {
 			continue
 		}
 		if t.Project == "" {

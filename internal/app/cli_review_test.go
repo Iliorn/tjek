@@ -442,6 +442,22 @@ func TestShowPrintsTheRepeatRule(t *testing.T) {
 	}
 }
 
+// tags and projects count what the app's tabs count: not the waiting tasks.
+func TestTagsAndProjectsLeaveOutWaitingTasks(t *testing.T) {
+	captureStdout(t, func() {
+		cliAdd([]string{"now task #waitcount-tag @WaitcountProj"})
+		cliAdd([]string{"later task #waitcount-tag @WaitcountProj wait:someday"})
+	})
+	tags := captureStdout(t, func() { cliTags(nil) })
+	projects := captureStdout(t, func() { cliProjects(nil) })
+	if !strings.Contains(tags, "   1  waitcount-tag") {
+		t.Errorf("tags should count only the startable task:\n%s", tags)
+	}
+	if !strings.Contains(projects, "   1  WaitcountProj") {
+		t.Errorf("projects should count only the startable task:\n%s", projects)
+	}
+}
+
 // Contradictory text filters are a usage error, not a precedence puzzle.
 func TestListRejectsContradictoryTextFilters(t *testing.T) {
 	if code := cliList([]string{"--search", "ram", "--search-word", "ram"}); code != 2 {
