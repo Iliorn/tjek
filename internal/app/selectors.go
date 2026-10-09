@@ -308,6 +308,10 @@ func selectActiveDoneRanked(todos []*todo.Todo, rollup map[string]float64, now t
 	// up may be a subtask, or filtered out of view.
 	_, less, _ := taskSortColumn(sortMode)
 	switch {
+	case sortMode == taskSortSequence && searchShowsWaiting(search):
+		// /waiting lists what is put away, by when it comes back: the
+		// Score column shows that day, and someday sorts last.
+		sortTodoPtrs(activeP, lessByStart)
 	case sortMode == taskSortSequence:
 		blocked, _ := rank.DependencySets(todos)
 		rank.SortPtrs(activeP, rollup, rank.Sunk(blocked, activeP, now), score)

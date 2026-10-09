@@ -709,6 +709,7 @@ func TestWaitingTaskIsHiddenUntilItsStartDate(t *testing.T) {
 	sub.Project = "Admin"
 	someday := todo.New("learn the cello")
 	someday.SetStartDate(todo.Someday)
+	someday.Priority = todo.PriorityHigh // outscores the dated one
 	waitsOn := todo.New("book the trip")
 	waitsOn.Dependencies = []string{later.ID}
 	now := todo.New("water the plants")
@@ -752,8 +753,8 @@ func TestWaitingTaskIsHiddenUntilItsStartDate(t *testing.T) {
 
 	m.searchQuery = "waiting"
 	m.refreshFilteredCaches()
-	if got := titles(m.cache.active); len(got) != 2 {
-		t.Errorf("/waiting should show the two waiting tasks, got %v", got)
+	if got := titles(m.cache.active); len(got) != 2 || got[0] != later.Title {
+		t.Errorf("/waiting should show the two waiting tasks, the dated one first, got %v", got)
 	}
 
 	m.searchQuery = ""
