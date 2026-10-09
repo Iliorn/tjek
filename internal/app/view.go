@@ -1508,6 +1508,7 @@ func (m model) helpBodyLines() []string {
 		{"som / eom · soq / eoq", tr("start/end of this month · quarter")},
 		{"soy / eoy", tr("start/end of this year")},
 		{"sonw/sonm/sonq/sony", tr("start of the next week/month/quarter/year")},
+		{inputWord("end of month") + " …", tr("any of them spelled out (joined in the add field)")},
 		{"eom-2d / friday+1w", tr("any date word, moved by a count")},
 	}})
 

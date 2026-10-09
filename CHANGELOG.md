@@ -15,7 +15,7 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ### Added
 
-- Dates take Taskwarrior's eom, eow, soq, eoy and friends, and a count after a word: `eom-2d`.
+- Dates take eom, soq, "end of month" and the like, with a count after them: `eom-2d`.
 
 ## [1.54.1] - 2026-10-09
 

@@ -188,8 +188,11 @@ Dates: `today` · `tomorrow` · `next week` · `monday` · `15-06-25` · `+3d` �
 Taskwarrior's period names work too, in every language: `sow`/`eow`,
 `som`/`eom`, `soq`/`eoq` and `soy`/`eoy` are the first and last day of this
 week, month, quarter and year, `eoww` is this Friday, and `sonw`, `sonm`,
-`sonq` and `sony` the first day of the next one. Weeks start on Monday. Any
-date word takes a count after it: `eom-2d`, `friday+1w`.
+`sonq` and `sony` the first day of the next one. Weeks start on Monday. Each
+can be spelled out, `end of month`, `start of next week`, `end of the year`,
+and in the add field written as one word or with dashes: `due:end-of-month`.
+In Danish and German they read `slut på måneden` (or `ultimo`) and
+`Monatsende`. Any date word takes a count after it: `eom-2d`, `friday+1w`.
 
 ## Repeating tasks
 

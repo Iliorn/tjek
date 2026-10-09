@@ -24,7 +24,7 @@ func TestHelpOverlayScrollRevealsLowerSections(t *testing.T) {
 
 	// The final date-input row is the last content line — off-screen at the
 	// top, reachable at the bottom.
-	const lastRow = "+3d / +2w / +1m"
+	const lastRow = "eom-2d / friday+1w"
 
 	atTop := m.renderHelpFullscreen()
 	if strings.Contains(atTop, lastRow) {

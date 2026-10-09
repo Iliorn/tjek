@@ -1695,6 +1695,9 @@ func parseDueDateAt(s string, now time.Time) (time.Time, error) {
 		return today.AddDate(0, 1, 0), nil
 	}
 
+	if abbr, ok := periodPhrase(lower); ok {
+		lower = abbr
+	}
 	if d, ok := periodEdge(lower, today); ok {
 		return d, nil
 	}
@@ -1778,6 +1781,51 @@ func splitDateOffset(s string) (base string, n int, unit byte, ok bool) {
 		n = -n
 	}
 	return s[:i], n, unit, true
+}
+
+// periodPhrases spell out the names periodEdge reads. Each phrase is an input
+// keyword (lang_input.go), so the active language's spelling of it parses too.
+var periodPhrases = map[string]string{
+	"start of week":         "sow",
+	"end of week":           "eow",
+	"end of work week":      "eoww",
+	"start of next week":    "sonw",
+	"start of month":        "som",
+	"end of month":          "eom",
+	"start of next month":   "sonm",
+	"start of quarter":      "soq",
+	"end of quarter":        "eoq",
+	"start of next quarter": "sonq",
+	"start of year":         "soy",
+	"end of year":           "eoy",
+	"start of next year":    "sony",
+}
+
+// periodPhraseIndex holds every phrase with its spaces taken out, and again
+// with "the" after "of" ("end of the month"), the way English says it.
+var periodPhraseIndex = func() map[string]string {
+	idx := map[string]string{}
+	for phrase, abbr := range periodPhrases {
+		idx[strings.ReplaceAll(phrase, " ", "")] = abbr
+		withThe := strings.Replace(phrase, " of ", " of the ", 1)
+		idx[strings.ReplaceAll(withThe, " ", "")] = abbr
+	}
+	return idx
+}()
+
+// periodPhrase maps a spelled-out period, "end of month", to its short name.
+// Spaces and dashes are ignored, since a quick-add value cannot hold a space:
+// "endofmonth" and "end-of-month" read the same, in any language.
+func periodPhrase(s string) (string, bool) {
+	squashed := strings.NewReplacer(" ", "", "-", "").Replace(s)
+	if abbr, ok := periodPhraseIndex[squashed]; ok {
+		return abbr, true
+	}
+	if abbr, ok := periodPhrases[canonicalInputWord(s)]; ok {
+		return abbr, true
+	}
+	abbr, ok := periodPhrases[canonicalInputWord(squashed)]
+	return abbr, ok
 }
 
 // periodEdge reads Taskwarrior's names for the first and last day of the

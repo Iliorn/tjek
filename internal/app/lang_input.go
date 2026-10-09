@@ -44,6 +44,11 @@ import (
 var inputKeywords = []string{
 	// Date words (parseDueDate).
 	"today", "tomorrow", "yesterday", "next week", "next month", "next",
+	// Spelled-out periods (periodPhrases).
+	"start of week", "end of week", "end of work week", "start of next week",
+	"start of month", "end of month", "start of next month",
+	"start of quarter", "end of quarter", "start of next quarter",
+	"start of year", "end of year", "start of next year",
 	// Priority values (p:) — "medium" is shared with the size scale.
 	"high", "medium", "low",
 	// Size values (s:, size:).
@@ -64,6 +69,11 @@ var inputKeywords = []string{
 // space-free variant of every multi-word translation, so only genuine
 // irregularities belong here.
 var extraInputAliases = map[language]map[string]string{
+	langDA: {
+		// The bookkeeping words for a month's first and last day.
+		"primo":  "start of month",
+		"ultimo": "end of month",
+	},
 	langDE: {
 		// German inflects the article-like "nächste" by case and gender;
 		// whichever one the user reaches for should find the weekday.

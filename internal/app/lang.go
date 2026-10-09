@@ -401,6 +401,7 @@ var daTranslations = map[string]string{
 	"start/end of this year":                              "start/slut på dette år",
 	"start of the next week/month/quarter/year":           "start på næste uge/måned/kvartal/år",
 	"any date word, moved by a count":                     "et datoord, flyttet et antal",
+	"any of them spelled out (joined in the add field)":   "skrevet helt ud (i ét ord i tilføj-feltet)",
 
 	// Stats detail
 	"Last 30 days":                  "Sidste 30 dage",
@@ -473,6 +474,21 @@ var daTranslations = map[string]string{
 	"recur:":     "gentag:",
 	"until:":     "indtil:",
 	"dep:":       "afh:",
+
+	// Spelled-out periods (periodPhrases), "end of month" for eom.
+	"start of week":         "start på ugen",
+	"end of week":           "slut på ugen",
+	"end of work week":      "slut på arbejdsugen",
+	"start of next week":    "start på næste uge",
+	"start of month":        "start på måneden",
+	"end of month":          "slut på måneden",
+	"start of next month":   "start på næste måned",
+	"start of quarter":      "start på kvartalet",
+	"end of quarter":        "slut på kvartalet",
+	"start of next quarter": "start på næste kvartal",
+	"start of year":         "start på året",
+	"end of year":           "slut på året",
+	"start of next year":    "start på næste år",
 
 	// List headers / sort
 	"Completed tasks":   "Afsluttede opgaver",
@@ -1154,6 +1170,7 @@ var deTranslations = map[string]string{
 	"start/end of this year":                              "Anfang/Ende dieses Jahres",
 	"start of the next week/month/quarter/year":           "Anfang der nächsten Woche/des nächsten Monats/Quartals/Jahres",
 	"any date word, moved by a count":                     "ein Datumswort, um eine Anzahl verschoben",
+	"any of them spelled out (joined in the add field)":   "ausgeschrieben (im Eingabefeld zusammengeschrieben)",
 
 	// Stats detail
 	"Last 30 days":                  "Letzte 30 Tage",
@@ -1226,6 +1243,21 @@ var deTranslations = map[string]string{
 	"recur:":     "wiederh:",
 	"until:":     "bis:",
 	"dep:":       "abh:",
+
+	// Spelled-out periods (periodPhrases), "end of month" for eom.
+	"start of week":         "Wochenanfang",
+	"end of week":           "Ende der Woche",
+	"end of work week":      "Ende der Arbeitswoche",
+	"start of next week":    "Anfang nächster Woche",
+	"start of month":        "Monatsanfang",
+	"end of month":          "Monatsende",
+	"start of next month":   "Anfang nächsten Monats",
+	"start of quarter":      "Quartalsanfang",
+	"end of quarter":        "Quartalsende",
+	"start of next quarter": "Anfang nächsten Quartals",
+	"start of year":         "Jahresanfang",
+	"end of year":           "Jahresende",
+	"start of next year":    "Anfang nächsten Jahres",
 
 	// List headers / sort
 	"Completed tasks":   "Erledigte Aufgaben",

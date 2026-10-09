@@ -1436,6 +1436,49 @@ func TestParseDueDatePeriodEdges(t *testing.T) {
 	}
 }
 
+// Every period can be spelled out, with or without spaces, dashes or "the",
+// and moved by a count like its short name.
+func TestParseDueDatePeriodPhrases(t *testing.T) {
+	now := time.Date(2026, 8, 13, 10, 0, 0, 0, time.Local)
+	for phrase, abbr := range periodPhrases {
+		want, _ := parseDueDateAt(abbr, now)
+		for _, in := range []string{
+			phrase,
+			strings.ReplaceAll(phrase, " ", ""),
+			strings.ReplaceAll(phrase, " ", "-"),
+			strings.Replace(phrase, " of ", " of the ", 1),
+		} {
+			if got, err := parseDueDateAt(in, now); err != nil || !got.Equal(want) {
+				t.Errorf("parseDueDateAt(%q) = %v, %v; want %s as %s", in, got, err, want, abbr)
+			}
+		}
+	}
+	if got, _ := parseDueDateAt("end-of-month-2d", now); got.Format("02-01-06") != "29-08-26" {
+		t.Errorf("end-of-month-2d = %s, want 29-08-26", got.Format("02-01-06"))
+	}
+	if p := parseQuickAdd("Pay rent due:end-of-month"); p.title != "Pay rent" || p.dueDate.Day() != 31 {
+		t.Errorf("quick-add due:end-of-month: title %q, due %v", p.title, p.dueDate)
+	}
+}
+
+// The translated phrases, and Danish primo/ultimo, in the add field.
+func TestPeriodPhrasesSpeakTheActiveLanguage(t *testing.T) {
+	cases := map[language][]string{
+		langDA: {"frist:slutpåmåneden", "frist:slut-på-måneden", "frist:ultimo"},
+		langDE: {"fällig:monatsende", "fällig:Monatsende"},
+	}
+	eom := time.Date(time.Now().Year(), time.Now().Month()+1, 0, 0, 0, 0, 0, time.Local)
+	for l, tokens := range cases {
+		withLang(t, l, func() {
+			for _, tok := range tokens {
+				if p := parseQuickAdd("Pay rent " + tok); p.title != "Pay rent" || !p.dueDate.Equal(eom) {
+					t.Errorf("%s: %q gave title %q, due %v; want %v", l, tok, p.title, p.dueDate, eom)
+				}
+			}
+		})
+	}
+}
+
 // A column heading much wider than its values strands cells on every row. In
 // Danish "Størrelse" over a single s/m/l pushed Project off the list at a
 // width where English still shows it.
