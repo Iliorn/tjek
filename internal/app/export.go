@@ -90,19 +90,20 @@ Import is idempotent: running it a second time with the same file changes nothin
 }
 
 // importFile is what an import file holds: its tasks, whether they came from
-// Taskwarrior, and, for those, what did not come across.
+// Taskwarrior, and, for those, what did not come across: notes in sentences,
+// left in the fewest words.
 type importFile struct {
 	tasks       []todo.Todo
 	taskwarrior bool
 	notes       []string
+	left        []string
 }
 
 // readImport reads any file tjek imports: its own export, in either shape, or
 // Taskwarrior's (import_taskwarrior.go).
 func readImport(data []byte) (importFile, error) {
 	if isTaskwarriorExport(data) {
-		tasks, notes, err := parseTaskwarrior(data)
-		return importFile{tasks: tasks, taskwarrior: true, notes: notes}, err
+		return parseTaskwarrior(data)
 	}
 	tasks, err := parseExportData(data)
 	return importFile{tasks: tasks}, err

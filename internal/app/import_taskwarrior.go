@@ -118,16 +118,19 @@ func isTaskwarriorExport(data []byte) bool {
 	return p.UUID != "" && p.Description != nil && p.Title == nil
 }
 
-// parseTaskwarrior turns a `task export` into tjek tasks. notes say what did
-// not come across, one line each, for the import to report.
-func parseTaskwarrior(data []byte) (tasks []todo.Todo, notes []string, err error) {
+// parseTaskwarrior turns a `task export` into tjek tasks. The file's notes
+// say what did not come across, a line each for tjek import to print, and
+// left says it again in a few words for the app's one-line toast.
+func parseTaskwarrior(data []byte) (importFile, error) {
+	var tasks []todo.Todo
+	var notes, left []string
 	var raw []map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, nil, fmt.Errorf("malformed Taskwarrior export: %w", err)
+		return importFile{}, fmt.Errorf("malformed Taskwarrior export: %w", err)
 	}
 	var tw []twTask
 	if err := json.Unmarshal(data, &tw); err != nil {
-		return nil, nil, fmt.Errorf("malformed Taskwarrior export: %w", err)
+		return importFile{}, fmt.Errorf("malformed Taskwarrior export: %w", err)
 	}
 
 	unknown := map[string]bool{}
@@ -241,20 +244,25 @@ func parseTaskwarrior(data []byte) (tasks []todo.Todo, notes []string, err error
 
 	if deleted > 0 {
 		notes = append(notes, fmt.Sprintf("left out %d deleted task(s)", deleted))
+		left = append(left, fmt.Sprintf(tr("%d deleted"), deleted))
 	}
 	if len(droppedRules) > 0 {
 		slices.Sort(droppedRules)
 		notes = append(notes, fmt.Sprintf("%d task(s) no longer repeat: no tjek rule for %s",
 			len(droppedRules), strings.Join(slices.Compact(droppedRules), ", ")))
+		left = append(left, fmt.Sprintf(tr("%d repeat rules"), len(droppedRules)))
 	}
 	if untilDropped > 0 {
 		notes = append(notes, fmt.Sprintf("until: (expiry) dropped from %d task(s)", untilDropped))
+		left = append(left, "until")
 	}
 	if somedayDue > 0 {
 		notes = append(notes, fmt.Sprintf("due:someday dropped from %d task(s)", somedayDue))
+		left = append(left, "due:someday")
 	}
 	if depsDropped > 0 {
 		notes = append(notes, fmt.Sprintf("%d dependency link(s) to deleted tasks dropped", depsDropped))
+		left = append(left, fmt.Sprintf(tr("%d links to deleted tasks"), depsDropped))
 	}
 	if len(unknown) > 0 {
 		keys := make([]string, 0, len(unknown))
@@ -263,8 +271,9 @@ func parseTaskwarrior(data []byte) (tasks []todo.Todo, notes []string, err error
 		}
 		slices.Sort(keys)
 		notes = append(notes, "fields tjek has no place for: "+strings.Join(keys, ", "))
+		left = append(left, keys...)
 	}
-	return tasks, notes, nil
+	return importFile{tasks: tasks, taskwarrior: true, notes: notes, left: left}, nil
 }
 
 // twStart is the tjek start date of a Taskwarrior task: its wait (hidden

@@ -752,8 +752,11 @@ func (m model) Init() tea.Cmd {
 
 // ── Error timer ───────────────────────────────────────────────────────────────
 
-func clearErrAfter() tea.Cmd {
-	return tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
+func clearErrAfter() tea.Cmd { return clearErrIn(3 * time.Second) }
+
+// clearErrIn clears the toast after d, for one with more to read.
+func clearErrIn(d time.Duration) tea.Cmd {
+	return tea.Tick(d, func(t time.Time) tea.Msg {
 		return clearErrMsg{}
 	})
 }

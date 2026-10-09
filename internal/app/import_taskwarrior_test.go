@@ -68,10 +68,11 @@ func TestTaskwarriorExportIsRecognised(t *testing.T) {
 }
 
 func TestTaskwarriorFieldsComeAcross(t *testing.T) {
-	tasks, notes, err := parseTaskwarrior([]byte(twSample))
+	file, err := parseTaskwarrior([]byte(twSample))
 	if err != nil {
 		t.Fatal(err)
 	}
+	tasks, notes := file.tasks, file.notes
 	// 11 entries: the template and the deleted task are left out.
 	if len(tasks) != 9 {
 		t.Fatalf("got %d tasks, want 9", len(tasks))
@@ -172,11 +173,12 @@ func TestTaskwarriorRecurRules(t *testing.T) {
 // The same export read twice gives the same tasks, so a second import into
 // the store changes nothing.
 func TestTaskwarriorImportIsIdempotent(t *testing.T) {
-	first, _, err := parseTaskwarrior([]byte(twSample))
+	firstFile, err := parseTaskwarrior([]byte(twSample))
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, _, _ := parseTaskwarrior([]byte(twSample))
+	secondFile, _ := parseTaskwarrior([]byte(twSample))
+	first, second := firstFile.tasks, secondFile.tasks
 	if !reflect.DeepEqual(first, second) {
 		t.Fatal("two reads of one export differ")
 	}
@@ -186,5 +188,21 @@ func TestTaskwarriorImportIsIdempotent(t *testing.T) {
 	}
 	if _, changed, err := mergeIntoStore(h, second, rank.DefaultBiases()); err != nil || changed {
 		t.Fatalf("second import: changed=%v, %v; want no change", changed, err)
+	}
+}
+
+// The app's toast names what did not come across, after the undo hint.
+func TestTaskwarriorImportToastSaysWhatWasNotKept(t *testing.T) {
+	file, err := parseTaskwarrior([]byte(twSample))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := modelWithTasks(t)
+	next, _ := m.handleImportDone(importDoneMsg{res: importResult{added: 9}, left: file.left})
+	got := next.(model).err
+	for _, want := range []string{"u undoes it · not kept: 1 deleted", "until", "client, estimate"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("toast %q lacks %q", got, want)
+		}
 	}
 }

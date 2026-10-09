@@ -836,6 +836,10 @@ var daTranslations = map[string]string{
 	"Folder to keep tjek-export.json in (blank turns it off)":   "Mappe til tjek-export.json (tom slår den fra)",
 	"Nothing to import: every task in the file is already here": "Intet at importere: alle opgaver i filen er her allerede",
 	"Imported %d new, %d updated · u undoes it":                 "Importeret %d nye, %d opdaterede · u fortryder",
+	"not kept: %s":                                              "ikke med: %s",
+	"%d deleted":                                                "%d slettede",
+	"%d repeat rules":                                           "%d gentagelsesregler",
+	"%d links to deleted tasks":                                 "%d links til slettede opgaver",
 	"tab completes the name · enter confirms · esc cancels":     "tab fuldfører navnet · enter bekræfter · esc annullerer",
 
 	// ── Adding tasks ──
@@ -1614,6 +1618,10 @@ var deTranslations = map[string]string{
 	"Folder to keep tjek-export.json in (blank turns it off)":   "Ordner für tjek-export.json (leer schaltet ihn ab)",
 	"Nothing to import: every task in the file is already here": "Nichts zu importieren: alle Aufgaben der Datei sind schon da",
 	"Imported %d new, %d updated · u undoes it":                 "%d neu, %d aktualisiert importiert · u macht es rückgängig",
+	"not kept: %s":                                              "nicht übernommen: %s",
+	"%d deleted":                                                "%d gelöschte",
+	"%d repeat rules":                                           "%d Wiederholungsregeln",
+	"%d links to deleted tasks":                                 "%d Verweise auf gelöschte Aufgaben",
 	"tab completes the name · enter confirms · esc cancels":     "Tab vervollständigt · Enter bestätigt · Esc bricht ab",
 
 	// ── Adding tasks ──

@@ -43,6 +43,8 @@ type importDoneMsg struct {
 	res   importResult
 	todos []todo.Todo
 	err   error
+	// left is what the file held that did not come across (importFile.left).
+	left []string
 }
 
 // exportSoon notes that the export is out of date and schedules its write.
@@ -173,7 +175,7 @@ func (m model) updateImportFile(msg tea.Msg) (tea.Model, tea.Cmd) {
 				var file importFile
 				if file, err = readImport(data); err == nil {
 					m.mode = modeNormal
-					return m, m.startImport(file.tasks)
+					return m, m.startImport(file)
 				}
 			}
 			m.flashError(fmt.Sprintf(tr("Import failed: %v"), err))
@@ -191,7 +193,8 @@ func (m model) updateImportFile(msg tea.Msg) (tea.Model, tea.Cmd) {
 // the file, so u restores the ones it changed and removes the ones it added.
 // Edits still inside the save debounce are written first, since the merge
 // reads the store from disk.
-func (m *model) startImport(tasks []todo.Todo) tea.Cmd {
+func (m *model) startImport(file importFile) tea.Cmd {
+	tasks := file.tasks
 	ids := make([]string, 0, len(tasks))
 	for i := range tasks {
 		ids = append(ids, tasks[i].ID)
@@ -212,7 +215,7 @@ func (m *model) startImport(tasks []todo.Todo) tea.Cmd {
 			return importDoneMsg{err: err}
 		}
 		todos, err := repo.Load()
-		return importDoneMsg{res: res, todos: todos, err: err}
+		return importDoneMsg{res: res, todos: todos, err: err, left: file.left}
 	}
 }
 
@@ -233,9 +236,17 @@ func (m model) handleImportDone(msg importDoneMsg) (tea.Model, tea.Cmd) {
 		m.flashInfo(tr("Nothing to import: every task in the file is already here"))
 		return m, tea.Batch(clearErrAfter(), finished)
 	}
-	m.flashSuccess(fmt.Sprintf(tr("Imported %d new, %d updated · u undoes it"), msg.res.added, msg.res.updated))
+	text := fmt.Sprintf(tr("Imported %d new, %d updated · u undoes it"), msg.res.added, msg.res.updated)
+	clear := clearErrAfter()
+	if len(msg.left) > 0 {
+		// Last, so a narrow window cuts the list rather than the undo hint,
+		// and up for longer, since it is a list to read.
+		text += " · " + fmt.Sprintf(tr("not kept: %s"), strings.Join(msg.left, ", "))
+		clear = clearErrIn(6 * time.Second)
+	}
+	m.flashSuccess(text)
 	reloaded := reloadedMsg{todos: msg.todos, epoch: m.saveEpoch}
-	return m, tea.Batch(clearErrAfter(), finished, func() tea.Msg { return reloaded })
+	return m, tea.Batch(clear, finished, func() tea.Msg { return reloaded })
 }
 
 // exportFolderDisplay is the Settings row's value: the folder, with the home
