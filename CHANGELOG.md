@@ -24,6 +24,10 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 - Starting the timer on a task with a later start date moves its start to now.
 
+### Fixed
+
+- `tjek show` prints a repeating task's rule.
+
 ## [1.54.1] - 2026-10-09
 
 ### Changed

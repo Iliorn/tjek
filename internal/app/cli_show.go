@@ -164,6 +164,10 @@ func printTaskDetail(t *todo.Todo, subs []todo.Todo, todos []todo.Todo, rk rank.
 	if !t.DueDate.IsZero() {
 		fmt.Printf("Due:      %s\n", t.DueDate.Format("2006-01-02"))
 	}
+	// The rule as stored, which is what --recur takes back.
+	if t.Recurrence != "" {
+		fmt.Printf("Repeats:  %s\n", t.Recurrence)
+	}
 	if t.Project != "" {
 		fmt.Printf("Project:  %s\n", t.Project)
 	}

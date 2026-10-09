@@ -429,6 +429,19 @@ func TestCLIWaitHidesUntilTheStartDate(t *testing.T) {
 	}
 }
 
+// show prints a repeating task's rule, in the form --recur takes.
+func TestShowPrintsTheRepeatRule(t *testing.T) {
+	id := strings.TrimSpace(captureStdout(t, func() {
+		if code := cliAdd([]string{"call mum r:mon,thu due:monday", "--quiet-id"}); code != 0 {
+			t.Fatalf("add: exit %d", code)
+		}
+	}))
+	show := captureStdout(t, func() { cliShow([]string{id}) })
+	if !strings.Contains(show, "Repeats:  weekly:mon,thu") {
+		t.Errorf("show should print the rule:\n%s", show)
+	}
+}
+
 // Contradictory text filters are a usage error, not a precedence puzzle.
 func TestListRejectsContradictoryTextFilters(t *testing.T) {
 	if code := cliList([]string{"--search", "ram", "--search-word", "ram"}); code != 2 {
