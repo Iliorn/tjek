@@ -317,7 +317,9 @@ and another tool can read it.
   `tjek-export.json` there straight away, then keeps it current: within a
   minute of a change, and again when you quit. `x` in the picker turns it
   off.
-- **Import from file**: press enter and pick a tjek export. Its tasks are
+- **Import from file**: press enter and pick a tjek export, or a
+  Taskwarrior one saved from `task export` (see
+  [From Taskwarrior](cli.md#from-taskwarrior)). Its tasks are
   merged in: new ones are added, ones you already have take the newer
   version, and nothing is deleted, so importing the same file twice changes
   nothing. `u` takes the whole import back.

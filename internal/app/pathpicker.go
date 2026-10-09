@@ -51,7 +51,7 @@ var pathPickSpecs = map[pathPick]pathPickSpec{
 		placeholder: "The .tjek file of a shared project"},
 	pickExportFolder: {folder: true, title: "Folder to keep tjek-export.json in", mode: modeEditExportFolder,
 		placeholder: "Folder to keep tjek-export.json in (blank turns it off)"},
-	pickImportFile: {exts: []string{".json", ".JSON"}, title: "A tjek export (.json)", mode: modeImportFile,
+	pickImportFile: {exts: []string{".json", ".JSON"}, title: "A tjek/Taskwarrior export (.json)", mode: modeImportFile,
 		placeholder: "Path to a tjek export (.json)"},
 }
 

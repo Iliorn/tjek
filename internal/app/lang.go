@@ -1040,7 +1040,7 @@ var daTranslations = map[string]string{
 	// The path picker (pathpicker.go).
 	"Folder to share '%s' in":            "Mappe at dele '%s' i",
 	"Folder to keep tjek-export.json in": "Mappe til tjek-export.json",
-	"A tjek export (.json)":              "En tjek-eksport (.json)",
+	"A tjek/Taskwarrior export (.json)":  "En tjek-/Taskwarrior-eksport (.json)",
 	"This folder is empty":               "Mappen er tom",
 	"Can't open %s":                      "Kan ikke åbne %s",
 	"Not a %s file: %s":                  "Ikke en %s-fil: %s",
@@ -1818,7 +1818,7 @@ var deTranslations = map[string]string{
 	// The path picker (pathpicker.go).
 	"Folder to share '%s' in":            "Ordner, in dem '%s' geteilt wird",
 	"Folder to keep tjek-export.json in": "Ordner für tjek-export.json",
-	"A tjek export (.json)":              "Ein tjek-Export (.json)",
+	"A tjek/Taskwarrior export (.json)":  "Ein tjek-/Taskwarrior-Export (.json)",
 	"This folder is empty":               "Dieser Ordner ist leer",
 	"Can't open %s":                      "Kann %s nicht öffnen",
 	"Not a %s file: %s":                  "Keine %s-Datei: %s",

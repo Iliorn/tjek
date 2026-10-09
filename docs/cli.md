@@ -45,6 +45,7 @@ tjek export tasks.json          # versioned JSON snapshot of the open tasks
 tjek export --include-done full.json  # every task, completed ones too (a backup)
 tjek import backup.json         # merge an export file into the local store
 tjek import - < backup.json     # same, reading from stdin
+task export | tjek import -     # bring a Taskwarrior list over (see below)
 tjek doctor                     # this installation's health, for bug reports
 tjek help
 ```
@@ -157,3 +158,24 @@ The main fields of each task:
 your tasks with the same merge that powers sync. It **never replaces**
 anything wholesale, so `export | import` is always safe and importing the same
 file twice changes nothing. A bare JSON array of tasks is accepted too.
+
+### From Taskwarrior
+
+`tjek import` also reads Taskwarrior's `task export`, and tells it apart on
+its own: `task export | tjek import -`, or a saved file through Settings →
+Import. Each task keeps its Taskwarrior UUID as its tjek ID, so importing a
+later export again updates what changed and adds nothing twice.
+
+| Taskwarrior | tjek |
+|---|---|
+| `description`, `project`, `tags`, `due` | title, project, tags, due date |
+| `priority` H / M / L, none | high / medium / low, medium |
+| `status` completed, `end` | done, completed at |
+| `wait` (`someday` too), else `scheduled`, else `start` | start date, so the task [waits](guide.md#waiting-until-later) |
+| `depends` | dependencies |
+| `annotations` | comments |
+| `recur` | the repeat rule, on the series' latest pending task |
+
+Deleted tasks and recurring templates are left out. The command prints what
+did not come across: `until`, a repeat rule tjek has no form of (anything
+shorter than a day), and your own fields (UDAs).

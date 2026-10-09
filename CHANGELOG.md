@@ -18,6 +18,7 @@ belongs in the commit message, where it is kept next to the code it explains.
 - Dates take eom, soq, "end of month" and the like, with a count after them: `eom-2d`.
 - Tasks with a later start date stay hidden until then; `/waiting` shows them.
 - Add with `wait:date`, or `wait:someday` to put a task away until you bring it back.
+- `tjek import` and Settings → Import read Taskwarrior's `task export`.
 
 ### Changed
 

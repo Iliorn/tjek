@@ -32,8 +32,9 @@ func cliImport(args []string) int {
 		fmt.Fprintln(os.Stderr, `usage: tjek import <file>
        tjek import -              read from stdin
 
-Merges the tasks in the export file into the local store. Both the versioned
-envelope produced by 'tjek export' and the legacy bare JSON array are accepted.
+Merges the tasks in the export file into the local store. The versioned
+envelope produced by 'tjek export', the legacy bare JSON array, and
+Taskwarrior's 'task export' are accepted (task export | tjek import -).
 Import is idempotent: running it a second time with the same file changes nothing.`)
 	}
 	if err := fs.Parse(args); err != nil {
@@ -59,11 +60,12 @@ Import is idempotent: running it a second time with the same file changes nothin
 		return 1
 	}
 
-	tasks, err := parseExportData(data)
+	file, err := readImport(data)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "tjek import: %v\n", err)
 		return 1
 	}
+	tasks := file.tasks
 
 	// Get the DB handle through the same path that sync uses: openStore sets
 	// up the package-level `db` singleton and applies all migrations.
@@ -76,8 +78,34 @@ Import is idempotent: running it a second time with the same file changes nothin
 		fmt.Fprintf(os.Stderr, "tjek import: %v\n", err)
 		return 1
 	}
-	fmt.Printf("imported %d task(s), %d changed\n", len(tasks), res.added+res.updated)
+	from := ""
+	if file.taskwarrior {
+		from = " from Taskwarrior"
+	}
+	fmt.Printf("imported %d task(s)%s, %d changed\n", len(tasks), from, res.added+res.updated)
+	for _, note := range file.notes {
+		fmt.Printf("  %s\n", note)
+	}
 	return 0
+}
+
+// importFile is what an import file holds: its tasks, whether they came from
+// Taskwarrior, and, for those, what did not come across.
+type importFile struct {
+	tasks       []todo.Todo
+	taskwarrior bool
+	notes       []string
+}
+
+// readImport reads any file tjek imports: its own export, in either shape, or
+// Taskwarrior's (import_taskwarrior.go).
+func readImport(data []byte) (importFile, error) {
+	if isTaskwarriorExport(data) {
+		tasks, notes, err := parseTaskwarrior(data)
+		return importFile{tasks: tasks, taskwarrior: true, notes: notes}, err
+	}
+	tasks, err := parseExportData(data)
+	return importFile{tasks: tasks}, err
 }
 
 // importResult counts what an import did to the store: tasks it did not have,

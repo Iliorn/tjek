@@ -170,10 +170,10 @@ func (m model) updateImportFile(msg tea.Msg) (tea.Model, tea.Cmd) {
 			path := expandHome(strings.TrimSpace(m.textInput.Value()))
 			data, err := os.ReadFile(path)
 			if err == nil {
-				var tasks []todo.Todo
-				if tasks, err = parseExportData(data); err == nil {
+				var file importFile
+				if file, err = readImport(data); err == nil {
 					m.mode = modeNormal
-					return m, m.startImport(tasks)
+					return m, m.startImport(file.tasks)
 				}
 			}
 			m.flashError(fmt.Sprintf(tr("Import failed: %v"), err))
