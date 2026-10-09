@@ -25,7 +25,11 @@ func cliEdit(args []string) int {
 	size := fs.String("size", "", "new size: s|m|l")
 	due := fs.String("due", "", "set due date (today|tomorrow|+3d|dd-mm-yy|...)")
 	clearDue := fs.Bool("clear-due", false, "drop the due date")
-	start := fs.String("start", "", "set start date")
+	// --wait is Taskwarrior's word for the same thing: hidden until then.
+	var editStartVal string
+	fs.StringVar(&editStartVal, "start", "", "set start date (a date, or someday); the task is hidden until then")
+	fs.StringVar(&editStartVal, "wait", "", "alias for --start")
+	start := &editStartVal
 	clearStart := fs.Bool("clear-start", false, "drop the start date")
 	recur := fs.String("recur", "", "set the recurrence rule, which restarts the series from the due date: "+recurRuleHelp)
 	clearRecur := fs.Bool("clear-recur", false, "stop the task recurring")
@@ -236,7 +240,7 @@ func editOneTask(t *todo.Todo, todos []todo.Todo, f editFields, saveSet, propaga
 		t.ModifiedAt = todo.StampModified(t.ModifiedAt)
 		changed = true
 	} else if *start != "" {
-		d, err := parseDueDate(*start)
+		d, err := parseStartDate(*start)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "invalid start date %q: %v\n", *start, err)
 			return false, 2

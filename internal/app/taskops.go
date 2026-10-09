@@ -97,7 +97,9 @@ func cloneSubtreeResetFrom(children func(string) []string, get func(string) *tod
 			if !child.DueDate.IsZero() {
 				clone.DueDate = child.DueDate.AddDate(0, 0, days)
 			}
-			if !child.StartDate.IsZero() {
+			if todo.IsSomeday(child.StartDate) {
+				clone.StartDate = child.StartDate
+			} else if !child.StartDate.IsZero() {
 				clone.StartDate = child.StartDate.AddDate(0, 0, days)
 			}
 			out = append(out, clone)

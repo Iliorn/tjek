@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Iliorn/tjek/rank"
+	"github.com/Iliorn/tjek/todo"
 )
 
 // view_explain.go is the reading side of rank/explain.go: the "why this
@@ -139,7 +140,11 @@ func seqStartsLine(e rank.Explanation) string {
 	if e.StartsOn.IsZero() {
 		return ""
 	}
-	return fmt.Sprintf(tr("starts %s, so it ranks below the work you can start today"), e.StartsOn.Format("02-01-06"))
+	on := e.StartsOn.Format("02-01-06")
+	if todo.IsSomeday(e.StartsOn) {
+		on = tr("someday")
+	}
+	return fmt.Sprintf(tr("starts %s, so it ranks below the work you can start today"), on)
 }
 
 // seqScaleLine says what 100% currently costs. Normalizing against the live

@@ -19,6 +19,11 @@ type cacheState struct {
 	overdueSet  map[string]bool
 	blockedSet  map[string]bool // tasks waiting on an unfinished dependency
 	blockerSet  map[string]bool // tasks an unfinished task depends on
+	// waiting is the tasks hidden until their start date (waitingSet), nil
+	// when nothing waits or hiding is off; waitingTop counts the top-level
+	// ones for the status line.
+	waiting    map[string]bool
+	waitingTop int
 	// dependents lists, per task, the unfinished tasks that wait on it.
 	dependents map[string][]string
 	active     []todo.Todo
@@ -98,10 +103,15 @@ func (m *model) refreshCaches() {
 
 	m.rebuildDependencySets(all)
 
-	m.cache.active, m.cache.done = selectActiveDoneRanked(all, m.cache.rankScore, m.frameTime, m.rank.ScoreAt(m.frameTime), m.searchQuery, m.focusFilter, m.taskSort, m.historySort)
+	m.cache.waiting, m.cache.waitingTop = nil, 0
+	if m.hideWaiting {
+		m.cache.waiting, m.cache.waitingTop = waitingSet(all, m.frameTime)
+	}
+
+	m.cache.active, m.cache.done = selectActiveDoneRanked(all, m.cache.rankScore, m.frameTime, m.rank.ScoreAt(m.frameTime), m.searchQuery, m.focusFilter, m.taskSort, m.historySort, m.listHidden())
 
 	m.refreshUsageRecency(all)
-	m.refreshGroups(all)
+	m.refreshGroups(withoutHidden(all, m.cache.waiting))
 
 	// subtaskOf is maintained incrementally by Store.add / Store.remove, so
 	// no rebuild is needed here.
@@ -115,6 +125,30 @@ func (m *model) refreshCaches() {
 
 	m.cache.dirty = false
 	m.cache.filterDirty = false
+}
+
+// listHidden is the waiting set the lists leave out: none while the search
+// asks for exactly those tasks.
+func (m *model) listHidden() map[string]bool {
+	if searchShowsWaiting(m.searchQuery) {
+		return nil
+	}
+	return m.cache.waiting
+}
+
+// withoutHidden is all less the tasks in hidden, for the summaries that count
+// what the lists show. It returns all itself when nothing is hidden.
+func withoutHidden(all []*todo.Todo, hidden map[string]bool) []*todo.Todo {
+	if len(hidden) == 0 {
+		return all
+	}
+	out := make([]*todo.Todo, 0, len(all))
+	for _, t := range all {
+		if !hidden[t.ID] {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 // rebuildDependencySets recomputes blockedSet/blockerSet from the full task set.
@@ -231,7 +265,7 @@ func (m model) rankedScore(t *todo.Todo) float64 {
 // entire task set on every keypress for no reason.
 func (m *model) refreshFilteredCaches() {
 	all := m.allTodos()
-	m.cache.active, m.cache.done = selectActiveDoneRanked(all, m.cache.rankScore, m.frameTime, m.rank.ScoreAt(m.frameTime), m.searchQuery, m.focusFilter, m.taskSort, m.historySort)
+	m.cache.active, m.cache.done = selectActiveDoneRanked(all, m.cache.rankScore, m.frameTime, m.rank.ScoreAt(m.frameTime), m.searchQuery, m.focusFilter, m.taskSort, m.historySort, m.listHidden())
 	m.refreshTagRenderCache()
 	m.refreshTaskColMetrics()
 	m.refreshClosedToday()

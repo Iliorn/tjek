@@ -1599,6 +1599,7 @@ func (m *model) persistSettings() {
 		Keys:              activeKeys,
 
 		SubtaskTagsDisabled: !m.subtaskTags,
+		ShowWaiting:         !m.hideWaiting,
 		ExportFolder:        m.exportFolder,
 		PickerFolder:        m.pickerFolder,
 		Name:                m.userName,
@@ -1952,6 +1953,10 @@ func (m *model) settingsAdjust(dir int) tea.Cmd {
 		m.cycleDetailPos(dir)
 	case settingSubtaskTags:
 		m.subtaskTags = !m.subtaskTags
+		m.persistSettings()
+	case settingHideWaiting:
+		m.hideWaiting = !m.hideWaiting
+		m.markCacheDirty()
 		m.persistSettings()
 	case settingSyncAuto:
 		m.toggleSyncAuto()

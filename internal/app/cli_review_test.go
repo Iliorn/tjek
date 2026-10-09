@@ -389,6 +389,46 @@ func TestListWideAddsAgeAndIdleColumns(t *testing.T) {
 	}
 }
 
+// A task added with wait: is left out of list and top until its start date,
+// list --waiting shows it, show says someday, and --start=today wakes it.
+func TestCLIWaitHidesUntilTheStartDate(t *testing.T) {
+	const project = "wait-check"
+	id := strings.TrimSpace(captureStdout(t, func() {
+		if code := cliAdd([]string{"learn the cello wait:someday", "--project", project, "--quiet-id"}); code != 0 {
+			t.Fatalf("add: exit %d", code)
+		}
+	}))
+	list := func(args ...string) string {
+		return captureStdout(t, func() {
+			if code := cliList(append([]string{"--project", project}, args...)); code != 0 {
+				t.Fatalf("list %v: exit %d", args, code)
+			}
+		})
+	}
+	if out := list(); strings.Contains(out, "cello") {
+		t.Errorf("list shows the waiting task:\n%s", out)
+	}
+	if out := list("--waiting"); !strings.Contains(out, "cello") {
+		t.Errorf("list --waiting misses the waiting task:\n%s", out)
+	}
+	top := captureStdout(t, func() { cliTop([]string{"-n", "100"}) })
+	if strings.Contains(top, "cello") {
+		t.Errorf("top shows the waiting task:\n%s", top)
+	}
+	show := captureStdout(t, func() { cliShow([]string{id}) })
+	if !strings.Contains(show, "Start:    someday") {
+		t.Errorf("show should print the someday start:\n%s", show)
+	}
+	captureStdout(t, func() {
+		if code := cliEdit([]string{id, "--wait=today"}); code != 0 {
+			t.Fatalf("edit --wait=today: exit %d", code)
+		}
+	})
+	if out := list(); !strings.Contains(out, "cello") {
+		t.Errorf("a task starting today should be listed:\n%s", out)
+	}
+}
+
 // Contradictory text filters are a usage error, not a precedence puzzle.
 func TestListRejectsContradictoryTextFilters(t *testing.T) {
 	if code := cliList([]string{"--search", "ram", "--search-word", "ram"}); code != 2 {

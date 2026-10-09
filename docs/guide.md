@@ -174,8 +174,9 @@ Buy groceries #shopping due:friday p:high size:s @personal
 ```
 
 The add field understands `#tag`, `@project`, `due:date`,
-`p:high/medium/low`, `size:s/m/l` and `r:rule` (see
-[Repeating tasks](#repeating-tasks)). Typing `#` or `@` offers your existing
+`p:high/medium/low`, `size:s/m/l`, `r:rule` (see
+[Repeating tasks](#repeating-tasks)) and `wait:date` (see
+[Waiting until later](#waiting-until-later)). Typing `#` or `@` offers your existing
 tags and projects, most recently used first; `tab` inserts the highlighted
 one, `↑/↓` pick another. Projects whose name contains a space aren't offered
 there, since the field splits on spaces; set those from the detail pane's `@`
@@ -193,6 +194,32 @@ can be spelled out, `end of month`, `start of next week`, `end of the year`,
 and in the add field written as one word or with dashes: `due:end-of-month`.
 In Danish and German they read `slut på måneden` (or `ultimo`) and
 `Monatsende`. Any date word takes a count after it: `eom-2d`, `friday+1w`.
+
+## Waiting until later
+
+A task with a start date on a later day is put away until that day, like
+Taskwarrior's `wait`. It leaves the Tasks list, the board, and the counts and
+lists on Tags and Projects, and comes back on its own at midnight of its
+start day. Set the date with `wait:` when adding (`Renew passport
+wait:sonm`), on the detail pane's **Start date** row, or with
+`tjek edit <ref> --start` (`--wait` works too).
+
+`someday` is a start date with no day in mind: `wait:someday` puts a task away
+until you bring it back. The Start column shows the word, and the Score
+column `∞`.
+
+Put-away tasks are not lost:
+
+- the status line counts them, as `3 waiting`;
+- `/waiting` shows exactly those tasks, so you can open one and clear its
+  start date, or set it to `today`, to bring it back now;
+- `tjek list --waiting` lists them from the command line;
+- starting the timer on one brings it back, since work on it has begun.
+
+A hidden task still blocks the tasks that depend on it. Subtasks wait with
+their parent; a subtask's own start date only ranks it lower. Settings →
+"Hide until start date" turns the hiding off, and tasks with a later start
+then stay in the list, ranked below today's work.
 
 ## Repeating tasks
 
@@ -226,7 +253,8 @@ grcrs                           # finds "Buy groceries"
 ```
 
 Supported: `#tag`, `@project`, `p:high/medium/low`, `due:<date`,
-`due:>date`, `due:date` (`<=` and `>=` too) and the word `overdue`. A `#` on
+`due:>date`, `due:date` (`<=` and `>=` too), the word `overdue`, and the word
+`waiting` for the tasks put away until a later start date. A `#` on
 its own shows every tagged task, and an `@` every task in a project. Anything
 else matches the title loosely (every letter in order, so `dply` finds
 "Deploy release") or the description as plain text.

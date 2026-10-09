@@ -35,6 +35,9 @@ func (m model) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if !parsed.dueDate.IsZero() {
 						t.DueDate = parsed.dueDate
 					}
+					if !parsed.startDate.IsZero() {
+						t.SetStartDate(parsed.startDate)
+					}
 					if parsed.project != "" {
 						t.Project = parsed.project
 					}
@@ -116,7 +119,7 @@ func (m model) updateInput(msg tea.Msg) (tea.Model, tea.Cmd) {
 						if val == "" {
 							m.pushUndo("clear start date", t.ID)
 							t.StartDate = time.Time{}
-						} else if d, err := parseDueDate(val); err == nil {
+						} else if d, err := parseStartDate(val); err == nil {
 							m.pushUndo("set start date", t.ID)
 							t.SetStartDate(d)
 						} else {

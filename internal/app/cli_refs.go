@@ -176,7 +176,11 @@ type listFilterOpts struct {
 	// to close did so recently. Nothing else surfaces "you can start this now"
 	// — a freed task looks exactly like one that never had a blocker.
 	unblockedFor time.Duration
-	now          time.Time // injectable clock for the windows above; zero = time.Now()
+	// hideWaiting leaves out the tasks that start on a later day, as the
+	// app's lists do (waitingSet); onlyWaiting keeps only those.
+	hideWaiting bool
+	onlyWaiting bool
+	now         time.Time // injectable clock for the windows above; zero = time.Now()
 }
 
 // matchesText applies whichever of the three text filters are set. They are
@@ -300,6 +304,9 @@ func filterTopLevel(todos []todo.Todo, opts listFilterOpts) []todo.Todo {
 			continue
 		}
 		if opts.focus && !(t.IsOverdue() || t.IsDueToday()) {
+			continue
+		}
+		if (opts.hideWaiting || opts.onlyWaiting) && rank.StartsLater(&t, now) != opts.onlyWaiting {
 			continue
 		}
 		if tagQ != "" {

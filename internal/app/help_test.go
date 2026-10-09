@@ -194,6 +194,8 @@ func TestHelpDocumentsEveryToken(t *testing.T) {
 		{"s:l", "x s:l", func(p parsedTask) bool { return p.hasSize }},
 		{"r:weekly", "x r:weekly", func(p parsedTask) bool { return p.recurrence != "" }},
 		{"dep:", "x dep:^", func(p parsedTask) bool { return len(p.deps) == 1 }},
+		{"wait:eom", "x wait:eom", func(p parsedTask) bool { return !p.startDate.IsZero() }},
+		{"wait:someday", "x wait:someday", func(p parsedTask) bool { return todo.IsSomeday(p.startDate) }},
 	}
 	for _, c := range quickAdd {
 		if !strings.Contains(body, c.doc) {
@@ -213,10 +215,12 @@ func TestHelpDocumentsEveryToken(t *testing.T) {
 		{"p:high", "p:high"},
 		{"due:<friday", "due:>01-01-20"},
 		{"overdue", "overdue"},
+		{"waiting", "waiting"},
 		{"grcrs", "grcrs"},
 	}
 	task := m.get(mustAddTask(t, &m, "Buy groceries #home p:high @House"))
 	task.DueDate = time.Now().Add(-24 * time.Hour)
+	task.StartDate = time.Now().AddDate(0, 0, 2)
 	for _, c := range search {
 		if !strings.Contains(body, c.doc) {
 			t.Errorf("search token %q is not documented in the help", c.doc)

@@ -580,7 +580,7 @@ func ganttMoment(t todo.Todo) (time.Time, bool) {
 	switch {
 	case !t.DueDate.IsZero():
 		return t.DueDate, true
-	case !t.StartDate.IsZero():
+	case !plannedStart(t).IsZero():
 		return t.StartDate, true
 	case t.Status == todo.Done && !t.CompletedAt.IsZero():
 		return t.CompletedAt, true
@@ -603,7 +603,7 @@ func ganttMoment(t todo.Todo) (time.Time, bool) {
 
 // ganttPlacementOf reports how a task is drawn and, for a point, when.
 func ganttPlacementOf(t todo.Todo) (ganttPlacement, time.Time) {
-	if !t.StartDate.IsZero() && !t.DueDate.IsZero() {
+	if !plannedStart(t).IsZero() && !t.DueDate.IsZero() {
 		return ganttSpan, time.Time{}
 	}
 	if at, ok := ganttMoment(t); ok {
@@ -631,8 +631,8 @@ func ganttDateWindow(tasks []todo.Todo, today time.Time) (minDate, maxDate time.
 		}
 	}
 	for _, t := range tasks {
-		if !t.StartDate.IsZero() && (minDate.IsZero() || t.StartDate.Before(minDate)) {
-			minDate = t.StartDate
+		if start := plannedStart(t); !start.IsZero() && (minDate.IsZero() || start.Before(minDate)) {
+			minDate = start
 		}
 		if !t.DueDate.IsZero() && (maxDate.IsZero() || t.DueDate.After(maxDate)) {
 			maxDate = t.DueDate

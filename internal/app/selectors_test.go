@@ -670,8 +670,8 @@ func TestBlockedWorkSinksBelowStartableWork(t *testing.T) {
 	}
 }
 
-// A start date on a later day sinks the task the same way, without the
-// blocked glyph: nothing is holding it up but the calendar.
+// With hiding off, a start date on a later day sinks the task the same way,
+// without the blocked glyph: nothing is holding it up but the calendar.
 func TestLaterStartSinksBelowStartableWork(t *testing.T) {
 	urgent := todo.New("book the venue")
 	urgent.Priority = todo.PriorityHigh
@@ -682,6 +682,7 @@ func TestLaterStartSinksBelowStartableWork(t *testing.T) {
 
 	m := modelWithTasks(t, urgent, calm)
 	m.taskSort = taskSortSequence
+	m.hideWaiting = false
 	m.refreshCaches()
 
 	if last := m.cache.active[1]; last.ID != urgent.ID {
@@ -694,6 +695,72 @@ func TestLaterStartSinksBelowStartableWork(t *testing.T) {
 	m.refreshCaches()
 	if first := m.cache.active[0]; first.ID != urgent.ID {
 		t.Errorf("starting today, the overdue task should lead, got %q", first.Title)
+	}
+}
+
+// With hiding on (the default), a task that starts on a later day leaves
+// every list with its subtasks until that day, is counted for the status line,
+// and still blocks what depends on it. /waiting shows exactly those tasks.
+func TestWaitingTaskIsHiddenUntilItsStartDate(t *testing.T) {
+	later := todo.New("renew the passport")
+	later.SetStartDate(time.Now().AddDate(0, 0, 3))
+	later.Project = "Admin"
+	sub := todo.NewSubtask("find the photos", later.ID)
+	sub.Project = "Admin"
+	someday := todo.New("learn the cello")
+	someday.SetStartDate(todo.Someday)
+	waitsOn := todo.New("book the trip")
+	waitsOn.Dependencies = []string{later.ID}
+	now := todo.New("water the plants")
+
+	m := modelWithTasks(t, later, sub, someday, waitsOn, now)
+	if !m.hideWaiting {
+		t.Fatal("hiding should be on by default")
+	}
+	m.refreshCaches()
+
+	titles := func(list []todo.Todo) []string {
+		var out []string
+		for _, x := range list {
+			out = append(out, x.Title)
+		}
+		return out
+	}
+	for _, x := range m.cache.active {
+		if x.ID == later.ID || x.ID == someday.ID {
+			t.Errorf("waiting task %q is on the list: %v", x.Title, titles(m.cache.active))
+		}
+	}
+	if len(m.cache.active) != 2 {
+		t.Errorf("want the two startable tasks, got %v", titles(m.cache.active))
+	}
+	if m.cache.waitingTop != 2 {
+		t.Errorf("waitingTop = %d, want 2", m.cache.waitingTop)
+	}
+	if !m.cache.waiting[sub.ID] {
+		t.Error("the subtask of a waiting task should wait with it")
+	}
+	if !m.cache.blockedSet[waitsOn.ID] {
+		t.Error("a hidden task should still block the task that depends on it")
+	}
+	if g := m.cache.projectGroups["Admin"]; g != nil && g.open > 0 {
+		t.Errorf("the Admin project counts %d open tasks, all of them waiting", g.open)
+	}
+	if list := m.groupTaskList(func(x *todo.Todo) bool { return x.Project == "Admin" }); len(list) != 0 {
+		t.Errorf("the Admin drill-in shows %v", titles(list))
+	}
+
+	m.searchQuery = "waiting"
+	m.refreshFilteredCaches()
+	if got := titles(m.cache.active); len(got) != 2 {
+		t.Errorf("/waiting should show the two waiting tasks, got %v", got)
+	}
+
+	m.searchQuery = ""
+	m.get(later.ID).SetStartDate(time.Now())
+	m.refreshCaches()
+	if m.cache.waitingTop != 1 || m.cache.waiting[sub.ID] {
+		t.Error("a task starting today should be back, subtasks and all")
 	}
 }
 

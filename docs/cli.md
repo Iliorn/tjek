@@ -11,12 +11,15 @@ tjek list --json --focus        # JSON, today + overdue only
 tjek list --stale=30d --sort=idle --wide   # backlog review: nothing touched in a month,
                                  # longest-untouched first, with AGE and IDLE columns
 tjek list --unblocked-since=14d # tasks freed recently: every blocker done, the last one this fortnight
+tjek list --waiting             # tasks put away until a later start date (list and top leave them out)
 tjek search RAM --word          # whole-word match ("RAM" won't match "Ramte"); --re for a regexp
 tjek top -n=5                   # top 5 by sequence score (percent of the current field)
 tjek show milk                  # full detail (incl. score breakdown + subtask IDs)
 tjek why milk                   # why it ranks there: each factor's cause, the margins to the
                                  # tasks either side, and when the ranking shifts on its own
 tjek edit milk --p=high --add-tag=urgent --due=tomorrow
+tjek edit cello --wait=someday  # put it away until you bring it back (--wait is --start)
+tjek add "Renew passport wait:eom-7d"   # hidden until a week before the month ends
 tjek edit deploy --add-dep=sign-off   # depend on another task (refused if it would loop)
 tjek edit deploy --remove-dep=sign-off
 tjek edit a1b2 c3d4 e5f6 --project=hoth   # one change across several tasks (--title stays single-ref)

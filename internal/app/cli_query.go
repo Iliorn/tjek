@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -33,6 +34,7 @@ func cliList(args []string) int {
 	unblocked := fs.String("unblocked-since", "", "only tasks freed within this window: every dependency done, the last one recently")
 	sortBy := fs.String("sort", "", "order rows: "+strings.Join(cliSortNames(), "|")+" (default seq)")
 	wide := fs.Bool("wide", false, "add AGE and IDLE columns (days since creation / last change)")
+	waiting := fs.Bool("waiting", false, "only tasks hidden until their start date (left out otherwise)")
 	flagArgs, positionals := splitFlagsAndPositionals(fs, args)
 	if err := fs.Parse(flagArgs); err != nil {
 		return 2
@@ -46,6 +48,8 @@ func cliList(args []string) int {
 	}
 	opts.onlyReady = *ready
 	opts.onlyBlocked = *blocked
+	opts.onlyWaiting = *waiting
+	opts.hideWaiting = !*waiting && storedHideWaiting()
 	repo, todos, err := loadForCLI()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "load: %v\n", err)
@@ -316,6 +320,9 @@ func cliTop(args []string) int {
 	rk := repo.ranker()
 	rows := rk.Top(todoPtrs(todos))
 	now := time.Now()
+	if storedHideWaiting() {
+		rows = slices.DeleteFunc(rows, func(t todo.Todo) bool { return rank.StartsLater(&t, now) })
+	}
 	if *n > 0 && len(rows) > *n {
 		rows = rows[:*n]
 	}

@@ -411,6 +411,9 @@ var extraColumns = []extraColumn{
 		if t.StartDate.IsZero() {
 			return ""
 		}
+		if todo.IsSomeday(t.StartDate) {
+			return tr("someday")
+		}
 		return formatDueShort(t.StartDate, m.frameTime)
 	}},
 	{"created", "Created", 5, func(m *model, t *todo.Todo) string {
@@ -893,12 +896,15 @@ func cleanupNotesFile(taskID string) {
 // ── Quick-add parsing ─────────────────────────────────────────────────────────
 
 type parsedTask struct {
-	title    string
-	tags     []string
-	project  string
-	dueDate  time.Time
-	priority todo.Priority
-	size     todo.Size
+	title   string
+	tags    []string
+	project string
+	dueDate time.Time
+	// startDate is from wait:, Taskwarrior's word for a start date the task
+	// stays hidden until (waitingSet). It may be todo.Someday.
+	startDate time.Time
+	priority  todo.Priority
+	size      todo.Size
 	// hasPriority/hasSize record whether a p:/s: token was actually present, so
 	// a CLI caller can tell "no token" from the Medium default and avoid
 	// clobbering a --like clone. The TUI ignores them (it always starts fresh).
@@ -935,6 +941,13 @@ func parseQuickAdd(input string) parsedTask {
 		case strings.HasPrefix(lower, "due:"):
 			if d, err := parseDueDate(strings.TrimPrefix(lower, "due:")); err == nil {
 				result.dueDate = d
+			} else {
+				titleWords = append(titleWords, word)
+				result.unparsed = append(result.unparsed, word)
+			}
+		case strings.HasPrefix(lower, "wait:"):
+			if d, err := parseStartDate(strings.TrimPrefix(lower, "wait:")); err == nil {
+				result.startDate = d
 			} else {
 				titleWords = append(titleWords, word)
 				result.unparsed = append(result.unparsed, word)
@@ -1017,6 +1030,9 @@ func calendarDays(from, to time.Time) int {
 // real time, so cycle-time reads carry that precision). Legacy midnight values
 // show as a bare date.
 func formatStartDate(t time.Time) string {
+	if todo.IsSomeday(t) {
+		return tr("someday")
+	}
 	if t.Equal(startOfDay(t)) {
 		return t.Format("02-01-06")
 	}
@@ -1050,6 +1066,10 @@ func formatDueShort(due, now time.Time) string {
 // dd-mm beyond it. It sorts below the startable work, so a percentage there
 // would contradict its place in the list.
 func startsCell(start, now time.Time) string {
+	// The Score column is too narrow for the word in every language.
+	if todo.IsSomeday(start) {
+		return "∞"
+	}
 	days := calendarDays(now, start)
 	if days >= 1 && days <= 6 {
 		return localizedWeekdayShort(start.Weekday())
@@ -1059,7 +1079,38 @@ func startsCell(start, now time.Time) string {
 
 // startsLong is startsCell for a row with room: "starts Fri 02-10-26".
 func startsLong(start time.Time) string {
+	if todo.IsSomeday(start) {
+		return fmt.Sprintf(tr("starts %s"), tr("someday"))
+	}
 	return fmt.Sprintf(tr("starts %s"), localizedWeekdayShort(start.Weekday())+" "+start.Format("02-01-06"))
+}
+
+// startDayText is a start date as a day, dd-mm, or the word for someday.
+func startDayText(d time.Time) string {
+	if todo.IsSomeday(d) {
+		return tr("someday")
+	}
+	return d.Format("02-01")
+}
+
+// parseStartDate is parseDueDate plus "someday", a start with no day in mind
+// (todo.Someday). A due date has no such value: a deadline nobody can name is
+// no deadline.
+func parseStartDate(s string) (time.Time, error) {
+	switch canonicalInputWord(strings.ToLower(strings.TrimSpace(s))) {
+	case "someday", "later": // Taskwarrior takes both
+		return todo.Someday, nil
+	}
+	return parseDueDate(s)
+}
+
+// plannedStart is t's start date as a timeline draws it: none for someday,
+// which has no place on a chart scaled to real dates.
+func plannedStart(t todo.Todo) time.Time {
+	if todo.IsSomeday(t.StartDate) {
+		return time.Time{}
+	}
+	return t.StartDate
 }
 
 // formatDurationLive renders a running duration with seconds, for the

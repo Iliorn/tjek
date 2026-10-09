@@ -599,7 +599,9 @@ func (m model) startEditing() (tea.Model, tea.Cmd) {
 	switch m.detail.field {
 	case fieldStartDate:
 		m.mode = modeInput
-		if !t.StartDate.IsZero() {
+		if todo.IsSomeday(t.StartDate) {
+			m.textInput.SetValue(inputWord("someday"))
+		} else if !t.StartDate.IsZero() {
 			m.textInput.SetValue(t.StartDate.Format("02-01-06"))
 		} else {
 			m.textInput.SetValue("")

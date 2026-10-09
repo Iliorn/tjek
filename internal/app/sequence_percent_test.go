@@ -204,13 +204,14 @@ func TestBoardCursorSurvivesAFilterThatEmptiesIt(t *testing.T) {
 	}
 }
 
-// A task that starts on a later day shows that day in the Score column, not a
-// percentage: it sorts below every task that can start today, and "100%" at
-// the bottom of the list read as a contradiction.
+// With hiding off, a task that starts on a later day shows that day in the
+// Score column, not a percentage: it sorts below every task that can start
+// today, and "100%" at the bottom of the list read as a contradiction.
 func TestScoreColumnShowsTheStartOfAWaitingTask(t *testing.T) {
 	waiting := todo.New("waiting for the parts")
 	waiting.Priority = todo.PriorityHigh
 	m := modelWithTasks(t, waiting, todo.New("ready now"))
+	m.hideWaiting = false
 	start := m.frameTime.AddDate(0, 0, 3)
 	m.get(waiting.ID).StartDate = start
 	m.markModified(waiting.ID)

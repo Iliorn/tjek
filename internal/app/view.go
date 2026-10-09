@@ -523,6 +523,10 @@ func (m model) renderStatusLine() string {
 	if m.tab == tabTags && m.tagTabSearchQuery != "" {
 		chips = append(chips, searchChipStyle.Render("/"+m.tagTabSearchQuery))
 	}
+	// Hidden tasks are counted so they are not forgotten; /waiting shows them.
+	if m.cache.waitingTop > 0 && !searchShowsWaiting(m.searchQuery) {
+		chips = append(chips, helpStyle.Render(fmt.Sprintf(tr("%d waiting"), m.cache.waitingTop)))
+	}
 	left := strings.Join(chips, " ")
 
 	var right []string
@@ -1454,6 +1458,7 @@ func (m model) helpBodyLines() []string {
 			inputWord("daily"), inputWord("weekdays"), inputWord("weekly"),
 			inputWord("monthly"), inputWord("yearly"))},
 		{inputWord("dep:") + "^", fmt.Sprintf(tr("block on the last added task (or %s<id prefix>)"), inputWord("dep:"))},
+		{inputWord("wait:") + "eom", fmt.Sprintf(tr("start date, hidden until then (or %s)"), inputWord("wait:")+inputToken("someday"))},
 	}})
 	sections = append(sections, helpSec{tr("Filters"), [][2]string{
 		{"#tag", tr("only tasks carrying the tag")},
@@ -1461,6 +1466,7 @@ func (m model) helpBodyLines() []string {
 		{"p:" + inputWord("high"), tr("only that priority")},
 		{inputWord("due:") + "<" + strings.ToLower(localizedWeekday(time.Friday)), tr("due before a date (also >, <=, >= and an exact date)")},
 		{inputWord("overdue"), tr("only overdue tasks")},
+		{inputWord("waiting"), tr("only tasks hidden until their start date")},
 		{"grcrs", tr("anything else fuzzy-matches the title, or the description as text")},
 	}})
 
@@ -1492,6 +1498,7 @@ func (m model) helpBodyLines() []string {
 		{tr("! sync"), tr("server runs another version: update the older end")},
 		{tr("FOCUS"), tr("the focus filter is on: today + overdue only")},
 		{"/…", tr("a filter is narrowing the list")},
+		{fmt.Sprintf(tr("%d waiting"), 3), fmt.Sprintf(tr("tasks hidden until their start date: /%s shows them"), inputWord("waiting"))},
 	}})
 
 	// Reference section: date-input grammar. Not key bindings, so it lives

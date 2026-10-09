@@ -41,6 +41,9 @@ func renderQuickAddPreview(input string, w int) string {
 	if !p.dueDate.IsZero() {
 		parts = append(parts, normalStyle.Render(tr("due ")+p.dueDate.Format("02-01")))
 	}
+	if !p.startDate.IsZero() {
+		parts = append(parts, normalStyle.Render(fmt.Sprintf(tr("hidden until %s"), startDayText(p.startDate))))
+	}
 	if p.priority != todo.PriorityMedium {
 		parts = append(parts, normalStyle.Render("p:"+trPriority(p.priority)))
 	}

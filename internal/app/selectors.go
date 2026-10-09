@@ -87,6 +87,9 @@ func compileSearch(search string) func(todo.Todo) bool {
 			}
 		case canonicalInputWord(lower) == "overdue":
 			preds = append(preds, func(t todo.Todo) bool { return t.IsOverdue() })
+		case canonicalInputWord(lower) == "waiting":
+			now := time.Now()
+			preds = append(preds, func(t todo.Todo) bool { return rank.StartsLater(&t, now) })
 		default:
 			titleWords = append(titleWords, tok)
 		}
@@ -118,6 +121,56 @@ func compileSearch(search string) func(todo.Todo) bool {
 		}
 		return true
 	}
+}
+
+// searchShowsWaiting reports whether a query asks for the tasks waiting for
+// their start date, which the lists otherwise leave out (waitingSet).
+func searchShowsWaiting(search string) bool {
+	for _, tok := range strings.Fields(search) {
+		if canonicalInputWord(strings.ToLower(tok)) == "waiting" {
+			return true
+		}
+	}
+	return false
+}
+
+// waitingSet is the tasks hidden until their start date, Taskwarrior's wait:
+// every pending top-level task that starts on a later day, and the subtasks
+// under it, which wait with their parent. A subtask's own start date does not
+// hide it, since its parent is on the list; it only ranks lower. top counts
+// the top-level tasks, which is what the status line reports. The second pass
+// walks parents only when something is waiting, so a set with nothing hidden
+// costs one date comparison per task.
+func waitingSet(all []*todo.Todo, now time.Time) (set map[string]bool, top int) {
+	for _, t := range all {
+		if t.ParentID == "" && rank.StartsLater(t, now) {
+			if set == nil {
+				set = make(map[string]bool)
+			}
+			set[t.ID] = true
+			top++
+		}
+	}
+	if set == nil {
+		return nil, 0
+	}
+	parent := make(map[string]string, len(all))
+	for _, t := range all {
+		if t.ParentID != "" {
+			parent[t.ID] = t.ParentID
+		}
+	}
+	for _, t := range all {
+		// A parent chain is short, and the step bound guards a cycle that
+		// a bad sync could leave behind.
+		for id, steps := t.ParentID, 0; id != "" && steps < 64; id, steps = parent[id], steps+1 {
+			if set[id] {
+				set[t.ID] = true
+				break
+			}
+		}
+	}
+	return set, top
 }
 
 // subsequenceFold reports whether every rune of needle appears in haystack in
@@ -218,14 +271,18 @@ func selectActiveDone(todos []*todo.Todo, now time.Time, score func(*todo.Todo) 
 	if sortMode == taskSortSequence {
 		rollup = rank.Lifts(todos, score)
 	}
-	return selectActiveDoneRanked(todos, rollup, now, score, search, focus, sortMode, historyMode)
+	return selectActiveDoneRanked(todos, rollup, now, score, search, focus, sortMode, historyMode, nil)
 }
 
 // selectActiveDoneRanked takes the lift map from its caller. The model computes
 // it once per data change and caches it: it depends on the task set, not on the
 // filter, so recomputing it inside the per-keystroke search path walked every
 // task twice for an answer that had not changed.
-func selectActiveDoneRanked(todos []*todo.Todo, rollup map[string]float64, now time.Time, score func(*todo.Todo) float64, search string, focus bool, sortMode taskSortMode, historyMode historySortMode) (active, done []todo.Todo) {
+//
+// hidden is the waitingSet the active list leaves out, nil to hide nothing. It
+// is applied here rather than by narrowing todos, since a hidden task still
+// blocks the visible ones that depend on it.
+func selectActiveDoneRanked(todos []*todo.Todo, rollup map[string]float64, now time.Time, score func(*todo.Todo) float64, search string, focus bool, sortMode taskSortMode, historyMode historySortMode, hidden map[string]bool) (active, done []todo.Todo) {
 	match := compileSearch(search)
 	// Split and sort as pointers, then materialize once at the end. The caches
 	// hold values — they outlive this call and are read while the store mutates
@@ -237,7 +294,7 @@ func selectActiveDoneRanked(todos []*todo.Todo, rollup map[string]float64, now t
 			continue
 		}
 		switch {
-		case t.Status == todo.Pending && match(*t) && todoMatchesFocus(*t, focus):
+		case t.Status == todo.Pending && !hidden[t.ID] && match(*t) && todoMatchesFocus(*t, focus):
 			activeP = append(activeP, t)
 		case t.Status == todo.Done && match(*t):
 			doneP = append(doneP, t)

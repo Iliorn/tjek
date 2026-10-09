@@ -49,6 +49,8 @@ var inputKeywords = []string{
 	"start of month", "end of month", "start of next month",
 	"start of quarter", "end of quarter", "start of next quarter",
 	"start of year", "end of year", "start of next year",
+	// A start date with no day (parseStartDate).
+	"someday",
 	// Priority values (p:) — "medium" is shared with the size scale.
 	"high", "medium", "low",
 	// Size values (s:, size:).
@@ -56,9 +58,9 @@ var inputKeywords = []string{
 	// Recurrence rules (r:, recur:).
 	"daily", "weekdays", "weekly", "monthly", "yearly",
 	// Bare search keywords.
-	"overdue",
+	"overdue", "waiting",
 	// Field prefixes whose English form is a word rather than an initial.
-	"due:", "size:", "recur:", "dep:",
+	"due:", "size:", "recur:", "dep:", "wait:",
 	// A recurrence rule's end (r:weekly/until:…).
 	"until:",
 }
@@ -83,6 +85,8 @@ var extraInputAliases = map[language]map[string]string{
 		"gross":    "large",
 		"groesse:": "size:",
 		"faellig:": "due:",
+		// "später" is shown for someday; this is the other word for it.
+		"irgendwann": "someday",
 	},
 }
 

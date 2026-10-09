@@ -205,7 +205,7 @@ func (m model) groupTaskList(match func(*todo.Todo) bool) []todo.Todo {
 	var open, done []*todo.Todo
 	inOpen := make(map[string]bool)
 	for _, t := range m.tasks {
-		if !match(t) {
+		if !match(t) || m.cache.waiting[t.ID] {
 			continue
 		}
 		if t.Status == todo.Done {
@@ -366,7 +366,7 @@ func (m model) groupNestedRows(tasks []todo.Todo) []bool {
 func hasDatedOpenTask(tasks []todo.Todo) bool {
 	for i := range tasks {
 		t := &tasks[i]
-		if t.Status != todo.Done && (!t.StartDate.IsZero() || !t.DueDate.IsZero()) {
+		if t.Status != todo.Done && (!plannedStart(*t).IsZero() || !t.DueDate.IsZero()) {
 			return true
 		}
 	}

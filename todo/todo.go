@@ -369,6 +369,16 @@ func (t *Todo) SetStartDate(d time.Time) {
 	t.ModifiedAt = StampModified(t.ModifiedAt)
 }
 
+// Someday is the start date of a task put off with no day in mind,
+// Taskwarrior's "someday": a real date, so every comparison already reads it
+// as later than any other. It sits mid-year so that no time zone moves it out
+// of 9999, which IsSomeday reads, and none moves it past 9999, beyond which
+// JSON cannot encode a time.
+var Someday = time.Date(9999, 6, 1, 9, 0, 0, 0, time.UTC)
+
+// IsSomeday reports whether d is Someday, in whatever zone it was read back.
+func IsSomeday(d time.Time) bool { return d.Year() == 9999 }
+
 // sameDay reports whether a and b fall on the same calendar day (each in its
 // own location).
 func sameDay(a, b time.Time) bool {
@@ -528,8 +538,10 @@ func (t *Todo) StartTimerBy(who string) {
 	// capture the task, with the precise time of day (same rule as starting
 	// "today" via SetStartDate). StartDate is a domain timestamp (wall-clock
 	// moment), not a merge-ordering stamp, so it uses the real now rather than
-	// the clamped value.
-	if t.StartDate.IsZero() {
+	// the clamped value. A start date still ahead is moved to now too: work
+	// on the task has begun, and a task waiting for that date would otherwise
+	// stay hidden while its timer runs.
+	if t.StartDate.IsZero() || t.StartDate.After(wall) {
 		t.StartDate = wall
 	}
 	t.TimeEntries = append(t.TimeEntries, TimeEntry{

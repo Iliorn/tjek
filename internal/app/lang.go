@@ -474,6 +474,9 @@ var daTranslations = map[string]string{
 	"recur:":     "gentag:",
 	"until:":     "indtil:",
 	"dep:":       "afh:",
+	"wait:":      "vent:",
+	"someday":    "en dag",
+	"waiting":    "venter",
 
 	// Spelled-out periods (periodPhrases), "end of month" for eom.
 	"start of week":         "start på ugen",
@@ -782,6 +785,7 @@ var daTranslations = map[string]string{
 	"Auto-close parent":     "Luk forælder automatisk",
 	"Auto-close subtasks":   "Luk delopgaver automatisk",
 	"Subtasks copy tags":    "Delopgaver arver mærker",
+	"Hide until start date": "Skjul indtil startdato",
 	"Kanban board":          "Kanban-tavle",
 	"Tags and projects":     "Tags og projekter",
 	"Add":                   "Tilføj",
@@ -910,6 +914,11 @@ var daTranslations = map[string]string{
 	"only that priority":                                                "kun den prioritet",
 	"due before a date (also >, <=, >= and an exact date)":              "forfalder før en dato (også >, <=, >= og en præcis dato)",
 	"only overdue tasks":                                                "kun forfaldne opgaver",
+	"only tasks hidden until their start date":                          "kun opgaver skjult indtil deres startdato",
+	"start date, hidden until then (or %s)":                             "startdato, skjult indtil da (eller %s)",
+	"hidden until %s":                                                   "skjult indtil %s",
+	"%d waiting":                                                        "%d venter",
+	"tasks hidden until their start date: /%s shows them":               "opgaver skjult indtil deres startdato: /%s viser dem",
 	"anything else fuzzy-matches the title, or the description as text": "alt andet fuzzy-matcher titlen, eller beskrivelsen som tekst",
 
 	// ── Help: row symbols and scroll hints ──
@@ -1243,6 +1252,9 @@ var deTranslations = map[string]string{
 	"recur:":     "wiederh:",
 	"until:":     "bis:",
 	"dep:":       "abh:",
+	"wait:":      "warten:",
+	"someday":    "später",
+	"waiting":    "wartend",
 
 	// Spelled-out periods (periodPhrases), "end of month" for eom.
 	"start of week":         "Wochenanfang",
@@ -1551,6 +1563,7 @@ var deTranslations = map[string]string{
 	"Auto-close parent":     "Eltern autom. schließen",
 	"Auto-close subtasks":   "Teilaufg. autom. schließen",
 	"Subtasks copy tags":    "Teilaufg. erben Schlagw.",
+	"Hide until start date": "Bis Startdatum ausblenden",
 	"Kanban board":          "Kanban-Tafel",
 	"Tags and projects":     "Tags und Projekte",
 	"Add":                   "Hinzufügen",
@@ -1679,6 +1692,11 @@ var deTranslations = map[string]string{
 	"only that priority":                                                "nur diese Priorität",
 	"due before a date (also >, <=, >= and an exact date)":              "fällig vor einem Datum (auch >, <=, >= und ein genaues Datum)",
 	"only overdue tasks":                                                "nur überfällige Aufgaben",
+	"only tasks hidden until their start date":                          "nur bis zum Startdatum ausgeblendete Aufgaben",
+	"start date, hidden until then (or %s)":                             "Startdatum, bis dahin ausgeblendet (oder %s)",
+	"hidden until %s":                                                   "ausgeblendet bis %s",
+	"%d waiting":                                                        "%d wartend",
+	"tasks hidden until their start date: /%s shows them":               "bis zum Startdatum ausgeblendete Aufgaben: /%s zeigt sie",
 	"anything else fuzzy-matches the title, or the description as text": "alles andere trifft den Titel unscharf oder die Beschreibung als Text",
 
 	// ── Help: row symbols and scroll hints ──

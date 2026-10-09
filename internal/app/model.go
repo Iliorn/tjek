@@ -63,6 +63,7 @@ const (
 	settingName
 	settingShareJoin
 	settingShowGroups
+	settingHideWaiting
 	// settingColFirst is the first of the Columns page's rows, one per
 	// listColumnKeys entry (settingColumnKey); they run to numSettingsRows.
 	settingColFirst
@@ -442,6 +443,9 @@ type model struct {
 	autoCloseSubtasks bool
 	// subtaskTags: a new subtask copies its parent's tags.
 	subtaskTags bool
+	// hideWaiting: a task is left out of the lists until its start date
+	// (waitingSet).
+	hideWaiting bool
 	// columns is which optional columns the task lists show.
 	columns listColumns
 	// exportFolder is where tjek-export.json is kept current ("" = off);
@@ -624,6 +628,7 @@ func initialModel(repo Repository) model {
 		autoCloseParent:   settings.AutoCloseParent,
 		autoCloseSubtasks: settings.AutoCloseSubtasks,
 		subtaskTags:       !settings.SubtaskTagsDisabled,
+		hideWaiting:       !settings.ShowWaiting,
 		themeName:         th.name,
 		detailPos:         detailPosFromSettings(settings.DetailPosition),
 		columns:           listColumnsFromSettings(settings.Columns),
@@ -1115,7 +1120,9 @@ func buildNextRecurrence(src todo.Todo) (todo.Todo, bool) {
 		clone.Tags = append([]string{}, src.Tags...)
 	}
 	clone.DueDate = next
-	if !src.StartDate.IsZero() && !src.DueDate.IsZero() {
+	if todo.IsSomeday(src.StartDate) {
+		clone.StartDate = src.StartDate
+	} else if !src.StartDate.IsZero() && !src.DueDate.IsZero() {
 		clone.StartDate = src.StartDate.AddDate(0, 0, calendarDays(src.DueDate, next))
 	}
 	return clone, true

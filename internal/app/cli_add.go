@@ -226,6 +226,9 @@ func cliAdd(args []string) int {
 		if !parsed.dueDate.IsZero() {
 			t.DueDate = parsed.dueDate
 		}
+		if !parsed.startDate.IsZero() {
+			t.SetStartDate(parsed.startDate)
+		}
 		if parsed.project != "" {
 			t.Project = parsed.project
 		}

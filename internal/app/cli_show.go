@@ -152,7 +152,9 @@ func printTaskDetail(t *todo.Todo, subs []todo.Todo, todos []todo.Todo, rk rank.
 	}
 	fmt.Printf("Priority: %s\n", t.Priority.String())
 	fmt.Printf("Size:     %s\n", t.Size.String())
-	if !t.StartDate.IsZero() {
+	if todo.IsSomeday(t.StartDate) {
+		fmt.Printf("Start:    someday\n")
+	} else if !t.StartDate.IsZero() {
 		layout := "2006-01-02"
 		if !t.StartDate.Equal(startOfDay(t.StartDate)) {
 			layout = "2006-01-02 15:04"

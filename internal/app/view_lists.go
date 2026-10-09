@@ -1377,6 +1377,7 @@ var settingsGroups = []settingsGroup{
 		settingAutoCloseParent,
 		settingAutoCloseSubtasks,
 		settingSubtaskTags,
+		settingHideWaiting,
 		settingShowBoard,
 		settingShowGroups,
 		settingStages,
@@ -1605,6 +1606,7 @@ func (m model) renderSettingsSection(w int) (string, int) {
 		settingExportFolder:      tr("Auto-export folder"),
 		settingImportFile:        tr("Import from file"),
 		settingSubtaskTags:       tr("Subtasks copy tags"),
+		settingHideWaiting:       tr("Hide until start date"),
 		settingName:              tr("Your name"),
 		settingShareJoin:         tr("Join a project"),
 	}
@@ -1637,6 +1639,10 @@ func (m model) renderSettingsSection(w int) (string, int) {
 	subtaskTagsVal := tr("Off")
 	if m.subtaskTags {
 		subtaskTagsVal = tr("On")
+	}
+	hideWaitingVal := tr("Off")
+	if m.hideWaiting {
+		hideWaitingVal = tr("On")
 	}
 	syncAutoVal := "‹ " + tr("needs server") + " ›"
 	if m.syncCfg.ready() {
@@ -1703,6 +1709,7 @@ func (m model) renderSettingsSection(w int) (string, int) {
 		settingExportFolder:      exportFolderDisplay(m.exportFolder),
 		settingImportFile:        tr("choose a file"),
 		settingSubtaskTags:       "‹ " + subtaskTagsVal + " ›",
+		settingHideWaiting:       "‹ " + hideWaitingVal + " ›",
 		settingName:              authorName(appSettings{Name: m.userName}),
 		settingShareJoin:         m.sharedJoinDisplay(),
 	}

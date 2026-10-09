@@ -1,6 +1,7 @@
 package todo
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
@@ -1103,5 +1104,43 @@ func TestRunningEntryFindsTheOpenSpan(t *testing.T) {
 	task.StopTimer()
 	if task.RunningEntry() != nil {
 		t.Error("RunningEntry still reports an open span after StopTimer")
+	}
+}
+
+// Someday reads back as someday in any zone, survives JSON, and is later
+// than any real date.
+func TestSomedayHoldsInEveryZone(t *testing.T) {
+	for _, zone := range []string{"Pacific/Kiritimati", "Pacific/Pago_Pago", "UTC"} {
+		loc, err := time.LoadLocation(zone)
+		if err != nil {
+			t.Skipf("no zone data: %v", err)
+		}
+		if !IsSomeday(Someday.In(loc)) {
+			t.Errorf("Someday in %s reads as %v", zone, Someday.In(loc))
+		}
+	}
+	var task Todo
+	task.SetStartDate(Someday)
+	b, err := json.Marshal(task)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var back Todo
+	if err := json.Unmarshal(b, &back); err != nil || !IsSomeday(back.StartDate) {
+		t.Errorf("someday did not survive JSON: %v, %v", back.StartDate, err)
+	}
+	if IsSomeday(time.Now().AddDate(100, 0, 0)) {
+		t.Error("a date a century out is not someday")
+	}
+}
+
+// Starting the timer on a task that waits for a later start date brings the
+// start to now, so the task is not hidden while it is worked on.
+func TestTimerStartEndsTheWait(t *testing.T) {
+	task := New("learn the cello")
+	task.SetStartDate(Someday)
+	task.StartTimerBy("")
+	if task.StartDate.After(time.Now()) {
+		t.Errorf("start date still ahead after starting the timer: %v", task.StartDate)
 	}
 }

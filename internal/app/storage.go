@@ -137,6 +137,12 @@ type appSettings struct {
 	// Negative like BoardDisabled, so the zero value keeps copying them.
 	SubtaskTagsDisabled bool `json:"subtask_tags_disabled,omitempty"`
 
+	// ShowWaiting keeps a task in the lists before its start date, ranked
+	// below today's work, instead of hiding it until then. Negative like
+	// SubtaskTagsDisabled, so the zero value hides them, as Taskwarrior's
+	// wait does.
+	ShowWaiting bool `json:"show_waiting,omitempty"`
+
 	// ExportFolder is where the TUI keeps tjek-export.json current
 	// (exportsettings.go); empty means no auto-export.
 	ExportFolder string `json:"export_folder,omitempty"`
@@ -204,6 +210,13 @@ func storedBiases() rank.Biases {
 func storedSubtaskTags() bool {
 	s, _ := loadSettings()
 	return !s.SubtaskTagsDisabled
+}
+
+// storedHideWaiting reads whether tasks are hidden until their start date,
+// for the CLI, which has no model to hold it.
+func storedHideWaiting() bool {
+	s, _ := loadSettings()
+	return !s.ShowWaiting
 }
 
 func settingsPath() string {
