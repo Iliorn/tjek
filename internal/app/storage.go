@@ -143,6 +143,11 @@ type appSettings struct {
 	// wait does.
 	ShowWaiting bool `json:"show_waiting,omitempty"`
 
+	// Contexts are the saved filters F switches between (context.go), and
+	// Context the one on, "" for none.
+	Contexts []savedContext `json:"contexts,omitempty"`
+	Context  string         `json:"context,omitempty"`
+
 	// ExportFolder is where the TUI keeps tjek-export.json current
 	// (exportsettings.go); empty means no auto-export.
 	ExportFolder string `json:"export_folder,omitempty"`

@@ -431,9 +431,10 @@ func selectActiveDone(todos []*todo.Todo, now time.Time, score func(*todo.Todo) 
 // filter, so recomputing it inside the per-keystroke search path walked every
 // task twice for an answer that had not changed.
 //
-// hidden is the waitingSet the active list leaves out, nil to hide nothing. It
-// is applied here rather than by narrowing todos, since a hidden task still
-// blocks the visible ones that depend on it.
+// hidden is what both lists leave out (listHidden: the waiting set, and what
+// the active context does not match), nil to hide nothing. It is applied here
+// rather than by narrowing todos, since a hidden task still blocks the
+// visible ones that depend on it.
 func selectActiveDoneRanked(todos []*todo.Todo, rollup map[string]float64, now time.Time, score func(*todo.Todo) float64, search string, env filterEnv, focus bool, sortMode taskSortMode, historyMode historySortMode, hidden map[string]bool) (active, done []todo.Todo) {
 	match := compileSearchWith(search, env)
 	// Split and sort as pointers, then materialize once at the end. The caches
@@ -448,7 +449,7 @@ func selectActiveDoneRanked(todos []*todo.Todo, rollup map[string]float64, now t
 		switch {
 		case t.Status == todo.Pending && !hidden[t.ID] && match(*t) && todoMatchesFocus(*t, focus):
 			activeP = append(activeP, t)
-		case t.Status == todo.Done && match(*t):
+		case t.Status == todo.Done && !hidden[t.ID] && match(*t):
 			doneP = append(doneP, t)
 		}
 	}

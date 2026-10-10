@@ -18,7 +18,7 @@ import (
 // one in one place would break that everywhere else.
 var keyPageActions = []string{
 	"add", "done", "track", "timeentry", "priority", "setdue", "edit",
-	"delete", "notes", "focus", "why", "sort", "history", "search",
+	"delete", "notes", "focus", "context", "why", "sort", "history", "search",
 	"quicktag", "quickproject", "tagfilter", "merge", "share",
 	"help", "undo", "quit",
 }
@@ -35,6 +35,7 @@ var keyActionLabels = map[string]string{
 	"delete":       "Delete",
 	"notes":        "Description",
 	"focus":        "Focus",
+	"context":      "Context",
 	"why":          "Why this rank",
 	"sort":         "Sort",
 	"history":      "Show finished",

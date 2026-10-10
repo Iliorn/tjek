@@ -24,6 +24,9 @@ type cacheState struct {
 	// ones for the status line.
 	waiting    map[string]bool
 	waitingTop int
+	// outside is the tasks the active context does not match (context.go),
+	// nil when no context is on.
+	outside map[string]bool
 	// dependents lists, per task, the unfinished tasks that wait on it.
 	dependents map[string][]string
 	active     []todo.Todo
@@ -109,10 +112,11 @@ func (m *model) refreshCaches() {
 	if m.hideWaiting {
 		m.cache.waiting, m.cache.waitingTop = waitingSet(all, m.frameTime)
 	}
+	m.cache.outside = m.outsideContext(all)
 
 	m.cache.active, m.cache.done = selectActiveDoneRanked(all, m.cache.rankScore, m.frameTime, m.rank.ScoreAt(m.frameTime), m.searchQuery, m.searchEnv(), m.focusFilter, m.taskSort, m.historySort, m.listHidden())
 
-	m.refreshGroups(withoutHidden(all, m.cache.waiting))
+	m.refreshGroups(withoutHidden(withoutHidden(all, m.cache.waiting), m.cache.outside))
 
 	// subtaskOf is maintained incrementally by Store.add / Store.remove, so
 	// no rebuild is needed here.
@@ -140,13 +144,27 @@ func (m *model) searchEnv() filterEnv {
 	}
 }
 
-// listHidden is the waiting set the lists leave out: none while the search
-// asks for exactly those tasks.
+// listHidden is what the lists leave out: the tasks outside the active
+// context, and the waiting set unless the search asks for exactly those.
 func (m *model) listHidden() map[string]bool {
+	waiting := m.cache.waiting
 	if searchShowsWaiting(m.searchQuery) {
-		return nil
+		waiting = nil
 	}
-	return m.cache.waiting
+	switch {
+	case len(m.cache.outside) == 0:
+		return waiting
+	case len(waiting) == 0:
+		return m.cache.outside
+	}
+	both := make(map[string]bool, len(waiting)+len(m.cache.outside))
+	for id := range waiting {
+		both[id] = true
+	}
+	for id := range m.cache.outside {
+		both[id] = true
+	}
+	return both
 }
 
 // withoutHidden is all less the tasks in hidden, for the summaries that count

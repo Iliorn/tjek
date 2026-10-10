@@ -21,6 +21,7 @@ belongs in the commit message, where it is kept next to the code it explains.
 - `tjek import` and Settings → Import read Taskwarrior's `task export`.
 - Filters take `-` or `!` for not, commas and `or` for either: `#bug,urgent -@home`.
 - Filters take the words `blocked`, `ready` and `active`.
+- Contexts: `F` saves a filter that stays on, and switches between them.
 
 ### Changed
 

@@ -70,7 +70,7 @@ const (
 	// settingKeyFirst is the first of the Keys page's rows, one per
 	// keyPageActions entry (settingKeyAction); they run to numSettingsRows.
 	settingKeyFirst = settingColFirst + 13
-	numSettingsRows = settingKeyFirst + 22
+	numSettingsRows = settingKeyFirst + 23
 )
 
 type pane int
@@ -127,6 +127,7 @@ const (
 	modeSearchTag
 	modeSearchProject
 	modeSearchTagTab
+	modePickContext
 	// modeConfirm is the generic yes/no prompt: confirmMsg holds the question
 	// and confirmOnYes the action to run on y/enter. It replaced a dozen
 	// near-identical per-action confirm modes.
@@ -342,6 +343,7 @@ type model struct {
 	depSearch  searchState
 	tagSearch  searchState
 	projSearch searchState
+	ctxPick    searchState
 
 	// Inputs
 	textInput         textinput.Model
@@ -351,6 +353,7 @@ type model struct {
 	projSearchInput   textinput.Model
 	tagTabSearchInput textinput.Model
 	paletteInput      textinput.Model
+	ctxInput          textinput.Model
 
 	// paletteCursor is the highlighted row of the command palette (palette.go).
 	paletteCursor int
@@ -446,6 +449,9 @@ type model struct {
 	// hideWaiting: a task is left out of the lists until its start date
 	// (waitingSet).
 	hideWaiting bool
+	// contexts are the saved filters, and context the one on (context.go).
+	contexts []savedContext
+	context  string
 	// columns is which optional columns the task lists show.
 	columns listColumns
 	// exportFolder is where tjek-export.json is kept current ("" = off);
@@ -555,6 +561,10 @@ func initialModel(repo Repository) model {
 	proji := textinput.New()
 	proji.CharLimit = 100
 
+	ctxi := textinput.New()
+	ctxi.CharLimit = 60
+	ctxi.Placeholder = tr("Context name, to switch to or save...")
+
 	pal := textinput.New()
 	pal.Placeholder = tr("Type a command…")
 	pal.Prompt = "❯ "
@@ -613,6 +623,7 @@ func initialModel(repo Repository) model {
 		depSearchInput:    di,
 		tagSearchInput:    tagi,
 		projSearchInput:   proji,
+		ctxInput:          ctxi,
 		tagTabSearchInput: tagTabSearch,
 		paletteInput:      pal,
 		mode:              modeNormal,
@@ -629,6 +640,8 @@ func initialModel(repo Repository) model {
 		autoCloseSubtasks: settings.AutoCloseSubtasks,
 		subtaskTags:       !settings.SubtaskTagsDisabled,
 		hideWaiting:       !settings.ShowWaiting,
+		contexts:          settings.Contexts,
+		context:           settings.Context,
 		themeName:         th.name,
 		detailPos:         detailPosFromSettings(settings.DetailPosition),
 		columns:           listColumnsFromSettings(settings.Columns),

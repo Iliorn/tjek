@@ -798,6 +798,7 @@ var daTranslations = map[string]string{
 	"Rename / edit":         "Omdøb / rediger",
 	"Delete":                "Slet",
 	"Focus":                 "Fokus",
+	"Context":               "Kontekst",
 	"Sort":                  "Sortering",
 	"Show finished":         "Vis afsluttede",
 	"Filter":                "Filtrer",
@@ -875,6 +876,16 @@ var daTranslations = map[string]string{
 	"overdue":                               "forfalden",
 	"title~":                                "titel~",
 	"not %s":                                "ikke %s",
+
+	// The context picker (context.go).
+	"%s is new: filter with / first to save it":                        "%s er ny: filtrer med / først for at gemme den",
+	"Context name, to switch to or save...":                            "Kontekstnavn, at skifte til eller gemme...",
+	"Filter with / first, then save the filter here":                   "Filtrer med / først, og gem så filteret her",
+	"No contexts yet: filter with /, then type a name here to save it": "Ingen kontekster endnu: filtrer med /, og skriv så et navn her for at gemme",
+	"context: switch to or save a filter that stays on":                "kontekst: skift til eller gem et filter der bliver ved",
+	"enter use · del delete · esc close":                               "enter brug · del slet · esc luk",
+	"no context: show every task":                                      "ingen kontekst: vis alle opgaver",
+	"save the filter as: ":                                             "gem filteret som: ",
 
 	// ── Calendar entries ──
 	"✓ done at ": "✓ færdig kl. ",
@@ -1591,6 +1602,7 @@ var deTranslations = map[string]string{
 	"Rename / edit":         "Umbenennen / bearbeiten",
 	"Delete":                "Löschen",
 	"Focus":                 "Fokus",
+	"Context":               "Kontext",
 	"Sort":                  "Sortierung",
 	"Show finished":         "Erledigte zeigen",
 	"Filter":                "Filtern",
@@ -1668,6 +1680,16 @@ var deTranslations = map[string]string{
 	"overdue":                               "überfällig",
 	"title~":                                "Titel~",
 	"not %s":                                "nicht %s",
+
+	// The context picker (context.go).
+	"%s is new: filter with / first to save it":                        "%s ist neu: zuerst mit / filtern, um ihn zu speichern",
+	"Context name, to switch to or save...":                            "Kontextname, zum Wechseln oder Speichern...",
+	"Filter with / first, then save the filter here":                   "Zuerst mit / filtern, dann den Filter hier speichern",
+	"No contexts yet: filter with /, then type a name here to save it": "Noch keine Kontexte: mit / filtern, dann hier einen Namen eingeben",
+	"context: switch to or save a filter that stays on":                "Kontext: zu einem bleibenden Filter wechseln oder ihn speichern",
+	"enter use · del delete · esc close":                               "enter nutzen · del löschen · esc schließen",
+	"no context: show every task":                                      "kein Kontext: alle Aufgaben zeigen",
+	"save the filter as: ":                                             "Filter speichern als: ",
 
 	// ── Calendar entries ──
 	"✓ done at ": "✓ fertig am ",

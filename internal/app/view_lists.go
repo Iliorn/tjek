@@ -313,7 +313,7 @@ func (m model) statsScopedTodos() []*todo.Todo {
 	match := compileSearchWith(m.searchQuery, m.searchEnv())
 	scoped := make([]*todo.Todo, 0, len(all))
 	for _, t := range all {
-		if t.ParentID == "" && match(*t) {
+		if t.ParentID == "" && !m.cache.outside[t.ID] && match(*t) {
 			scoped = append(scoped, t)
 		}
 	}

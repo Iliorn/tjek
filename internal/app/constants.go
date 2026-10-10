@@ -100,6 +100,8 @@ const (
 	maxDepSearchResults  = 5
 	maxTagSearchResults  = 5
 	maxProjSearchResults = 5
+	// maxContextRows is how many rows the context picker shows (context.go).
+	maxContextRows = 5
 
 	// maxPaletteResults is how many command-palette rows are shown at once. The
 	// palette replaces the footer hint while it is open, so the budget is what

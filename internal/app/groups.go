@@ -205,7 +205,7 @@ func (m model) groupTaskList(match func(*todo.Todo) bool) []todo.Todo {
 	var open, done []*todo.Todo
 	inOpen := make(map[string]bool)
 	for _, t := range m.tasks {
-		if !match(t) || m.cache.waiting[t.ID] {
+		if !match(t) || m.cache.waiting[t.ID] || m.cache.outside[t.ID] {
 			continue
 		}
 		if t.Status == todo.Done {

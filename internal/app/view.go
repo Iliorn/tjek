@@ -510,6 +510,9 @@ func (m model) renderStatusLine() string {
 	}
 
 	var chips []string
+	if m.context != "" {
+		chips = append(chips, focusChipStyle.Render("◉ "+m.context))
+	}
 	if m.focusFilter && m.listFocusChip() == "" {
 		chips = append(chips, focusChipStyle.Render(tr("FOCUS")))
 	}
@@ -762,6 +765,8 @@ func (m model) footerContentFor(w int) string {
 		return field
 	case modeSearchTagTab:
 		return searchStyle.Width(w).Render(m.tagTabSearchInput.View())
+	case modePickContext:
+		return m.renderContextPicker(w)
 	case modeSearchDep:
 		b := getBuilder()
 		defer putBuilder(b)

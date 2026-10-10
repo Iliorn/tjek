@@ -159,6 +159,8 @@ func (m model) updateForMode(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateSearchProject(msg)
 	case modeSearchTagTab:
 		return m.updateSearchTagTab(msg)
+	case modePickContext:
+		return m.updateContextPicker(msg)
 	}
 	if m.pane == paneList {
 		return m.updateList(msg)
@@ -576,6 +578,11 @@ func (m model) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if m.tab == tabTasks {
 				m.toggleHistory()
+			}
+
+		case "F":
+			if m.tab == tabTasks && !m.showHistory {
+				return m, m.openContextPicker()
 			}
 
 		case "f":
@@ -1600,6 +1607,8 @@ func (m *model) persistSettings() {
 
 		SubtaskTagsDisabled: !m.subtaskTags,
 		ShowWaiting:         !m.hideWaiting,
+		Contexts:            m.contexts,
+		Context:             m.context,
 		ExportFolder:        m.exportFolder,
 		PickerFolder:        m.pickerFolder,
 		Name:                m.userName,
@@ -2064,6 +2073,7 @@ func (m *model) applyLangPlaceholders() {
 	m.depSearchInput.Placeholder = tr("Search for task to add as dependency...")
 	m.tagSearchInput.Placeholder = tr("Search or create tag...")
 	m.projSearchInput.Placeholder = tr("Search or create project...")
+	m.ctxInput.Placeholder = tr("Context name, to switch to or save...")
 	m.tagTabSearchInput.Placeholder = tr("Filter tags...")
 }
 

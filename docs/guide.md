@@ -134,6 +134,7 @@ before history existed start with none.
 | `x` / `del` | Delete |
 | `n` | Edit the description in `$EDITOR` |
 | `f` | Focus mode (today + overdue) |
+| `F` | Contexts: switch to or save a filter that stays on |
 | `h` | Toggle history |
 | `s` | Cycle sort: Sequence, then each column shown (Settings → Columns) |
 | `w` | Why this rank: the points behind the percentage and what moves it next |
@@ -271,6 +272,25 @@ finds "Deploy release") or the description as plain text.
 - **`or` splits the filter**: `#bug overdue or p:high` is overdue bugs, or
   anything high priority. Words beside each other must all hold, and `or`
   joins those groups, as in Taskwarrior.
+
+### Contexts
+
+A context is a filter that stays on, Taskwarrior's `task context`: say `work`
+for `#work,meeting -@home`. While it is on, the tasks it does not match leave
+the Tasks list, the board, Stats and the Tags and Projects tabs, and `/`
+narrows what is left. The status line names it, `◉ work`.
+
+`F` on the Tasks tab opens the contexts:
+
+- **Save one**: filter with `/` first, then press `F`, type a new name and
+  `enter`. The filter moves into the context and `/` is cleared.
+- **Switch**: pick a context and `enter`; typing narrows the list.
+- **Switch off**: "no context", the first row while one is on.
+- **Delete**: `del` on a context.
+
+Contexts are kept on this device, with your other settings, and stay on
+across restarts. The command line ignores them, so a script always sees
+every task.
 
 ## In your own language
 

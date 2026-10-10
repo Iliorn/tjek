@@ -104,6 +104,7 @@ var keymap = []binding{
 	{ctxTasksList, "x", "delete", "delete", secTasks, true, true},
 	{ctxTasksList, "n", "notes", "edit description (opens $EDITOR)", secTasks, false, false},
 	{ctxTasksList, "f", "focus", "focus: today + overdue only", secTasks, false, false},
+	{ctxTasksList, "F", "context", "context: switch to or save a filter that stays on", secTasks, false, false},
 	{ctxTasksList, "w", "why", "why this rank: the score, its causes, what moves it", secTasks, false, false},
 	{ctxTasksList, "s", "sort", "cycle sort order", secTasks, false, false},
 	{ctxTasksList, "h", "history", "toggle history", secTasks, false, false},

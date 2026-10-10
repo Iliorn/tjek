@@ -649,6 +649,8 @@ func (m model) extraOverheadLines() int {
 		return 3
 	case modeSearchDep, modeSearchTag, modeSearchProject:
 		return 8
+	case modePickContext:
+		return 4 + maxContextRows
 	case modePalette:
 		return 3 + maxPaletteResults
 	case modePickPath:
@@ -672,7 +674,7 @@ func (m *model) fitInputs() {
 	inner := m.termWidth - 8
 	for _, ti := range []*textinput.Model{
 		&m.textInput, &m.searchInput, &m.depSearchInput, &m.tagSearchInput,
-		&m.projSearchInput, &m.tagTabSearchInput, &m.paletteInput,
+		&m.projSearchInput, &m.tagTabSearchInput, &m.paletteInput, &m.ctxInput,
 	} {
 		ti.Width = max(1, inner-ansi.StringWidth(ti.Prompt)-1)
 		// Recompute the visible window for the new width: the input only
