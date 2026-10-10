@@ -133,6 +133,7 @@ var keymap = []binding{
 	{ctxProjects | ctxTags, "s", "sort", "cycle sort order", secTagsProjects, false, false},
 	{ctxProjects | ctxTags, "r", "edit", "rename globally", secTagsProjects, false, false},
 	{ctxTags, "m", "merge", "merge tags (Tags tab)", secTagsProjects, false, false},
+	{ctxProjects | ctxTags, "b", "mark", "rank its tasks higher, lower, or as usual", secTagsProjects, false, false},
 	{ctxProjects | ctxTags, "x", "delete", "delete globally", secTagsProjects, false, false},
 	{ctxProjects, "S", "share", "share in a file / leave", secTagsProjects, false, false},
 	{ctxProjects | ctxTags, "/", "search", "filter", secTagsProjects, true, true},

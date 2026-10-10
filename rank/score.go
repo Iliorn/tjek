@@ -7,7 +7,7 @@
 // wins edge ahead of equal peers and old tasks always eventually surface for
 // cleanup or completion.
 //
-//	Score = U·Wd + I·Wp + M·Wm + Size + Age
+//	Score = U·Wd + I·Wp + M·Wm + Size + Age + K·Wp
 //
 //	U  Urgency    closeness to deadline (0..10+)
 //	I  Importance priority bucket (0/5/10)
@@ -17,6 +17,8 @@
 //	Size          quick-win nudge (S=2, M=1, L=0)
 //	Age           rot-guard: +0.1/day, +0.2/day past 30, counted from the
 //	              start date when that is later than creation
+//	K             ±MarkStep when a tag or project of the task is marked to
+//	              rank higher or lower (Marks), one priority step; else 0
 //	Wd Wp Wm      Deadline / Priority / Momentum bias multipliers
 //
 // Done tasks score 0.
@@ -27,6 +29,7 @@ import (
 	"math"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Iliorn/tjek/todo"
@@ -101,6 +104,123 @@ type Biases struct {
 	// guard on; toggling off zeros the Age term so a brand-new task and a
 	// year-old task with the same Deadline/Priority/Momentum score identically.
 	Aging bool
+	// Marks are the tags and projects marked to rank above or below the rest
+	// (markOf).
+	Marks Marks
+}
+
+// Marks are the tags and projects marked to rank their tasks higher (+1) or
+// lower (-1) than the rest; one not in them ranks as usual. Tags and projects
+// are kept apart so that scoring a task looks each name up as it is, without
+// building a key.
+type Marks struct {
+	Tags     map[string]int
+	Projects map[string]int
+}
+
+// MarksFrom reads the lists settings.json keeps, each entry written "#tag"
+// or "@project".
+func MarksFrom(higher, lower []string) Marks {
+	var k Marks
+	for _, key := range higher {
+		k = k.With(key, 1)
+	}
+	for _, key := range lower {
+		k = k.With(key, -1)
+	}
+	return k
+}
+
+// Get is the mark of key, "#tag" or "@project".
+func (k Marks) Get(key string) int {
+	if name, ok := strings.CutPrefix(key, "#"); ok {
+		return k.Tags[name]
+	}
+	return k.Projects[strings.TrimPrefix(key, "@")]
+}
+
+// With is k with key marked dir, 0 for as usual. The maps are new ones: a
+// Ranker copied into another goroutine goes on reading the old.
+func (k Marks) With(key string, dir int) Marks {
+	clone := func(m map[string]int) map[string]int {
+		out := make(map[string]int, len(m)+1)
+		for name, d := range m {
+			out[name] = d
+		}
+		return out
+	}
+	out := Marks{Tags: clone(k.Tags), Projects: clone(k.Projects)}
+	set, name := out.Projects, strings.TrimPrefix(key, "@")
+	if tag, ok := strings.CutPrefix(key, "#"); ok {
+		set, name = out.Tags, tag
+	}
+	if dir == 0 {
+		delete(set, name)
+	} else {
+		set[name] = dir
+	}
+	return out
+}
+
+// Keys lists the marks in one direction as "#tag" and "@project", sorted.
+func (k Marks) Keys(dir int) []string {
+	var out []string
+	for name, d := range k.Tags {
+		if d == dir {
+			out = append(out, "#"+name)
+		}
+	}
+	for name, d := range k.Projects {
+		if d == dir {
+			out = append(out, "@"+name)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// MarkStep is what a tag or project marked to rank higher adds, and one
+// marked lower takes away, before the Priority knob's weight: the gap between
+// two priority levels, so a mark reads as one priority step either way.
+const MarkStep = 5
+
+// MarkName is the explanation's name for the mark's points.
+const MarkName = "Marked"
+
+// markOf is +1 when one of t's tags or its project is marked higher, -1 when
+// one is marked lower, and 0 for neither or both, so a task cannot climb by
+// carrying several marked tags. word is the first mark that counted, as
+// "#tag" or "@project", for the explanation.
+func markOf(t *todo.Todo, b Biases) (dir int, word string) {
+	if len(b.Marks.Tags) == 0 && len(b.Marks.Projects) == 0 {
+		return 0, ""
+	}
+	// Scored for every task on every refresh: one lookup per name, and a key
+	// is built only for a mark that is found.
+	up, down := "", ""
+	note := func(d int, sigil, name string) {
+		switch {
+		case d > 0 && up == "":
+			up = sigil + name
+		case d < 0 && down == "":
+			down = sigil + name
+		}
+	}
+	for _, tag := range t.Tags {
+		if d := b.Marks.Tags[tag]; d != 0 {
+			note(d, "#", tag)
+		}
+	}
+	if d := b.Marks.Projects[t.Project]; d != 0 && t.Project != "" {
+		note(d, "@", t.Project)
+	}
+	switch {
+	case up != "" && down == "":
+		return 1, up
+	case down != "" && up == "":
+		return -1, down
+	}
+	return 0, ""
 }
 
 // DefaultBiases is the all-Balanced, aging-on configuration that the engine
@@ -450,7 +570,10 @@ type Components struct {
 	Momentum   float64
 	Size       float64
 	Age        float64
-	Total      float64
+	// Marked is the points a higher- or lower-marked tag or project moved it
+	// (markOf); zero for most tasks.
+	Marked float64
+	Total  float64
 }
 
 // ComponentsAt is the testable assembly: pure, takes `now`, biases,
@@ -467,7 +590,10 @@ func ComponentsAt(now time.Time, t *todo.Todo, b Biases, heat Heat) Components {
 		Size:       size,
 		Age:        age,
 	}
-	out.Total = out.Urgency + out.Importance + out.Momentum + out.Size + out.Age
+	if dir, _ := markOf(t, b); dir != 0 {
+		out.Marked = float64(dir*MarkStep) * b.Priority.Weight()
+	}
+	out.Total = out.Urgency + out.Importance + out.Momentum + out.Size + out.Age + out.Marked
 	return out
 }
 

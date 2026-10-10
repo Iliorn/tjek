@@ -189,9 +189,13 @@ func printTaskDetail(t *todo.Todo, subs []todo.Todo, todos []todo.Todo, rk rank.
 		// the sequencing engine's terminology.
 		// Percent of the current field, with the points that produced it —
 		// `tjek why` spells out where each of them came from.
-		fmt.Printf("Score:    %s  (%.1f pts: Deadline %.1f · Priority %.1f · Momentum %.1f · Size %.1f · Age %.1f)\n",
+		marked := ""
+		if sc.Marked != 0 {
+			marked = fmt.Sprintf(" · Marked %+.1f", sc.Marked)
+		}
+		fmt.Printf("Score:    %s  (%.1f pts: Deadline %.1f · Priority %.1f · Momentum %.1f · Size %.1f · Age %.1f%s)\n",
 			rk.FormatPercent(sc.Total), sc.Total,
-			sc.Urgency, sc.Importance, sc.Momentum, sc.Size, sc.Age)
+			sc.Urgency, sc.Importance, sc.Momentum, sc.Size, sc.Age, marked)
 	}
 	if len(subs) > 0 {
 		fmt.Printf("\nSubtasks (%d):\n", len(subs))

@@ -64,6 +64,11 @@ type appSettings struct {
 	// migration.
 	SeqAgingDisabled bool `json:"seq_aging_disabled"`
 
+	// RankHigher and RankLower are the tags ("#name") and projects ("@name")
+	// marked with b on the Tags and Projects tabs (rank.Marks).
+	RankHigher []string `json:"rank_higher,omitempty"`
+	RankLower  []string `json:"rank_lower,omitempty"`
+
 	// AutoCloseParent: when on, a parent task is auto-marked Done the moment
 	// its last open subtask closes. Off by default because the parent often
 	// represents review/sign-off work that survives the children. Opt-in
@@ -198,6 +203,7 @@ func biasesFromSettings(s appSettings) rank.Biases {
 		Priority: s.SeqBiasPriority,
 		Momentum: s.SeqBiasMomentum,
 		Aging:    !s.SeqAgingDisabled,
+		Marks:    rank.MarksFrom(s.RankHigher, s.RankLower),
 	}
 }
 

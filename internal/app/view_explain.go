@@ -61,6 +61,10 @@ func trSeqReason(f rank.Factor) string {
 		return tr("created today")
 	case rank.ReasonAgeOff:
 		return tr("aging is switched off in Settings")
+	case rank.ReasonMarkedHigher:
+		return fmt.Sprintf(tr("%s is marked to rank higher (b on its tab)"), f.Word)
+	case rank.ReasonMarkedLower:
+		return fmt.Sprintf(tr("%s is marked to rank lower (b on its tab)"), f.Word)
 	}
 	return ""
 }

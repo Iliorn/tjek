@@ -43,6 +43,8 @@ const (
 	ReasonAgeDays       // N = days since creation
 	ReasonAgeToday      //
 	ReasonAgeOff        // aging switched off in Settings
+	ReasonMarkedHigher  // Word = the "#tag" or "@project" marked higher
+	ReasonMarkedLower   // Word = the one marked lower
 )
 
 // Factor is one row of the breakdown: the raw 0–10 axis reading, the bias it
@@ -163,13 +165,23 @@ func FactorsAt(now time.Time, t *todo.Todo, b Biases, heat Heat) []Factor {
 	flat := func(name string, v float64, reason Reason, n int, word string) Factor {
 		return Factor{Name: name, Raw: v, Weight: 1, Weighted: v, Bias: Balanced, Reason: reason, N: n, Word: word}
 	}
-	return []Factor{
+	factors := []Factor{
 		knob(DimNames[0], u, b.Deadline, dueReason, dueN, ""),
 		knob(DimNames[1], i, b.Priority, ReasonPriority, 0, t.Priority.String()),
 		knob(DimNames[2], m, b.Momentum, momReason, 0, momWord),
 		flat(DimNames[3], size, ReasonSize, 0, t.Size.String()),
 		flat(DimNames[4], age, ageReason, ageN, ""),
 	}
+	// The mark is a row only when it moved the task, so the breakdown of
+	// every unmarked task reads as it always has.
+	if dir, word := markOf(t, b); dir != 0 {
+		reason := ReasonMarkedHigher
+		if dir < 0 {
+			reason = ReasonMarkedLower
+		}
+		factors = append(factors, knob(MarkName, float64(dir*MarkStep), b.Priority, reason, 0, word))
+	}
+	return factors
 }
 
 // deadlineReason names the branch of urgencyDim the task landed in. It counts

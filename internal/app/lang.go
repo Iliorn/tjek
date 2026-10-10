@@ -887,6 +887,15 @@ var daTranslations = map[string]string{
 	"no context: show every task":                                      "ingen kontekst: vis alle opgaver",
 	"save the filter as: ":                                             "gem filteret som: ",
 
+	// Marking a tag or project to rank higher or lower (rankmark.go).
+	"%s is marked to rank higher (b on its tab)": "%s er markeret til at rangere højere (b på dens fane)",
+	"%s is marked to rank lower (b on its tab)":  "%s er markeret til at rangere lavere (b på dens fane)",
+	"%s: its tasks rank as usual":                "%s: dens opgaver rangerer som normalt",
+	"%s: its tasks rank higher":                  "%s: dens opgaver rangerer højere",
+	"%s: its tasks rank lower":                   "%s: dens opgaver rangerer lavere",
+	"Rank higher / lower":                        "Rangér højere / lavere",
+	"rank its tasks higher, lower, or as usual":  "rangér dens opgaver højere, lavere eller som normalt",
+
 	// ── Calendar entries ──
 	"✓ done at ": "✓ færdig kl. ",
 	"⧗ due":      "⧗ forfalder",
@@ -992,6 +1001,7 @@ var daTranslations = map[string]string{
 	"Why this rank":              "Hvorfor denne placering",
 	"Deadline":                   "Deadline",
 	"Momentum":                   "Momentum",
+	"Marked":                     "Markeret",
 	"Total":                      "I alt",
 	"#%d of %d by sequence · %s": "#%d af %d efter sekvens · %s",
 	"%s = %.1f of the %.1f points the top task scores right now":          "%s = %.1f af de %.1f point, den højeste opgave scorer lige nu",
@@ -1691,6 +1701,15 @@ var deTranslations = map[string]string{
 	"no context: show every task":                                      "kein Kontext: alle Aufgaben zeigen",
 	"save the filter as: ":                                             "Filter speichern als: ",
 
+	// Marking a tag or project to rank higher or lower (rankmark.go).
+	"%s is marked to rank higher (b on its tab)": "%s ist markiert, höher zu rangieren (b auf seinem Tab)",
+	"%s is marked to rank lower (b on its tab)":  "%s ist markiert, niedriger zu rangieren (b auf seinem Tab)",
+	"%s: its tasks rank as usual":                "%s: seine Aufgaben rangieren wie üblich",
+	"%s: its tasks rank higher":                  "%s: seine Aufgaben rangieren höher",
+	"%s: its tasks rank lower":                   "%s: seine Aufgaben rangieren niedriger",
+	"Rank higher / lower":                        "Höher / niedriger einstufen",
+	"rank its tasks higher, lower, or as usual":  "seine Aufgaben höher, niedriger oder wie üblich einstufen",
+
 	// ── Calendar entries ──
 	"✓ done at ": "✓ fertig am ",
 	"⧗ due":      "⧗ fällig",
@@ -1795,6 +1814,7 @@ var deTranslations = map[string]string{
 	// ── Why this rank (the explain overlay and `tjek why`) ──
 	"Why this rank":              "Warum dieser Rang",
 	"Deadline":                   "Frist",
+	"Marked":                     "Markiert",
 	"Momentum":                   "Momentum",
 	"Total":                      "Gesamt",
 	"#%d of %d by sequence · %s": "#%d von %d nach Sequenz · %s",

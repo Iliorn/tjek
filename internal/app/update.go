@@ -721,6 +721,12 @@ func (m model) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "r":
 			return m.handleListRename()
 
+		case "b":
+			if key := m.selectedGroupKey(); key != "" {
+				m.cycleRankMark(key)
+				return m, clearErrAfter()
+			}
+
 		case "S":
 			if m.tab == tabProjects && !m.projectTaskMode {
 				if projects := m.allProjectsForList(); m.projectCursor < len(projects) {
@@ -1589,6 +1595,8 @@ func (m *model) persistSettings() {
 		Theme:             m.themeName,
 		Language:          string(activeLang),
 		SeqBiasDeadline:   m.rank.Biases.Deadline,
+		RankHigher:        m.rank.Biases.Marks.Keys(1),
+		RankLower:         m.rank.Biases.Marks.Keys(-1),
 		SeqBiasPriority:   m.rank.Biases.Priority,
 		SeqBiasMomentum:   m.rank.Biases.Momentum,
 		SeqAgingDisabled:  !m.rank.Biases.Aging,

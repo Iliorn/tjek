@@ -254,6 +254,14 @@ func (m model) renderDetailPage1(t *todo.Todo) string {
 		breakdown := fmt.Sprintf(tr("%s  (%sD %s · P %s · M %s · S %s · A %s)"),
 			m.rank.FormatPercent(ranked), lift,
 			comp(sc.Urgency), comp(sc.Importance), comp(sc.Momentum), comp(sc.Size), comp(sc.Age))
+		// A marked tag or project's points, as the row shows the mark.
+		if sc.Marked != 0 {
+			arrow := " · ▲ "
+			if sc.Marked < 0 {
+				arrow = " · ▼ "
+			}
+			breakdown = strings.TrimSuffix(breakdown, ")") + arrow + comp(math.Abs(sc.Marked)) + ")"
+		}
 		// The components are an explanation, not a value: clipped to
 		// "(D 10.5 · P 10 · M 10 · S…" they explain nothing and cost a row
 		// saying so. When the column cannot hold the whole account, keep the

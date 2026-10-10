@@ -70,7 +70,7 @@ const (
 	// settingKeyFirst is the first of the Keys page's rows, one per
 	// keyPageActions entry (settingKeyAction); they run to numSettingsRows.
 	settingKeyFirst = settingColFirst + 13
-	numSettingsRows = settingKeyFirst + 23
+	numSettingsRows = settingKeyFirst + 24
 )
 
 type pane int
@@ -1928,6 +1928,7 @@ func (m *model) renameTagGlobally(oldName, newName string) []string {
 		t.AddTag(newName)
 		touched = append(touched, t.ID)
 	}
+	m.moveRankMark("#"+oldName, "#"+newName)
 	return touched
 }
 
@@ -1958,6 +1959,11 @@ func (m *model) renameProjectGlobally(oldName, newName string) []string {
 			t.Project = newName
 			touched = append(touched, t.ID)
 		}
+	}
+	// Clearing a project (newName "") keeps its mark, as deleting a tag does:
+	// harmless with nothing carrying it, and there again if u brings it back.
+	if newName != "" {
+		m.moveRankMark("@"+oldName, "@"+newName)
 	}
 	return touched
 }

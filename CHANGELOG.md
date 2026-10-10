@@ -23,6 +23,7 @@ belongs in the commit message, where it is kept next to the code it explains.
 - Filters take the words `blocked`, `ready` and `active`.
 - Contexts: `F` saves a filter that stays on, and switches between them.
 - `tjek edit`, `done` and `list` take `--where '<filter>'`, the app's `/` grammar.
+- `b` on the Tags or Projects tab ranks its tasks higher or lower, by one priority step.
 
 ### Changed
 

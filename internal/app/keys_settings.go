@@ -19,7 +19,7 @@ import (
 var keyPageActions = []string{
 	"add", "done", "track", "timeentry", "priority", "setdue", "edit",
 	"delete", "notes", "focus", "context", "why", "sort", "history", "search",
-	"quicktag", "quickproject", "tagfilter", "merge", "share",
+	"quicktag", "quickproject", "tagfilter", "merge", "mark", "share",
 	"help", "undo", "quit",
 }
 
@@ -44,6 +44,7 @@ var keyActionLabels = map[string]string{
 	"quickproject": "Quick project",
 	"tagfilter":    "Show on the Tasks tab",
 	"merge":        "Merge tags",
+	"mark":         "Rank higher / lower",
 	"share":        "Share project",
 	"help":         "Help",
 	"undo":         "Undo",

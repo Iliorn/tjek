@@ -666,3 +666,60 @@ func TestWaitingTasksAreNotTheTopOfTheScale(t *testing.T) {
 		t.Errorf("100%% mark = %.3f, want the ready task's %.3f", got, want)
 	}
 }
+
+// A tag or project marked higher adds one priority step, scaled by the
+// Priority knob; marked lower takes one away; carrying both cancels, and
+// several marks of one kind count once. The explanation shows the mark only
+// when it moved the task, and its points keep the factors summing to Total.
+func TestMarkedTagsAndProjectsMoveTheScoreByOnePriorityStep(t *testing.T) {
+	now := time.Date(2026, 10, 10, 10, 0, 0, 0, time.Local)
+	task := func(project string, tags ...string) *todo.Todo {
+		x := todo.New("t")
+		x.CreatedAt, x.Project, x.Tags = now, project, tags
+		return &x
+	}
+	b := DefaultBiases()
+	b.Marks = MarksFrom([]string{"#next", "#soon", "@Work"}, []string{"#someday"})
+
+	for _, c := range []struct {
+		name string
+		t    *todo.Todo
+		want float64
+	}{
+		{"unmarked", task("", "misc"), 0},
+		{"tag higher", task("", "next"), MarkStep},
+		{"project higher", task("Work"), MarkStep},
+		{"two higher marks count once", task("Work", "next", "soon"), MarkStep},
+		{"lower", task("", "someday"), -MarkStep},
+		{"higher and lower cancel", task("", "next", "someday"), 0},
+	} {
+		if got := ComponentsAt(now, c.t, b, Heat{}).Marked; !approxEq(got, c.want) {
+			t.Errorf("%s: Marked = %v, want %v", c.name, got, c.want)
+		}
+	}
+
+	b.Priority = Intense
+	marked := task("", "next")
+	sc := ComponentsAt(now, marked, b, Heat{})
+	if !approxEq(sc.Marked, MarkStep*Intense.Weight()) {
+		t.Errorf("with Priority Intense, Marked = %v, want %v", sc.Marked, MarkStep*Intense.Weight())
+	}
+	sum := 0.0
+	var mark *Factor
+	factors := FactorsAt(now, marked, b, Heat{})
+	for i, f := range factors {
+		sum += f.Weighted
+		if f.Name == MarkName {
+			mark = &factors[i]
+		}
+	}
+	if !approxEq(sum, sc.Total) {
+		t.Errorf("factors sum to %v, Total is %v", sum, sc.Total)
+	}
+	if mark == nil || mark.Reason != ReasonMarkedHigher || mark.Word != "#next" {
+		t.Errorf("mark factor = %+v", mark)
+	}
+	if n := len(FactorsAt(now, task("", "misc"), b, Heat{})); n != DimCount {
+		t.Errorf("an unmarked task has %d factors, want the %d dimensions only", n, DimCount)
+	}
+}

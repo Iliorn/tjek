@@ -157,6 +157,15 @@ dimension), and press `w` on any task to see the points behind its
 percentage, their causes, the margins to the rows either side, and when the
 ranking will move on its own.
 
+Some tags and projects matter more than their tasks' priorities say, or
+less: `#next`, `@side-project`. On the Tags or Projects tab, `b` marks the
+selected one to rank its tasks **higher** (▲ beside its name), then
+**lower** (▼), then as usual again. A mark is worth one priority step either
+way, so a medium task in a ▲ project ranks with the high ones; a task with
+both a ▲ and a ▼ mark is left as it was, and several ▲ marks count once. `w`
+names the mark that moved a task. Marks are kept on this device with the
+other Sequencer settings, and follow a tag or project when it is renamed.
+
 Dependencies feed the ranking: a task that blocks others inherits their
 urgency, so the prerequisite for an urgent task surfaces right above it. In
 the list, `↥` marks a blocker and `↧` a task still waiting on one.

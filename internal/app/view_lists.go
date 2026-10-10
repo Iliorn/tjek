@@ -45,7 +45,7 @@ func (m model) renderTagList() string {
 			if key == untaggedKey {
 				return tr("(untagged)")
 			}
-			return "#" + key
+			return "#" + key + m.rankMarkSuffix("#"+key)
 		},
 		editing: func(key, lead, label string) (string, bool) {
 			if m.mode != modeEditTag || m.editingTagName != key {
@@ -1316,10 +1316,11 @@ func (m model) renderProjectListContent(projects []string) string {
 		start:      m.listOffset,
 		count:      m.projectListVisibleRows(),
 		label: func(key string) string {
+			mark := m.rankMarkSuffix("@" + key)
 			if _, ok := m.shared.find(key); ok {
-				return key + sharedMark
+				return key + sharedMark + mark
 			}
-			return key
+			return key + mark
 		},
 		editing: func(key, lead, _ string) (string, bool) {
 			if m.mode != modeEditProjectInline || key != m.editingProjectName {
