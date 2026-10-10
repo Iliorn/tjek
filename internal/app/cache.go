@@ -125,11 +125,30 @@ func (m *model) refreshCaches() {
 		m.cache.waiting, _ = waitingSet(all, m.frameTime)
 	}
 	m.cache.outside, m.cache.contextAsks = m.outsideContext(all)
-	// The status line counts what /waiting would list here: the waiting
-	// top-level tasks inside the context.
+	// A waiting task the context asks for brings its subtasks with it, as
+	// they wait with it (waitingSet), though they do not match "waiting".
+	for id := range m.cache.waiting {
+		if m.cache.contextAsks[id] {
+			continue
+		}
+		t := m.get(id)
+		for p, steps := t.ParentID, 0; t != nil && p != "" && steps < 64; steps++ {
+			if m.cache.contextAsks[p] {
+				m.cache.contextAsks[id] = true
+				break
+			}
+			parent := m.get(p)
+			if parent == nil {
+				break
+			}
+			p = parent.ParentID
+		}
+	}
+	// The status line counts what is waiting out of sight: the waiting
+	// top-level tasks inside the context that it does not show already.
 	m.cache.waitingTop = 0
 	for id := range m.cache.waiting {
-		if t := m.get(id); t != nil && t.ParentID == "" && !m.cache.outside[id] {
+		if t := m.get(id); t != nil && t.ParentID == "" && !m.cache.outside[id] && !m.cache.contextAsks[id] {
 			m.cache.waitingTop++
 		}
 	}

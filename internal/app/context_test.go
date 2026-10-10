@@ -156,3 +156,26 @@ func TestWaitingTasksShowOnlyThroughAGroupThatAsks(t *testing.T) {
 		t.Errorf("inside #home the status line counts %d waiting, want 1", m.cache.waitingTop)
 	}
 }
+
+// A context of "waiting" shows a waiting task's subtasks with it, and the
+// status line does not count as hidden what the context shows.
+func TestContextWaitingBringsSubtasksAndIsNotCounted(t *testing.T) {
+	parent := todo.New("parked parent")
+	parent.Tags = []string{"parked"}
+	parent.SetStartDate(todo.Someday)
+	child := todo.NewSubtask("its step", parent.ID)
+	child.Tags = []string{"step"}
+	m := modelWithTasks(t, parent, child)
+	m.contexts = []savedContext{{Name: "parked", Query: "waiting"}}
+	m.context = "parked"
+	m.refreshCaches()
+	if !m.listVisibility().shows(child.ID, false) {
+		t.Error("the subtask of a waiting task the context asks for should show")
+	}
+	if g := m.cache.tagGroups["step"]; g == nil || g.open != 1 {
+		t.Errorf("the subtask's tag should count it: %+v", g)
+	}
+	if m.cache.waitingTop != 0 {
+		t.Errorf("status line counts %d waiting, all of them shown", m.cache.waitingTop)
+	}
+}

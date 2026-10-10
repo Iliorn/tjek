@@ -223,13 +223,28 @@ func (m *model) outsideContext(all []*todo.Todo) (outside, asks map[string]bool)
 		return nil, nil
 	}
 	match := compileFilter(q, m.searchEnv())
-	outside, asks = make(map[string]bool), make(map[string]bool)
+	matched, asks := make(map[string]bool), make(map[string]bool)
+	parent := make(map[string]string, len(all))
 	for _, t := range all {
-		switch ok, asksWaiting := match(*t); {
-		case !ok:
+		parent[t.ID] = t.ParentID
+		if ok, asksWaiting := match(*t); ok {
+			matched[t.ID] = true
+			if asksWaiting {
+				asks[t.ID] = true
+			}
+		}
+	}
+	// A subtask belongs where its parent does: inside the context when it
+	// matches, or when a task above it does, as a #work task's untagged
+	// steps are #work's too.
+	outside = make(map[string]bool)
+	for _, t := range all {
+		inside := matched[t.ID]
+		for p, steps := t.ParentID, 0; !inside && p != "" && steps < 64; p, steps = parent[p], steps+1 {
+			inside = matched[p]
+		}
+		if !inside {
 			outside[t.ID] = true
-		case asksWaiting:
-			asks[t.ID] = true
 		}
 	}
 	return outside, asks
