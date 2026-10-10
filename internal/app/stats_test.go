@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/Iliorn/tjek/todo"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/muesli/termenv"
 )
 
 func statsTodos() []todo.Todo {
@@ -858,5 +860,21 @@ func TestRenderCellRowKeepsItsText(t *testing.T) {
 	}
 	if got := ansi.Strip(renderCellRow(row)); got != " █ █ ▀ ─w" {
 		t.Errorf("renderCellRow = %q", got)
+	}
+}
+
+// A blank between two half blocks keeps no background: it goes out between
+// the two styled runs rather than inside one that would paint the gap.
+func TestRenderCellRowLeavesGapsUnpainted(t *testing.T) {
+	before := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(before)
+
+	out := renderCellRow([]statsCell{{' ', -1, -1}, {'▀', 3, 1}, {' ', -1, -1}, {'▀', 3, 1}})
+	if n := strings.Count(out, "48;2;"); n != 2 {
+		t.Errorf("want two background runs, one per half block, got %d in %q", n, out)
+	}
+	if ansi.Strip(out) != " ▀ ▀" {
+		t.Errorf("text = %q", ansi.Strip(out))
 	}
 }

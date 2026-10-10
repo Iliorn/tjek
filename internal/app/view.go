@@ -2149,7 +2149,16 @@ func renderCellRow(cells []statsCell) string {
 			key++
 		}
 		g, bg := cells[key].gi, cells[key].bg
-		for c <= last && (blank(cells[c]) || cells[c].gi == g && cells[c].bg == bg) {
+		// A run with a background (the ▀ half blocks) would paint the blanks
+		// it took in, so blanks join only a run without one, and blanks ahead
+		// of such a run go out as plain spaces.
+		joins := bg < 0
+		if !joins && key > start {
+			sb.WriteString(strings.Repeat(" ", key-start))
+			c = key
+			start = c
+		}
+		for c <= last && (joins && blank(cells[c]) || cells[c].gi == g && cells[c].bg == bg) {
 			c++
 		}
 		seg := make([]rune, 0, c-start)
