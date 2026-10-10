@@ -312,3 +312,24 @@ func TestWaitsOnAndBlocksColumns(t *testing.T) {
 		t.Errorf("the waiting task should name what it waits on: %q", r)
 	}
 }
+
+// The Projects and Tags lists say how much of each group is done.
+func TestGroupListsShowTheShareDone(t *testing.T) {
+	mk := func(title string, done bool) todo.Todo {
+		x := todo.New(title)
+		x.Project, x.Tags = "Trip", []string{"trip"}
+		if done {
+			x.Status = todo.Done
+		}
+		return x
+	}
+	m := modelWithTasks(t, mk("book flights", true), mk("pack", true), mk("renew passport", false))
+	m.termWidth, m.termHeight = 100, 24
+	for _, tab := range []string{"4", "3"} {
+		m = script(t, m, tab)
+		view := ansi.Strip(m.View())
+		if !strings.Contains(view, "Done") || !strings.Contains(view, "67%") {
+			t.Errorf("tab %s should show the Done column with 67%%:\n%s", tab, view)
+		}
+	}
+}

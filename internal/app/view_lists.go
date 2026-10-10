@@ -78,7 +78,8 @@ type groupRows struct {
 }
 
 // renderGroupRows draws a Tags or Projects list: the group, how much is open
-// in it (and late, when anything anywhere is) and when it last moved. What to
+// in it, how much of it is done (Taskwarrior's summary), how much is late
+// when anything anywhere is, and when it last moved. What to
 // do first in a group is its task list's first row, by score, under it.
 // A finished group — shown only after h — is drawn dim throughout.
 func (m model) renderGroupRows(g groupRows) string {
@@ -88,6 +89,8 @@ func (m model) renderGroupRows(g groupRows) string {
 	gap := strings.Repeat(" ", listColGap)
 	openHdr, lateHdr, lastHdr := tr("Open"), tr("Overdue"), tr("Last")
 	labelMax, openW, lateW, lastW := 0, runeLen(openHdr), runeLen(lateHdr), runeLen(lastHdr)
+	doneHdr := tr("Done")
+	doneW := max(runeLen(doneHdr), len("100%"))
 	anyLate := false
 	for _, key := range g.keys {
 		s := g.sums[key]
@@ -99,7 +102,7 @@ func (m model) renderGroupRows(g groupRows) string {
 	nameW := contentFitWidth(m.termWidth, labelMax, listColGap, runeLen(g.nameHdr)+listColGap)
 	avail := m.termWidth - 8
 
-	header := cursorGap + padRight(g.nameHdr, nameW) + padLeft(openHdr, openW) + gap
+	header := cursorGap + padRight(g.nameHdr, nameW) + padLeft(openHdr, openW) + gap + padLeft(doneHdr, doneW) + gap
 	if anyLate {
 		header += padLeft(lateHdr, lateW) + gap
 	}
@@ -128,6 +131,9 @@ func (m model) renderGroupRows(g groupRows) string {
 			open = "─"
 		}
 		openCell := padLeft(open, openW) + gap
+		// Of everything ever in the group, the share that is done.
+		total := max(s.open+s.done, 1)
+		doneCell := padLeft(fmt.Sprintf("%d%%", (s.done*100+total/2)/total), doneW) + gap
 		lateCell := ""
 		if anyLate {
 			lateCell = padLeft(late, lateW) + gap
@@ -136,9 +142,9 @@ func (m model) renderGroupRows(g groupRows) string {
 
 		switch {
 		case i == g.cursor:
-			b.WriteString(selectedStyle.Render(padRight(lead+name+openCell+lateCell+lastCell, avail)) + "\n")
+			b.WriteString(selectedStyle.Render(padRight(lead+name+openCell+doneCell+lateCell+lastCell, avail)) + "\n")
 		case s.finished():
-			b.WriteString(doneCountStyle.Render(lead+name+openCell+lateCell+lastCell) + "\n")
+			b.WriteString(doneCountStyle.Render(lead+name+openCell+doneCell+lateCell+lastCell) + "\n")
 		default:
 			lateStyle := dimStyle
 			if s.overdue > 0 {
@@ -146,6 +152,7 @@ func (m model) renderGroupRows(g groupRows) string {
 			}
 			b.WriteString(g.labelStyle.Render(lead+name) +
 				activeCountStyle.Render(openCell) +
+				dimStyle.Render(doneCell) +
 				lateStyle.Render(lateCell) +
 				dimStyle.Render(lastCell) + "\n")
 		}

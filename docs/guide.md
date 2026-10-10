@@ -11,8 +11,8 @@ version; the [CLI reference](cli.md) covers the `tjek <command>` side.
   breakdown and the task's [history](#history).
 - **Calendar**: a per-day activity timeline with project and tag roll-ups
   and a tracked-time heatmap. Time entries can be edited or deleted in place.
-- **Projects**: tasks grouped by project, with a timeline when an open task
-  has a date. `enter` walks into a project's tasks, where the task keys
+- **Projects**: tasks grouped by project, how many are open and what share
+  is done, with a timeline when an open task has a date. `enter` walks into a project's tasks, where the task keys
   (`d` done, `t` track, `p` priority, `r` rename, `x` delete, `enter`
   details) all work; `a` adds a task already in that project, `x` on the
   project row clears the project from its tasks.
