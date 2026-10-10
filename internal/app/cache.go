@@ -27,6 +27,10 @@ type cacheState struct {
 	// outside is the tasks the active context does not match (context.go),
 	// nil when no context is on.
 	outside map[string]bool
+	// backlog memoizes the Stats backlog series (statsBacklog). A fresh empty
+	// memo each refresh, filled the first time the chart is drawn, so a
+	// refresh pays nothing for it unless the chart is on screen.
+	backlog *backlogMemo
 	// dependents lists, per task, the unfinished tasks that wait on it.
 	dependents map[string][]string
 	active     []todo.Todo
@@ -79,6 +83,7 @@ func (m *model) refreshCaches() {
 	m.frameTime = time.Now()
 	m.cache.builtAt = m.frameTime
 	m.cache.groupLists, m.cache.dayActs = nil, nil
+	m.cache.backlog = &backlogMemo{}
 
 	all := m.allTodos()
 
@@ -296,6 +301,7 @@ func (m model) rankedScore(t *todo.Todo) float64 {
 // entire task set on every keypress for no reason.
 func (m *model) refreshFilteredCaches() {
 	all := m.allTodos()
+	m.cache.backlog = &backlogMemo{} // its scope follows the search
 	m.cache.active, m.cache.done = selectActiveDoneRanked(all, m.cache.rankScore, m.frameTime, m.rank.ScoreAt(m.frameTime), m.searchQuery, m.searchEnv(), m.focusFilter, m.taskSort, m.historySort, m.listHidden())
 	m.refreshTagRenderCache()
 	m.refreshTaskColMetrics()

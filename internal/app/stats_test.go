@@ -493,7 +493,7 @@ func TestStatsWeekdayLabels(t *testing.T) {
 func TestStatsRangeCycles(t *testing.T) {
 	m := newTagModel()
 	m.tab = tabStats
-	want := []statsRangeMode{statsRange30Days, statsRange6Months, statsRange7Days}
+	want := []statsRangeMode{statsRange30Days, statsRange6Months, statsRangeBacklog, statsRange7Days}
 	for i, exp := range want {
 		nm, _ := m.handleListEnter()
 		m = nm.(model)
@@ -771,6 +771,65 @@ func TestFormatDaysCompact(t *testing.T) {
 	} {
 		if got := formatDaysCompact(d); got != want {
 			t.Errorf("formatDaysCompact(%v) = %q, want %q", d, got, want)
+		}
+	}
+}
+
+// The backlog counts a top-level task open from the day it was made to the
+// day it was closed; one closed before the window, or the day it was made,
+// never counts, and subtasks count with their parent.
+func TestStatsBacklogCountsOpenTasksPerDay(t *testing.T) {
+	now := time.Now()
+	day := func(d int) time.Time { return now.AddDate(0, 0, d) }
+	const stillOpen = 1 // a closing day in the future: not closed
+	mk := func(created, closed int) todo.Todo {
+		x := todo.New("t")
+		x.CreatedAt = day(created)
+		if closed != stillOpen {
+			x.Status, x.CompletedAt = todo.Done, day(closed)
+		}
+		return x
+	}
+	old := mk(-60, stillOpen)   // open all along
+	recent := mk(-5, stillOpen) // open the last six days
+	closedMid := mk(-20, -10)   // open from day -20 to the day before -10
+	gone := mk(-60, -40)        // closed before the window
+	sameDay := mk(-3, -3)       // made and closed the same day
+	sub := todo.NewSubtask("s", old.ID)
+	sub.CreatedAt = day(-60)
+	m := modelWithTasks(t, old, recent, closedMid, gone, sameDay, sub)
+	m.refreshCaches()
+
+	_, open := m.statsBacklog()
+	at := func(d int) int { return open[len(open)-1+d] }
+	for d, want := range map[int]int{0: 2, -5: 2, -6: 1, -10: 1, -11: 2, -20: 2, -21: 1, -29: 1} {
+		if got := at(d); got != want {
+			t.Errorf("day %d: %d open, want %d (series %v)", d, got, want, open)
+		}
+	}
+
+	m.termWidth, m.termHeight = 110, 40
+	m.statsRange = statsRangeBacklog
+	if out := ansi.Strip(m.renderStatsDetail()); !strings.Contains(out, "2 open · ▲ +1") || !strings.Contains(out, "peak 2") {
+		t.Errorf("chart labels:\n%s", out)
+	}
+	if got := m.statsPanelTitle(); !strings.Contains(got, "Backlog") {
+		t.Errorf("title %q", got)
+	}
+}
+
+// dayNumber's differences are calendar days, as calendarDays counts them,
+// across leap days and DST changes.
+func TestDayNumberCountsCalendarDays(t *testing.T) {
+	loc, err := time.LoadLocation("Europe/Copenhagen")
+	if err != nil {
+		t.Skip(err)
+	}
+	from := time.Date(2023, 12, 20, 0, 30, 0, 0, loc)
+	for i := 0; i < 1200; i += 7 {
+		to := from.AddDate(0, 0, i).Add(time.Duration(i%23) * time.Hour)
+		if got, want := dayNumber(to)-dayNumber(from), calendarDays(from, to); got != want {
+			t.Fatalf("%s → %s: dayNumber gives %d, calendarDays %d", from, to, got, want)
 		}
 	}
 }

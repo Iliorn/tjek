@@ -184,6 +184,9 @@ const (
 	statsRange7Days statsRangeMode = iota
 	statsRange30Days
 	statsRange6Months
+	// statsRangeBacklog swaps the completions chart for the backlog one
+	// (view_stats_backlog.go).
+	statsRangeBacklog
 	statsRangeCount
 )
 

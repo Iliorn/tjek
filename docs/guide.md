@@ -20,7 +20,10 @@ version; the [CLI reference](cli.md) covers the `tjek <command>` side.
   across every task; `f` shows a tag's tasks on the Tasks tab as a filter.
 - **Board**: a kanban view; see [The board](#the-board).
 - **Stats**: a productivity overview with an activity heatmap. It follows
-  the active search, so `#tag` scopes every number to that tag.
+  the active search, so `#tag` scopes every number to that tag. `enter`
+  cycles the chart under it through the tasks finished per day and week and,
+  last, the backlog: how many tasks were open at the end of each of the last
+  30 days, so you see whether the pile is shrinking.
 - **Settings**: the sequencing knobs, theme, language (English, Dansk,
   Deutsch), board columns, sync, and in-app update.
 

@@ -896,6 +896,12 @@ var daTranslations = map[string]string{
 	"Rank higher / lower":                        "Rangér højere / lavere",
 	"rank its tasks higher, lower, or as usual":  "rangér dens opgaver højere, lavere eller som normalt",
 
+	// The Stats tab's backlog chart (view_stats_backlog.go).
+	"%d open · %s %+d since %s · peak %d": "%d åbne · %s %+d siden %s · top %d",
+	"Backlog":                             "Efterslæb",
+	"No open tasks in this range.":        "Ingen åbne opgaver i denne periode.",
+	"open tasks at the end of each day":   "åbne opgaver ved hver dags slutning",
+
 	// ── Calendar entries ──
 	"✓ done at ": "✓ færdig kl. ",
 	"⧗ due":      "⧗ forfalder",
@@ -1709,6 +1715,12 @@ var deTranslations = map[string]string{
 	"%s: its tasks rank lower":                   "%s: seine Aufgaben rangieren niedriger",
 	"Rank higher / lower":                        "Höher / niedriger einstufen",
 	"rank its tasks higher, lower, or as usual":  "seine Aufgaben höher, niedriger oder wie üblich einstufen",
+
+	// The Stats tab's backlog chart (view_stats_backlog.go).
+	"%d open · %s %+d since %s · peak %d": "%d offen · %s %+d seit %s · Spitze %d",
+	"Backlog":                             "Rückstand",
+	"No open tasks in this range.":        "Keine offenen Aufgaben in diesem Zeitraum.",
+	"open tasks at the end of each day":   "offene Aufgaben am Ende jedes Tages",
 
 	// ── Calendar entries ──
 	"✓ done at ": "✓ fertig am ",

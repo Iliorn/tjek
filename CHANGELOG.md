@@ -25,6 +25,7 @@ belongs in the commit message, where it is kept next to the code it explains.
 - `tjek edit`, `done` and `list` take `--where '<filter>'`, the app's `/` grammar.
 - `b` on the Tags or Projects tab ranks its tasks higher or lower, by one priority step.
 - The Tags and Projects lists show the share of each that is done.
+- Stats charts the backlog, the tasks open each day for 30 days: `enter` on Stats.
 
 ### Changed
 

@@ -1731,6 +1731,9 @@ func (m model) statsActivity() (label string, buckets []statsBucket, weekly bool
 // back is one more block a busy day can stack. Dropped back to front as the
 // window narrows, so the least useful half goes first.
 func (m model) statsPanelTitle() string {
+	if m.statsRange == statsRangeBacklog {
+		return m.statsBacklogTitle()
+	}
 	name := tr("Activity")
 	label, _, _, total := m.statsActivity()
 	scope := "[" + label + " · " + trCount("%d done", total, total) + "]"
@@ -1826,6 +1829,9 @@ func statsChartRows(budget int, buckets []statsBucket) int {
 }
 
 func (m model) renderStatsDetail() string {
+	if m.statsRange == statsRangeBacklog {
+		return m.renderStatsBacklog()
+	}
 	b := getBuilder()
 	defer putBuilder(b)
 
