@@ -299,7 +299,7 @@ func cliFilterEnv(todos []todo.Todo, blocked map[string]bool) filterEnv {
 // tasks list --where shows, waiting ones left out unless the filter asks for
 // them, as pointers into todos for the caller to change.
 func whereTargets(todos []todo.Todo, where string) []*todo.Todo {
-	opts := listFilterOpts{where: where, hideWaiting: storedHideWaiting() && !searchShowsWaiting(where)}
+	opts := listFilterOpts{where: where, hideWaiting: storedHideWaiting()}
 	byID := make(map[string]*todo.Todo, len(todos))
 	for i := range todos {
 		byID[todos[i].ID] = &todos[i]
@@ -350,10 +350,11 @@ func filterTopLevel(todos []todo.Todo, opts listFilterOpts) []todo.Todo {
 	if opts.onlyReady || opts.onlyBlocked || opts.where != "" {
 		blockedSet = buildBlockedSet(todos)
 	}
-	where := func(todo.Todo) bool { return true }
+	env := filterEnv{}
 	if opts.where != "" {
-		where = compileSearchWith(opts.where, cliFilterEnv(todos, blockedSet))
+		env = cliFilterEnv(todos, blockedSet)
 	}
+	where := compileFilter(opts.where, env)
 	now := opts.now
 	if now.IsZero() {
 		now = time.Now()
@@ -374,10 +375,15 @@ func filterTopLevel(todos []todo.Todo, opts listFilterOpts) []todo.Todo {
 		if opts.focus && !(t.IsOverdue() || t.IsDueToday()) {
 			continue
 		}
-		if (opts.hideWaiting || opts.onlyWaiting) && rank.StartsLater(&t, now) != opts.onlyWaiting {
+		match, asksWaiting := where(t)
+		if !match {
 			continue
 		}
-		if !where(t) {
+		// As in the app (listVisibility): a waiting task is left out unless
+		// the --where group that matched it names "waiting".
+		switch waiting := rank.StartsLater(&t, now); {
+		case opts.onlyWaiting && !waiting,
+			opts.hideWaiting && waiting && !asksWaiting:
 			continue
 		}
 		if tagQ != "" {

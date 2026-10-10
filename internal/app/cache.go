@@ -27,6 +27,9 @@ type cacheState struct {
 	// outside is the tasks the active context does not match (context.go),
 	// nil when no context is on.
 	outside map[string]bool
+	// contextAsks is the waiting tasks a group of the context naming
+	// "waiting" matched (listVisibility).
+	contextAsks map[string]bool
 	// backlog memoizes the Stats backlog series (statsBacklog). A fresh empty
 	// memo each refresh, filled the first time the chart is drawn, so a
 	// refresh pays nothing for it unless the chart is on screen.
@@ -113,15 +116,23 @@ func (m *model) refreshCaches() {
 	// Before the lists: a #tag filter asks it which tags exist (searchEnv).
 	m.refreshUsageRecency(all)
 
-	m.cache.waiting, m.cache.waitingTop = nil, 0
+	m.cache.waiting = nil
 	if m.hideWaiting {
-		m.cache.waiting, m.cache.waitingTop = waitingSet(all, m.frameTime)
+		m.cache.waiting, _ = waitingSet(all, m.frameTime)
 	}
-	m.cache.outside = m.outsideContext(all)
+	m.cache.outside, m.cache.contextAsks = m.outsideContext(all)
+	// The status line counts what /waiting would list here: the waiting
+	// top-level tasks inside the context.
+	m.cache.waitingTop = 0
+	for id := range m.cache.waiting {
+		if t := m.get(id); t != nil && t.ParentID == "" && !m.cache.outside[id] {
+			m.cache.waitingTop++
+		}
+	}
 
-	m.cache.active, m.cache.done = selectActiveDoneRanked(all, m.cache.rankScore, m.frameTime, m.rank.ScoreAt(m.frameTime), m.searchQuery, m.searchEnv(), m.focusFilter, m.taskSort, m.historySort, m.listHidden())
+	m.cache.active, m.cache.done = selectActiveDoneRanked(all, m.cache.rankScore, m.frameTime, m.rank.ScoreAt(m.frameTime), m.searchQuery, m.searchEnv(), m.focusFilter, m.taskSort, m.historySort, m.listVisibility())
 
-	m.refreshGroups(withoutHidden(withoutHidden(all, m.cache.waiting), m.cache.outside))
+	m.refreshGroups(m.visibleTodos(all))
 
 	// subtaskOf is maintained incrementally by Store.add / Store.remove, so
 	// no rebuild is needed here.
@@ -149,38 +160,22 @@ func (m *model) searchEnv() filterEnv {
 	}
 }
 
-// listHidden is what the lists leave out: the tasks outside the active
-// context, and the waiting set unless the search asks for exactly those.
-func (m *model) listHidden() map[string]bool {
-	waiting := m.cache.waiting
-	if searchShowsWaiting(m.searchQuery) {
-		waiting = nil
-	}
-	switch {
-	case len(m.cache.outside) == 0:
-		return waiting
-	case len(waiting) == 0:
-		return m.cache.outside
-	}
-	both := make(map[string]bool, len(waiting)+len(m.cache.outside))
-	for id := range waiting {
-		both[id] = true
-	}
-	for id := range m.cache.outside {
-		both[id] = true
-	}
-	return both
+// listVisibility is what the lists hide beyond the search (selectors.go).
+func (m *model) listVisibility() listVisibility {
+	return listVisibility{outside: m.cache.outside, waiting: m.cache.waiting, contextAsks: m.cache.contextAsks}
 }
 
-// withoutHidden is all less the tasks in hidden, for the summaries that count
-// what the lists show. It returns all itself when nothing is hidden.
-func withoutHidden(all []*todo.Todo, hidden map[string]bool) []*todo.Todo {
-	if len(hidden) == 0 {
+// visibleTodos is all less what the lists hide with no search, for the
+// summaries that count what the lists show. It returns all itself when
+// nothing is hidden.
+func (m *model) visibleTodos(all []*todo.Todo) []*todo.Todo {
+	if len(m.cache.outside) == 0 && len(m.cache.waiting) == 0 {
 		return all
 	}
+	vis := m.listVisibility()
 	out := make([]*todo.Todo, 0, len(all))
 	for _, t := range all {
-		if !hidden[t.ID] {
+		if vis.shows(t.ID, false) {
 			out = append(out, t)
 		}
 	}
@@ -307,7 +302,7 @@ func (m model) rankedScore(t *todo.Todo) float64 {
 func (m *model) refreshFilteredCaches() {
 	all := m.allTodos()
 	m.cache.backlog = &backlogMemo{} // its scope follows the search
-	m.cache.active, m.cache.done = selectActiveDoneRanked(all, m.cache.rankScore, m.frameTime, m.rank.ScoreAt(m.frameTime), m.searchQuery, m.searchEnv(), m.focusFilter, m.taskSort, m.historySort, m.listHidden())
+	m.cache.active, m.cache.done = selectActiveDoneRanked(all, m.cache.rankScore, m.frameTime, m.rank.ScoreAt(m.frameTime), m.searchQuery, m.searchEnv(), m.focusFilter, m.taskSort, m.historySort, m.listVisibility())
 	m.refreshTagRenderCache()
 	m.refreshTaskColMetrics()
 	m.refreshClosedToday()

@@ -52,6 +52,9 @@ type filterTerm struct {
 	neg   bool
 	label string
 	match func(todo.Todo) bool
+	// waiting marks the word "waiting": a group naming it asks for the
+	// tasks the lists otherwise hide until their start date.
+	waiting bool
 }
 
 // compileSearch is compileSearchWith without the model's caches.
@@ -64,27 +67,47 @@ func compileSearch(search string) func(todo.Todo) bool {
 // task. The grammar is parseFilter's. The two click-driven sentinels — empty
 // (match all) and untaggedKey (no tags) — keep their exact-string meaning.
 func compileSearchWith(search string, env filterEnv) func(todo.Todo) bool {
+	match := compileFilter(search, env)
+	return func(t todo.Todo) bool {
+		ok, _ := match(t)
+		return ok
+	}
+}
+
+// compileFilter is compileSearchWith that also says, for a task it matches,
+// whether a matching group names "waiting": only such a group shows the
+// tasks the lists hide until their start date (listVisibility), so in
+// "#work or waiting" the #work group still leaves them out.
+func compileFilter(search string, env filterEnv) func(todo.Todo) (match, asksWaiting bool) {
 	switch search {
 	case "":
-		return func(todo.Todo) bool { return true }
+		return func(todo.Todo) (bool, bool) { return true, false }
 	case untaggedKey:
-		return func(t todo.Todo) bool { return len(t.Tags) == 0 }
+		return func(t todo.Todo) (bool, bool) { return len(t.Tags) == 0, false }
 	}
 	groups := parseFilter(search, env)
 	if len(groups) == 0 {
-		return func(todo.Todo) bool { return true }
+		return func(todo.Todo) (bool, bool) { return true, false }
 	}
-	return func(t todo.Todo) bool {
+	asks := make([]bool, len(groups))
+	for i, terms := range groups {
+		for _, term := range terms {
+			asks[i] = asks[i] || term.waiting && !term.neg
+		}
+	}
+	return func(t todo.Todo) (match, asksWaiting bool) {
 	group:
-		for _, terms := range groups {
+		for i, terms := range groups {
 			for _, term := range terms {
 				if term.match(t) == term.neg {
 					continue group
 				}
 			}
-			return true
+			if match, asksWaiting = true, asks[i]; asksWaiting {
+				return
+			}
 		}
-		return false
+		return
 	}
 }
 
@@ -260,7 +283,7 @@ func parseFilterTerm(tok string, env filterEnv) (filterTerm, bool) {
 	default:
 		return filterTerm{}, false
 	}
-	return filterTerm{kind: termWord, label: tr(word), match: match}, true
+	return filterTerm{kind: termWord, label: tr(word), match: match, waiting: word == "waiting"}, true
 }
 
 // filterValues splits a term's value on commas into its lower-cased
@@ -275,8 +298,25 @@ func filterValues(s string) []string {
 	return out
 }
 
-// searchShowsWaiting reports whether a query asks for the tasks waiting for
-// their start date, which the lists otherwise leave out (waitingSet).
+// listVisibility is what the lists leave out beyond the search: the tasks
+// outside the active context, and the waiting ones (waitingSet) unless a
+// group of the search or of the context that matched them names "waiting".
+type listVisibility struct {
+	outside map[string]bool
+	waiting map[string]bool // nil when hiding is off
+	// contextAsks is the waiting tasks the context itself asks for.
+	contextAsks map[string]bool
+}
+
+// shows reports whether the lists may show id, given whether the search's
+// matching group asked for waiting tasks.
+func (v listVisibility) shows(id string, searchAsksWaiting bool) bool {
+	return !v.outside[id] && (!v.waiting[id] || searchAsksWaiting || v.contextAsks[id])
+}
+
+// searchShowsWaiting reports whether a query names "waiting" anywhere, for
+// what is about the query as a whole: the status line's count, and the
+// /waiting list's order.
 func searchShowsWaiting(search string) bool {
 	for _, tok := range strings.Fields(search) {
 		if canonicalInputWord(strings.ToLower(tok)) == "waiting" {
@@ -423,7 +463,7 @@ func selectActiveDone(todos []*todo.Todo, now time.Time, score func(*todo.Todo) 
 	if sortMode == taskSortSequence {
 		rollup = rank.Lifts(todos, score)
 	}
-	return selectActiveDoneRanked(todos, rollup, now, score, search, filterEnv{}, focus, sortMode, historyMode, nil)
+	return selectActiveDoneRanked(todos, rollup, now, score, search, filterEnv{}, focus, sortMode, historyMode, listVisibility{})
 }
 
 // selectActiveDoneRanked takes the lift map from its caller. The model computes
@@ -431,12 +471,15 @@ func selectActiveDone(todos []*todo.Todo, now time.Time, score func(*todo.Todo) 
 // filter, so recomputing it inside the per-keystroke search path walked every
 // task twice for an answer that had not changed.
 //
-// hidden is what both lists leave out (listHidden: the waiting set, and what
-// the active context does not match), nil to hide nothing. It is applied here
-// rather than by narrowing todos, since a hidden task still blocks the
-// visible ones that depend on it.
-func selectActiveDoneRanked(todos []*todo.Todo, rollup map[string]float64, now time.Time, score func(*todo.Todo) float64, search string, env filterEnv, focus bool, sortMode taskSortMode, historyMode historySortMode, hidden map[string]bool) (active, done []todo.Todo) {
-	match := compileSearchWith(search, env)
+// vis is what both lists leave out beyond the search (listVisibility). It is
+// applied here rather than by narrowing todos, since a hidden task still
+// blocks the visible ones that depend on it.
+func selectActiveDoneRanked(todos []*todo.Todo, rollup map[string]float64, now time.Time, score func(*todo.Todo) float64, search string, env filterEnv, focus bool, sortMode taskSortMode, historyMode historySortMode, vis listVisibility) (active, done []todo.Todo) {
+	filter := compileFilter(search, env)
+	match := func(t *todo.Todo) bool {
+		ok, asksWaiting := filter(*t)
+		return ok && vis.shows(t.ID, asksWaiting)
+	}
 	// Split and sort as pointers, then materialize once at the end. The caches
 	// hold values — they outlive this call and are read while the store mutates
 	// — but sorting them as values meant every swap moved a 416-byte struct,
@@ -447,9 +490,9 @@ func selectActiveDoneRanked(todos []*todo.Todo, rollup map[string]float64, now t
 			continue
 		}
 		switch {
-		case t.Status == todo.Pending && !hidden[t.ID] && match(*t) && todoMatchesFocus(*t, focus):
+		case t.Status == todo.Pending && match(t) && todoMatchesFocus(*t, focus):
 			activeP = append(activeP, t)
-		case t.Status == todo.Done && !hidden[t.ID] && match(*t):
+		case t.Status == todo.Done && match(t):
 			doneP = append(doneP, t)
 		}
 	}

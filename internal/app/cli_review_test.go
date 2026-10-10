@@ -512,6 +512,19 @@ func TestCLIWhereEditsAndClosesWhatListShows(t *testing.T) {
 	}
 }
 
+// --where shows a waiting task only through a group that names "waiting".
+func TestCLIWhereWaitingFollowsTheGroup(t *testing.T) {
+	captureStdout(t, func() {
+		cliAdd([]string{"wgroup now #wgroup-a"})
+		cliAdd([]string{"wgroup parked #wgroup-a wait:someday"})
+		cliAdd([]string{"wgroup other #wgroup-b wait:someday"})
+	})
+	out := captureStdout(t, func() { cliList([]string{"--where", "#wgroup-a or #wgroup-b waiting"}) })
+	if !strings.Contains(out, "Wgroup now") || !strings.Contains(out, "Wgroup other") || strings.Contains(out, "Wgroup parked") {
+		t.Errorf("the #wgroup-a group should not bring in its waiting task:\n%s", out)
+	}
+}
+
 // Contradictory text filters are a usage error, not a precedence puzzle.
 func TestListRejectsContradictoryTextFilters(t *testing.T) {
 	if code := cliList([]string{"--search", "ram", "--search-word", "ram"}); code != 2 {

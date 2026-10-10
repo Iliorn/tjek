@@ -50,7 +50,7 @@ func cliList(args []string) int {
 	opts.onlyReady = *ready
 	opts.onlyBlocked = *blocked
 	opts.onlyWaiting = *waiting
-	opts.hideWaiting = !*waiting && storedHideWaiting() && !searchShowsWaiting(*where)
+	opts.hideWaiting = !*waiting && storedHideWaiting()
 	opts.where = *where
 	repo, todos, err := loadForCLI()
 	if err != nil {

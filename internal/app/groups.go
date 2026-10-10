@@ -204,8 +204,9 @@ func hiddenFinishedGroups(sums map[string]*groupSummary, showFinished bool, matc
 func (m model) groupTaskList(match func(*todo.Todo) bool) []todo.Todo {
 	var open, done []*todo.Todo
 	inOpen := make(map[string]bool)
+	vis := m.listVisibility()
 	for _, t := range m.tasks {
-		if !match(t) || m.cache.waiting[t.ID] || m.cache.outside[t.ID] {
+		if !match(t) || !vis.shows(t.ID, false) {
 			continue
 		}
 		if t.Status == todo.Done {

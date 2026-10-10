@@ -115,3 +115,44 @@ func TestPickersOfferHiddenTagsAndProjects(t *testing.T) {
 		}
 	}
 }
+
+// Waiting tasks show only through a group that names "waiting": in the search
+// ("#work or waiting" keeps waiting #work tasks out of the #work group) or in
+// the context (a context of "waiting" shows them with nothing in /). The
+// status line counts the waiting tasks inside the context.
+func TestWaitingTasksShowOnlyThroughAGroupThatAsks(t *testing.T) {
+	mk := func(title, tag string, waits bool) todo.Todo {
+		x := todo.New(title)
+		x.Tags = []string{tag}
+		if waits {
+			x.SetStartDate(todo.Someday)
+		}
+		return x
+	}
+	m := modelWithTasks(t,
+		mk("work now", "work", false),
+		mk("work later", "work", true),
+		mk("home later", "home", true),
+	)
+	m.searchQuery = "#work or waiting -#work"
+	m.refreshCaches()
+	if got := activeTitles(m); !slices.Equal(got, []string{"Work now", "Home later"}) &&
+		!slices.Equal(got, []string{"Home later", "Work now"}) {
+		t.Errorf("#work or waiting -#work shows %v; the #work group must not bring in Work later", got)
+	}
+
+	m.searchQuery = ""
+	m.contexts = []savedContext{{Name: "parked", Query: "waiting"}}
+	m.context = "parked"
+	m.refreshCaches()
+	if got := activeTitles(m); len(got) != 2 || slices.Contains(got, "Work now") {
+		t.Errorf("context waiting shows %v, want the two waiting tasks", got)
+	}
+
+	m.contexts = []savedContext{{Name: "home", Query: "#home"}}
+	m.context = "home"
+	m.refreshCaches()
+	if m.cache.waitingTop != 1 {
+		t.Errorf("inside #home the status line counts %d waiting, want 1", m.cache.waitingTop)
+	}
+}

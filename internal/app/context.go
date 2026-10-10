@@ -13,7 +13,8 @@ import (
 // context.go — saved filters that stay on, Taskwarrior's contexts. A context
 // is a name for a / filter. While one is active, the tasks it does not match
 // leave the Tasks list, the board, Stats and the Tags and Projects tabs, under
-// whatever / holds, the way the waiting tasks do (cache.outside, listHidden).
+// whatever / holds, the way the waiting tasks do (cache.outside,
+// listVisibility).
 // They are this device's own, kept in settings.json like Taskwarrior keeps
 // them in .taskrc, and the command line ignores them, so a script never
 // misses tasks over a choice made in the app.
@@ -211,20 +212,25 @@ func (m model) renderContextRow(r contextRow, selected bool) string {
 	return style.Render(gap+mark+r.name) + dimStyle.Render("  /"+r.query)
 }
 
-// outsideContext is the tasks the active context does not match, nil when
-// none is on. Its filter is compiled once per refresh, with the same caches
-// the / filter reads.
-func (m *model) outsideContext(all []*todo.Todo) map[string]bool {
+// outsideContext is the tasks the active context does not match, and the
+// ones it matched with a group naming "waiting", which may then be shown
+// though they wait (listVisibility); both nil when no context is on. Its
+// filter is compiled once per refresh, with the same caches the / filter
+// reads.
+func (m *model) outsideContext(all []*todo.Todo) (outside, asks map[string]bool) {
 	q := m.activeContextQuery()
 	if q == "" {
-		return nil
+		return nil, nil
 	}
-	match := compileSearchWith(q, m.searchEnv())
-	out := make(map[string]bool)
+	match := compileFilter(q, m.searchEnv())
+	outside, asks = make(map[string]bool), make(map[string]bool)
 	for _, t := range all {
-		if !match(*t) {
-			out[t.ID] = true
+		switch ok, asksWaiting := match(*t); {
+		case !ok:
+			outside[t.ID] = true
+		case asksWaiting:
+			asks[t.ID] = true
 		}
 	}
-	return out
+	return outside, asks
 }
