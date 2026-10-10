@@ -35,6 +35,7 @@ func cliList(args []string) int {
 	sortBy := fs.String("sort", "", "order rows: "+strings.Join(cliSortNames(), "|")+" (default seq)")
 	wide := fs.Bool("wide", false, "add AGE and IDLE columns (days since creation / last change)")
 	waiting := fs.Bool("waiting", false, "only tasks hidden until their start date (left out otherwise)")
+	where := fs.String("where", "", "only tasks matching a filter in the app's / grammar ('#work -@home or p:high'); edit and done --where change these")
 	flagArgs, positionals := splitFlagsAndPositionals(fs, args)
 	if err := fs.Parse(flagArgs); err != nil {
 		return 2
@@ -49,7 +50,8 @@ func cliList(args []string) int {
 	opts.onlyReady = *ready
 	opts.onlyBlocked = *blocked
 	opts.onlyWaiting = *waiting
-	opts.hideWaiting = !*waiting && storedHideWaiting()
+	opts.hideWaiting = !*waiting && storedHideWaiting() && !searchShowsWaiting(*where)
+	opts.where = *where
 	repo, todos, err := loadForCLI()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "load: %v\n", err)

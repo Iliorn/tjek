@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"regexp"
@@ -180,7 +181,10 @@ type listFilterOpts struct {
 	// app's lists do (waitingSet); onlyWaiting keeps only those.
 	hideWaiting bool
 	onlyWaiting bool
-	now         time.Time // injectable clock for the windows above; zero = time.Now()
+	// where is a filter in the app's / grammar (parseFilter): --where on
+	// list, and on edit and done, which change exactly what list shows.
+	where string
+	now   time.Time // injectable clock for the windows above; zero = time.Now()
 }
 
 // matchesText applies whichever of the three text filters are set. They are
@@ -276,6 +280,66 @@ func buildBlockedSet(todos []todo.Todo) map[string]bool {
 	return blocked
 }
 
+// cliFilterEnv is the app's searchEnv for the CLI, which has no caches: the
+// tags the loaded tasks carry, and the blocked set.
+func cliFilterEnv(todos []todo.Todo, blocked map[string]bool) filterEnv {
+	tags := map[string]bool{}
+	for i := range todos {
+		for _, tag := range todos[i].Tags {
+			tags[tag] = true
+		}
+	}
+	return filterEnv{
+		tagExists: func(tag string) bool { return tags[tag] },
+		blocked:   func(id string) bool { return blocked[id] },
+	}
+}
+
+// whereTargets is what --where hits on edit and done: the pending top-level
+// tasks list --where shows, waiting ones left out unless the filter asks for
+// them, as pointers into todos for the caller to change.
+func whereTargets(todos []todo.Todo, where string) []*todo.Todo {
+	opts := listFilterOpts{where: where, hideWaiting: storedHideWaiting() && !searchShowsWaiting(where)}
+	byID := make(map[string]*todo.Todo, len(todos))
+	for i := range todos {
+		byID[todos[i].ID] = &todos[i]
+	}
+	var out []*todo.Todo
+	for _, t := range filterTopLevel(todos, opts) {
+		out = append(out, byID[t.ID])
+	}
+	return out
+}
+
+// confirmBulk shows what a --where matched and asks before changing more than
+// one task, as Taskwarrior does. yes (-y) answers for the user; with no
+// terminal to ask, it refuses rather than change many tasks unseen.
+func confirmBulk(verb, where string, targets []*todo.Todo, yes bool) bool {
+	if len(targets) <= 1 || yes {
+		return true
+	}
+	const shown = 15
+	fmt.Fprintf(os.Stderr, "%d tasks match %q:\n", len(targets), where)
+	for i, t := range targets {
+		if i == shown {
+			fmt.Fprintf(os.Stderr, "  … and %d more\n", len(targets)-shown)
+			break
+		}
+		fmt.Fprintf(os.Stderr, "  %s  %s\n", t.ID[:8], t.Title)
+	}
+	if !stdinIsTTY() {
+		fmt.Fprintf(os.Stderr, "tjek %s: pass -y to %s %d tasks without a terminal to confirm on\n", verb, verb, len(targets))
+		return false
+	}
+	fmt.Fprintf(os.Stderr, "%s all %d? [y/N]: ", verb, len(targets))
+	sc := bufio.NewScanner(os.Stdin)
+	ans := ""
+	if sc.Scan() {
+		ans = strings.ToLower(strings.TrimSpace(sc.Text()))
+	}
+	return ans == "y" || ans == "yes"
+}
+
 func filterTopLevel(todos []todo.Todo, opts listFilterOpts) []todo.Todo {
 	tagQ := todo.NormalizeTag(opts.tag)
 	projQ := strings.ToLower(strings.TrimSpace(opts.project))
@@ -283,8 +347,12 @@ func filterTopLevel(todos []todo.Todo, opts listFilterOpts) []todo.Todo {
 	// Build the blocked set only when one of the readiness filters is active —
 	// it requires scanning the full task list and is unnecessary otherwise.
 	var blockedSet map[string]bool
-	if opts.onlyReady || opts.onlyBlocked {
+	if opts.onlyReady || opts.onlyBlocked || opts.where != "" {
 		blockedSet = buildBlockedSet(todos)
+	}
+	where := func(todo.Todo) bool { return true }
+	if opts.where != "" {
+		where = compileSearchWith(opts.where, cliFilterEnv(todos, blockedSet))
 	}
 	now := opts.now
 	if now.IsZero() {
@@ -307,6 +375,9 @@ func filterTopLevel(todos []todo.Todo, opts listFilterOpts) []todo.Todo {
 			continue
 		}
 		if (opts.hideWaiting || opts.onlyWaiting) && rank.StartsLater(&t, now) != opts.onlyWaiting {
+			continue
+		}
+		if !where(t) {
 			continue
 		}
 		if tagQ != "" {

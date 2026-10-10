@@ -458,6 +458,60 @@ func TestTagsAndProjectsLeaveOutWaitingTasks(t *testing.T) {
 	}
 }
 
+// --where changes what list --where shows: it asks before changing several,
+// refuses without a terminal unless -y, and refuses refs alongside it.
+func TestCLIWhereEditsAndClosesWhatListShows(t *testing.T) {
+	const proj = "@BulkWhere"
+	captureStdout(t, func() {
+		cliAdd([]string{"first bulk #bw-a " + proj})
+		cliAdd([]string{"second bulk #bw-a " + proj})
+		cliAdd([]string{"third bulk #bw-b " + proj})
+	})
+	list := func(where string) string {
+		return captureStdout(t, func() {
+			if code := cliList([]string{"--where", where}); code != 0 {
+				t.Fatalf("list --where %q: exit %d", where, code)
+			}
+		})
+	}
+	if out := list(proj + " #bw-a"); strings.Count(out, "bulk") != 2 || strings.Contains(out, "Third") {
+		t.Fatalf("list --where should show the two #bw-a tasks:\n%s", out)
+	}
+
+	// Two matches and no terminal: refused, nothing changed.
+	var code int
+	captureStdout(t, func() { code = cliEdit([]string{"--where", proj + " #bw-a", "--p=high"}) })
+	if code != 1 {
+		t.Errorf("edit --where without -y and no terminal: exit %d, want 1", code)
+	}
+	if out := list(proj + " p:high"); strings.Contains(out, "bulk") {
+		t.Errorf("a refused edit changed tasks:\n%s", out)
+	}
+
+	captureStdout(t, func() { code = cliEdit([]string{"--where", proj + " #bw-a", "--p=high", "-y"}) })
+	if out := list(proj + " p:high"); code != 0 || strings.Count(out, "bulk") != 2 {
+		t.Errorf("edit --where -y: exit %d, high tasks:\n%s", code, out)
+	}
+
+	// One match needs no -y.
+	captureStdout(t, func() { code = cliDone([]string{"--where", proj + " -#bw-a"}) })
+	if out := list(proj); code != 0 || strings.Contains(out, "Third") || strings.Count(out, "bulk") != 2 {
+		t.Errorf("done --where on one task: exit %d, left:\n%s", code, out)
+	}
+
+	if out := captureStdout(t, func() { code = cliEdit([]string{"--where", proj + " #nothing-here", "--p=low"}) }); code != 0 || !strings.Contains(out, "no tasks match") {
+		t.Errorf("no match: exit %d, %q", code, out)
+	}
+	captureStdout(t, func() { code = cliEdit([]string{"abc", "--where", proj, "--p=low"}) })
+	if code != 2 {
+		t.Errorf("refs and --where together: exit %d, want 2", code)
+	}
+	captureStdout(t, func() { code = cliEdit([]string{"--where", proj, "--title", "same"}) })
+	if code != 2 {
+		t.Errorf("--title with --where: exit %d, want 2", code)
+	}
+}
+
 // Contradictory text filters are a usage error, not a precedence puzzle.
 func TestListRejectsContradictoryTextFilters(t *testing.T) {
 	if code := cliList([]string{"--search", "ram", "--search-word", "ram"}); code != 2 {

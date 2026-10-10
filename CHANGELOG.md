@@ -22,6 +22,7 @@ belongs in the commit message, where it is kept next to the code it explains.
 - Filters take `-` or `!` for not, commas and `or` for either: `#bug,urgent -@home`.
 - Filters take the words `blocked`, `ready` and `active`.
 - Contexts: `F` saves a filter that stays on, and switches between them.
+- `tjek edit`, `done` and `list` take `--where '<filter>'`, the app's `/` grammar.
 
 ### Changed
 

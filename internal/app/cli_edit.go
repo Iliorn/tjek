@@ -43,16 +43,22 @@ func cliEdit(args []string) int {
 	note := fs.String("note", "", "replace the task's notes ('-' reads from stdin)")
 	appendNote := fs.String("append-note", "", "append a paragraph to the task's notes ('-' reads from stdin)")
 	clearNote := fs.Bool("clear-note", false, "drop the notes")
+	where := fs.String("where", "", "change every task matching this filter (the app's / grammar), as list --where shows them")
+	yes := fs.Bool("y", false, "with --where, change them without asking")
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: tjek edit <ref> [<ref>...] [flags]")
+		fmt.Fprintln(os.Stderr, "usage: tjek edit <ref> [<ref>...] [flags]\n       tjek edit --where '<filter>' [-y] [flags]")
 		fs.PrintDefaults()
 	}
 	flagArgs, positionals := splitFlagsAndPositionals(fs, args)
 	if err := fs.Parse(flagArgs); err != nil {
 		return 2
 	}
-	if len(positionals) < 1 {
-		fmt.Fprintln(os.Stderr, "tjek edit: at least one ref required")
+	if len(positionals) < 1 && *where == "" {
+		fmt.Fprintln(os.Stderr, "tjek edit: at least one ref, or --where, required")
+		return 2
+	}
+	if len(positionals) > 0 && *where != "" {
+		fmt.Fprintln(os.Stderr, "tjek edit: pass refs or --where, not both")
 		return 2
 	}
 	recurRule, ok := parseRecurInput(*recur)
@@ -63,7 +69,7 @@ func cliEdit(args []string) int {
 	// A title is one task's identity — applying the same one to several is
 	// always a mistake, so it's refused rather than obeyed. Every other flag
 	// here is a property several tasks can genuinely share.
-	if *title != "" && len(positionals) > 1 {
+	if *title != "" && (len(positionals) > 1 || *where != "") {
 		fmt.Fprintln(os.Stderr, "tjek edit: --title takes one ref (it would give every task the same title)")
 		return 2
 	}
@@ -74,8 +80,17 @@ func cliEdit(args []string) int {
 	}
 	// Resolve every ref before mutating anything, like `done` — an ambiguity
 	// in the third ref shouldn't leave the first two edited.
-	targets, err := resolveRefs(todoPtrs(todos), positionals)
-	if err != nil {
+	var targets []*todo.Todo
+	if *where != "" {
+		targets = whereTargets(todos, *where)
+		if len(targets) == 0 {
+			fmt.Println("(no tasks match)")
+			return 0
+		}
+		if !confirmBulk("edit", *where, targets, *yes) {
+			return 1
+		}
+	} else if targets, err = resolveRefs(todoPtrs(todos), positionals); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}

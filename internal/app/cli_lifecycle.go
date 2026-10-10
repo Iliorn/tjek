@@ -36,12 +36,14 @@ func cliDone(args []string) int {
 	fs.StringVar(&comment, "comment", "", "append this comment to each task transitioned to done")
 	fs.StringVar(&comment, "m", "", "shorthand for --comment (git muscle memory)")
 	cascade := fs.Bool("cascade", false, "also close pending subtasks of each target (default: prompt on a TTY, else warn and leave them open)")
+	where := fs.String("where", "", "close every task matching this filter (the app's / grammar), as list --where shows them")
+	yes := fs.Bool("y", false, "with --where, close them without asking")
 	flagArgs, positionals := splitFlagsAndPositionals(fs, args)
 	if err := fs.Parse(flagArgs); err != nil {
 		return 2
 	}
-	if len(positionals) < 1 {
-		fmt.Fprintln(os.Stderr, "usage: tjek done <ref> [<ref>...] [-m \"why\"] [--cascade]")
+	if (len(positionals) < 1) == (*where == "") {
+		fmt.Fprintln(os.Stderr, "usage: tjek done <ref> [<ref>...] [-m \"why\"] [--cascade]\n       tjek done --where '<filter>' [-y] [-m \"why\"] [--cascade]")
 		return 2
 	}
 	repo, todos, err := loadForCLI()
@@ -51,8 +53,17 @@ func cliDone(args []string) int {
 	}
 	// Resolve every ref before mutating anything — that way an ambiguity in
 	// position 3 doesn't leave the first two already toggled.
-	targets, err := resolveRefs(todoPtrs(todos), positionals)
-	if err != nil {
+	var targets []*todo.Todo
+	if *where != "" {
+		targets = whereTargets(todos, *where)
+		if len(targets) == 0 {
+			fmt.Println("(no tasks match)")
+			return 0
+		}
+		if !confirmBulk("close", *where, targets, *yes) {
+			return 1
+		}
+	} else if targets, err = resolveRefs(todoPtrs(todos), positionals); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}

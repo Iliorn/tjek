@@ -23,6 +23,9 @@ tjek add "Renew passport wait:eom-7d"   # hidden until a week before the month e
 tjek edit deploy --add-dep=sign-off   # depend on another task (refused if it would loop)
 tjek edit deploy --remove-dep=sign-off
 tjek edit a1b2 c3d4 e5f6 --project=hoth   # one change across several tasks (--title stays single-ref)
+tjek list --where '#work overdue -@home'   # the app's / filter, on the command line
+tjek edit --where '#work overdue' --p=high # change every task that list shows (asks first; -y doesn't)
+tjek done --where '@trip ready' -y         # close them all
 tjek add "Rent" --due=31-01-27 --recur=monthly   # due on the 31st, or the month's last day
 tjek edit gym --recur=mon,thu/until:30-06-27     # set a rule; the series counts from the due date
 tjek edit gym --clear-recur                      # stop repeating
@@ -49,6 +52,20 @@ task export | tjek import -     # bring a Taskwarrior list over (see below)
 tjek doctor                     # this installation's health, for bug reports
 tjek help
 ```
+
+## Changing many tasks at once
+
+`--where` takes a filter in the app's [`/` grammar](guide.md#filtering):
+tags, projects, `p:`, `due:`, the words `overdue`, `waiting`, `blocked`,
+`ready` and `active`, `-` for not, commas and `or` for either. `tjek list
+--where` shows what it matches, and `tjek edit --where` and `tjek done
+--where` change exactly those tasks: the pending top-level ones, leaving out
+those waiting for a later start date unless the filter says `waiting`.
+
+When more than one task matches, the command lists them and asks first; `-y`
+answers yes. Without a terminal to ask on, as in a script, it refuses unless
+given `-y`, so a filter wider than intended cannot change many tasks unseen.
+The app's contexts do not apply here.
 
 ## Referring to tasks
 
