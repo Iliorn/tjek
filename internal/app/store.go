@@ -5,6 +5,7 @@ import (
 	"hash/maphash"
 	"time"
 
+	"github.com/Iliorn/tjek/rank"
 	"github.com/Iliorn/tjek/todo"
 )
 
@@ -379,6 +380,19 @@ type undoEntry struct {
 	full    []todo.Todo // populated only when partial is nil; legacy fallback
 	partial []todo.Todo // captured "before" states for the named IDs
 	ids     []string    // IDs the partial entry covers (superset of partial IDs)
+	// marks is the rank marks before the step, when it moved one (a rename;
+	// rankmark.go); nil otherwise. In memory only, like every entry but a
+	// delete.
+	marks *rank.Marks
+}
+
+// noteUndoMarks records on the newest undo entry the marks as they were
+// before its step changed them, once: the step's first change is the one
+// undo goes back to.
+func (s *Store) noteUndoMarks(before rank.Marks) {
+	if n := len(s.undoStack); n > 0 && s.undoStack[n-1].marks == nil {
+		s.undoStack[n-1].marks = &before
+	}
 }
 
 // pushUndo records the current state of the named task IDs as a patch-style

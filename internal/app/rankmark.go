@@ -46,19 +46,21 @@ func (m *model) cycleRankMark(key string) {
 	m.flashInfo(fmt.Sprintf(msg, key))
 }
 
-// copyRankMark carries a mark across a rename or a merge to newKey. It is
-// copied, not moved: undo puts the tasks back under oldKey but cannot reach
-// settings.json, and the old name keeping its mark is what makes that come
-// out right. With nothing carrying it, the old name's mark changes nothing,
-// as a deleted tag's does. A merge into a group with a mark of its own keeps
-// that one.
-func (m *model) copyRankMark(oldKey, newKey string) {
+// moveRankMark carries a mark across a rename or a merge, from oldKey to
+// newKey. A merge into a group with a mark of its own keeps that one. The
+// rename's undo entry keeps the marks as they were (noteUndoMarks), so u
+// puts the mark back with the tasks.
+func (m *model) moveRankMark(oldKey, newKey string) {
 	marks := &m.rank.Biases.Marks
 	dir := marks.Get(oldKey)
-	if dir == 0 || marks.Get(newKey) != 0 {
+	if dir == 0 {
 		return
 	}
-	*marks = marks.With(newKey, dir)
+	m.noteUndoMarks(*marks)
+	*marks = marks.With(oldKey, 0)
+	if marks.Get(newKey) == 0 {
+		*marks = marks.With(newKey, dir)
+	}
 	m.persistSettings()
 }
 

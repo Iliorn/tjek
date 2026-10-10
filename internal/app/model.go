@@ -1931,7 +1931,7 @@ func (m *model) renameTagGlobally(oldName, newName string) []string {
 		t.AddTag(newName)
 		touched = append(touched, t.ID)
 	}
-	m.copyRankMark("#"+oldName, "#"+newName)
+	m.moveRankMark("#"+oldName, "#"+newName)
 	return touched
 }
 
@@ -1966,7 +1966,7 @@ func (m *model) renameProjectGlobally(oldName, newName string) []string {
 	// Clearing a project (newName "") keeps its mark, as deleting a tag does:
 	// harmless with nothing carrying it, and there again if u brings it back.
 	if newName != "" {
-		m.copyRankMark("@"+oldName, "@"+newName)
+		m.moveRankMark("@"+oldName, "@"+newName)
 	}
 	return touched
 }

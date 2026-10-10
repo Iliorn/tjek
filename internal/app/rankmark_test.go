@@ -55,17 +55,31 @@ func TestMarkingATagMovesItsTasks(t *testing.T) {
 		t.Fatal("a third b should leave #next as usual")
 	}
 
-	// A rename carries the mark to the new name, and keeps it on the old,
-	// so undoing the rename finds the tag as it was.
+	// A rename moves the mark to the new name, and undo moves it back with
+	// the tasks.
 	m = script(t, m, "b")
 	m.pushUndo("rename tag")
 	m.markModified(m.renameTagGlobally("next", "now")...)
-	if m.rank.Biases.Marks.Get("#now") != 1 {
+	if m.rank.Biases.Marks.Get("#now") != 1 || m.rank.Biases.Marks.Get("#next") != 0 {
 		t.Errorf("after rename: marks = %+v", m.rank.Biases.Marks)
 	}
 	m = script(t, m, "u")
 	m.ensureCache()
-	if got := m.get(tagged.ID); got == nil || !slices.Contains(got.Tags, "next") || m.rank.Biases.Marks.Get("#next") != 1 {
+	if got := m.get(tagged.ID); got == nil || !slices.Contains(got.Tags, "next") ||
+		m.rank.Biases.Marks.Get("#next") != 1 || m.rank.Biases.Marks.Get("#now") != 0 {
 		t.Errorf("after undo: tags %v, marks %+v", got.Tags, m.rank.Biases.Marks)
+	}
+	if s, _ := loadSettings(); !slices.Equal(s.RankHigher, []string{"#next"}) {
+		t.Errorf("after undo, settings keep higher %v", s.RankHigher)
+	}
+
+	// Renaming back carries the latest choice, with nothing left behind.
+	m.pushUndo("rename tag")
+	m.renameTagGlobally("next", "job")
+	m.cycleRankMark("#job") // higher → lower
+	m.pushUndo("rename tag")
+	m.renameTagGlobally("job", "next")
+	if m.rank.Biases.Marks.Get("#next") != -1 || m.rank.Biases.Marks.Get("#job") != 0 {
+		t.Errorf("after renaming back: marks = %+v", m.rank.Biases.Marks)
 	}
 }

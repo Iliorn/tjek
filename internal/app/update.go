@@ -327,6 +327,11 @@ func (m *model) performUndo() tea.Cmd {
 		m.flashInfo(tr("Nothing to undo"))
 		return clearErrAfter()
 	}
+	if entry.marks != nil {
+		m.rank.Biases.Marks = *entry.marks
+		m.markCacheDirty()
+		m.persistSettings()
+	}
 	// Partial entries name the IDs they touched. Tasks captured in the entry
 	// are restored to their prior state (mark dirty). Tasks named but not
 	// captured were newly-created — undo means delete them (mark tombstone).
