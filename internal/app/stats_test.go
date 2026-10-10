@@ -833,3 +833,18 @@ func TestDayNumberCountsCalendarDays(t *testing.T) {
 		}
 	}
 }
+
+// The backlog chart draws at any width without panicking, down to a window
+// too narrow for a single bar.
+func TestStatsBacklogSurvivesNarrowWindows(t *testing.T) {
+	x := todo.New("open task")
+	x.CreatedAt = time.Now().AddDate(0, 0, -3)
+	for _, w := range []int{1, 8, 10, 12, 14, 20, 40} {
+		m := modelWithTasks(t, x)
+		m.termWidth, m.termHeight = w, 40
+		m.statsRange = statsRangeBacklog
+		m.refreshCaches()
+		_ = m.renderStatsDetail()
+		_ = m.statsPanelTitle()
+	}
+}

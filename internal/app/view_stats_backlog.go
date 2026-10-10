@@ -132,10 +132,12 @@ func (m model) renderStatsBacklog() string {
 	chartH := max(m.statsChartHeight(), statsChartMinH)
 	axis := strconv.Itoa(peak)
 	gutter := len(axis) + 1
-	avail := m.termWidth - 8 - 2 - gutter
+	// At least one column, however narrow the window: the pane clips what
+	// does not fit, but a chart of no days has no today to label.
+	avail := max(m.termWidth-8-2-gutter, 1)
 	n := len(open)
 	bw := min(max((avail-(n-1))/n, 1), 3)
-	if maxN := (avail + 1) / (bw + 1); n > maxN {
+	if maxN := max((avail+1)/(bw+1), 1); n > maxN {
 		open, first = open[n-maxN:], first.AddDate(0, 0, n-maxN)
 		n = len(open)
 	}
