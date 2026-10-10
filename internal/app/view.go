@@ -1674,7 +1674,44 @@ type statsBucket struct {
 // with the range's label, whether a bucket spans a week, and the total. Shared
 // by the chart and by the panel title that names the range, so the two cannot
 // disagree about what the count counts.
+//
+// It is remembered per range until the next refresh (statsMemo), since the
+// title and the chart each ask on every frame and the answer walks every task.
 func (m model) statsActivity() (label string, buckets []statsBucket, weekly bool, total int) {
+	memo := m.cache.stats
+	if memo != nil {
+		if a, ok := memo.activity[m.statsRange]; ok {
+			return a.label, a.buckets, a.weekly, a.total
+		}
+	}
+	label, buckets, weekly, total = m.computeStatsActivity()
+	if memo != nil {
+		if memo.activity == nil {
+			memo.activity = make(map[statsRangeMode]statsActivityResult)
+		}
+		memo.activity[m.statsRange] = statsActivityResult{label, buckets, weekly, total}
+	}
+	return label, buckets, weekly, total
+}
+
+// statsActivityResult is one remembered statsActivity answer.
+type statsActivityResult struct {
+	label   string
+	buckets []statsBucket
+	weekly  bool
+	total   int
+}
+
+// statsMemo holds what the Stats tab works out from the task set and would
+// otherwise redo every frame: the activity per range, and the summary's
+// line count at a width. A fresh one comes with every refresh (cache.go).
+type statsMemo struct {
+	activity     map[statsRangeMode]statsActivityResult
+	summaryW     int
+	summaryLines int
+}
+
+func (m model) computeStatsActivity() (label string, buckets []statsBucket, weekly bool, total int) {
 	now := m.frameTime
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
@@ -1804,8 +1841,22 @@ func (m model) statsChartSpareRows(chartH int) int {
 	if f := m.buildFooterContent(m.termWidth - 6); f != "" {
 		footerLines = strings.Count(f, "\n") + 1
 	}
-	summary := len(trimTrailingBlank(strings.Split(m.renderStatsList(), "\n")))
-	return m.termHeight - minHeaderLines - footerLines - panelChromeLines - summary - panelChromeLines - (chartH + 2)
+	return m.termHeight - minHeaderLines - footerLines - panelChromeLines - m.statsSummaryLines() - panelChromeLines - (chartH + 2)
+}
+
+// statsSummaryLines is how many lines the Stats summary renders to at the
+// current width, remembered until the next refresh: sizing the chart asks
+// every frame, and rendering the summary to count it was most of a frame.
+func (m model) statsSummaryLines() int {
+	memo := m.cache.stats
+	if memo != nil && memo.summaryW == m.termWidth && memo.summaryLines > 0 {
+		return memo.summaryLines
+	}
+	n := len(trimTrailingBlank(strings.Split(m.renderStatsList(), "\n")))
+	if memo != nil {
+		memo.summaryW, memo.summaryLines = m.termWidth, n
+	}
+	return n
 }
 
 // statsChartRows is the height the chart actually draws at: the budget, or the
@@ -2085,12 +2136,20 @@ func renderCellRow(cells []statsCell) string {
 	if last < 0 {
 		return ""
 	}
+	// A blank cell looks the same in any foreground colour, so it joins the
+	// run around it: a row of bars with gaps between them is one styled run,
+	// not one per bar. Each run costs a lipgloss Render, which made rendering
+	// rows most of the chart's frame.
+	blank := func(cl statsCell) bool { return cl.ch == ' ' && cl.bg < 0 }
 	var sb strings.Builder
 	for c := 0; c <= last; {
-		g := cells[c].gi
-		bg := cells[c].bg
 		start := c
-		for c <= last && cells[c].gi == g && cells[c].bg == bg {
+		key := c
+		for key < last && blank(cells[key]) {
+			key++
+		}
+		g, bg := cells[key].gi, cells[key].bg
+		for c <= last && (blank(cells[c]) || cells[c].gi == g && cells[c].bg == bg) {
 			c++
 		}
 		seg := make([]rune, 0, c-start)

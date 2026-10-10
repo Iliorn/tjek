@@ -34,6 +34,9 @@ type cacheState struct {
 	// memo each refresh, filled the first time the chart is drawn, so a
 	// refresh pays nothing for it unless the chart is on screen.
 	backlog *backlogMemo
+	// stats memoizes the Stats tab's activity and summary height the same
+	// way (statsMemo).
+	stats *statsMemo
 	// dependents lists, per task, the unfinished tasks that wait on it.
 	dependents map[string][]string
 	active     []todo.Todo
@@ -87,6 +90,7 @@ func (m *model) refreshCaches() {
 	m.cache.builtAt = m.frameTime
 	m.cache.groupLists, m.cache.dayActs = nil, nil
 	m.cache.backlog = &backlogMemo{}
+	m.cache.stats = &statsMemo{}
 
 	all := m.allTodos()
 
@@ -302,6 +306,7 @@ func (m model) rankedScore(t *todo.Todo) float64 {
 func (m *model) refreshFilteredCaches() {
 	all := m.allTodos()
 	m.cache.backlog = &backlogMemo{} // its scope follows the search
+	m.cache.stats = &statsMemo{}
 	m.cache.active, m.cache.done = selectActiveDoneRanked(all, m.cache.rankScore, m.frameTime, m.rank.ScoreAt(m.frameTime), m.searchQuery, m.searchEnv(), m.focusFilter, m.taskSort, m.historySort, m.listVisibility())
 	m.refreshTagRenderCache()
 	m.refreshTaskColMetrics()

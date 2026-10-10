@@ -848,3 +848,15 @@ func TestStatsBacklogSurvivesNarrowWindows(t *testing.T) {
 		_ = m.statsPanelTitle()
 	}
 }
+
+// Joining blank cells into the runs around them changes how a row is styled,
+// never what it shows.
+func TestRenderCellRowKeepsItsText(t *testing.T) {
+	row := []statsCell{
+		{' ', -1, -1}, {'█', 2, -1}, {' ', -1, -1}, {'█', 2, -1}, {' ', -1, -1},
+		{'▀', 3, 1}, {' ', -1, -1}, {'─', -1, -1}, {'w', -2, -1}, {' ', -1, -1},
+	}
+	if got := ansi.Strip(renderCellRow(row)); got != " █ █ ▀ ─w" {
+		t.Errorf("renderCellRow = %q", got)
+	}
+}
