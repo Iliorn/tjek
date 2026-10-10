@@ -90,10 +90,12 @@ func compileFilter(search string, env filterEnv) func(todo.Todo) (match, asksWai
 		return func(todo.Todo) (bool, bool) { return true, false }
 	}
 	asks := make([]bool, len(groups))
+	anyAsks := false
 	for i, terms := range groups {
 		for _, term := range terms {
 			asks[i] = asks[i] || term.waiting && !term.neg
 		}
+		anyAsks = anyAsks || asks[i]
 	}
 	return func(t todo.Todo) (match, asksWaiting bool) {
 	group:
@@ -103,7 +105,10 @@ func compileFilter(search string, env filterEnv) func(todo.Todo) (match, asksWai
 					continue group
 				}
 			}
-			if match, asksWaiting = true, asks[i]; asksWaiting {
+			// The first match settles it unless a later group could still
+			// ask for waiting tasks; most queries name none, and this runs
+			// for every task on every keystroke.
+			if match, asksWaiting = true, asks[i]; asksWaiting || !anyAsks {
 				return
 			}
 		}
