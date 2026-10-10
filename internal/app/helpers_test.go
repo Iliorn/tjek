@@ -1505,3 +1505,21 @@ func TestFormatDurationCompactCountsSecondsUnderAMinute(t *testing.T) {
 		}
 	}
 }
+
+// A month on from a day the next month lacks is that month's last day.
+func TestMonthStepsKeepToTheMonth(t *testing.T) {
+	for _, c := range []struct{ now, in, want string }{
+		{"10-10-26", "eom+1m", "30-11-26"},
+		{"31-01-28", "+1m", "29-02-28"},
+		{"31-01-27", "+1m", "28-02-27"},
+		{"31-03-26", "-1m", "28-02-26"},
+		{"15-01-26", "+1m", "15-02-26"},
+		{"10-10-26", "eom-1m", "30-09-26"},
+	} {
+		now, _ := time.ParseInLocation("02-01-06", c.now, time.Local)
+		got, err := parseDueDateAt(c.in, now.Add(10*time.Hour))
+		if err != nil || got.Format("02-01-06") != c.want {
+			t.Errorf("on %s, %q = %s, %v; want %s", c.now, c.in, got.Format("02-01-06"), err, c.want)
+		}
+	}
+}

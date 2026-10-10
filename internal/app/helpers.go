@@ -1798,13 +1798,19 @@ func parseDueDateAt(s string, now time.Time) (time.Time, error) {
 		inputWord("today"), inputWord("tomorrow"), inputWord("next week"), strings.ToLower(localizedWeekday(time.Monday)))
 }
 
-// addDateUnit moves d by n days, weeks or months.
+// addDateUnit moves d by n days, weeks or months. A month from a day the
+// target month does not have lands on that month's last day, where AddDate
+// would spill into the month after: eom+1m is next month's end, and +1m on
+// 31 January is 28 or 29 February, not 3 March.
 func addDateUnit(d time.Time, n int, unit byte) time.Time {
 	switch unit {
 	case 'w':
 		return d.AddDate(0, 0, n*7)
 	case 'm':
-		return d.AddDate(0, n, 0)
+		y, mo, day := d.Date()
+		first := time.Date(y, mo+time.Month(n), 1, d.Hour(), d.Minute(), d.Second(), d.Nanosecond(), d.Location())
+		last := first.AddDate(0, 1, -1).Day()
+		return first.AddDate(0, 0, min(day, last)-1)
 	}
 	return d.AddDate(0, 0, n)
 }

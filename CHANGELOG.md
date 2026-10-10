@@ -35,6 +35,7 @@ belongs in the commit message, where it is kept next to the code it explains.
 ### Fixed
 
 - `tjek show` prints a repeating task's rule.
+- `+1m` from the 31st lands on next month's last day, not in the month after.
 
 ## [1.54.1] - 2026-10-09
 
