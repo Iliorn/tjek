@@ -216,11 +216,16 @@ func (m *model) refreshUsageRecency(all []*todo.Todo) {
 	}
 	for i := range all {
 		mod := all[i].ModifiedAt
-		if p := all[i].Project; p != "" && mod.After(m.cache.projLastUsed[p]) {
-			m.cache.projLastUsed[p] = mod
+		// Every name is entered, even one whose tasks carry no time: the
+		// maps also say which tags and projects exist (refreshGroups,
+		// searchEnv).
+		if p := all[i].Project; p != "" {
+			if cur, ok := m.cache.projLastUsed[p]; !ok || mod.After(cur) {
+				m.cache.projLastUsed[p] = mod
+			}
 		}
 		for _, tag := range all[i].Tags {
-			if mod.After(m.cache.tagLastUsed[tag]) {
+			if cur, ok := m.cache.tagLastUsed[tag]; !ok || mod.After(cur) {
 				m.cache.tagLastUsed[tag] = mod
 			}
 		}
@@ -310,22 +315,22 @@ func (m *model) refreshFilteredCaches() {
 	m.cache.filterDirty = false
 }
 
-// refreshGroups rebuilds the Tags and Projects summaries.
-func (m *model) refreshGroups(all []*todo.Todo) {
-	m.cache.tagGroups = summarizeGroups(all, tagGroupKeys)
-	m.cache.projectGroups = summarizeGroups(all, projectGroupKeys)
-	m.cache.tagNames = sortedGroupNames(m.cache.tagGroups)
-	m.cache.projectNames = sortedGroupNames(m.cache.projectGroups)
+// refreshGroups rebuilds the Tags and Projects summaries from visible, the
+// tasks the lists show. The names the pickers and completions offer come
+// from every task instead (the usage maps, refreshUsageRecency), so a tag
+// carried only by waiting tasks, or outside the context, can still be picked.
+func (m *model) refreshGroups(visible []*todo.Todo) {
+	m.cache.tagGroups = summarizeGroups(visible, tagGroupKeys)
+	m.cache.projectGroups = summarizeGroups(visible, projectGroupKeys)
+	m.cache.tagNames = sortedKeys(m.cache.tagLastUsed)
+	m.cache.projectNames = sortedKeys(m.cache.projLastUsed)
 }
 
-// sortedGroupNames lists a summary map's real group names alphabetically,
-// leaving out the virtual (untagged) row.
-func sortedGroupNames(sums map[string]*groupSummary) []string {
-	names := make([]string, 0, len(sums))
-	for key := range sums {
-		if key != untaggedKey {
-			names = append(names, key)
-		}
+// sortedKeys is a usage map's names, alphabetical.
+func sortedKeys(used map[string]time.Time) []string {
+	names := make([]string, 0, len(used))
+	for name := range used {
+		names = append(names, name)
 	}
 	sort.Strings(names)
 	return names

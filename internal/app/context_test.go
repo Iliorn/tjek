@@ -89,3 +89,29 @@ func TestContextSavedFromTheFilterStaysOn(t *testing.T) {
 		t.Errorf("contexts after del = %+v", m.contexts)
 	}
 }
+
+// The tag and project pickers offer every name, also those whose tasks are
+// all waiting or outside the active context.
+func TestPickersOfferHiddenTagsAndProjects(t *testing.T) {
+	later := todo.New("later task")
+	later.Tags, later.Project = []string{"someday-tag"}, "Later"
+	later.SetStartDate(todo.Someday)
+	other := todo.New("other task")
+	other.Tags, other.Project = []string{"elsewhere"}, "Elsewhere"
+	here := todo.New("here task")
+	here.Tags = []string{"here"}
+	m := modelWithTasks(t, later, other, here)
+	m.contexts = []savedContext{{Name: "here", Query: "#here"}}
+	m.context = "here"
+	m.refreshCaches()
+	for _, tag := range []string{"someday-tag", "elsewhere", "here"} {
+		if !slices.Contains(m.getAllTagsSorted(), tag) {
+			t.Errorf("tag picker lacks %q: %v", tag, m.getAllTagsSorted())
+		}
+	}
+	for _, p := range []string{"Later", "Elsewhere"} {
+		if !slices.Contains(m.cache.projectNames, p) {
+			t.Errorf("project picker lacks %q: %v", p, m.cache.projectNames)
+		}
+	}
+}
