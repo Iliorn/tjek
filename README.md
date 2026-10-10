@@ -22,6 +22,9 @@ No account, no cloud service.
   subtasks, dependencies, comments, descriptions and repeating tasks, and a
   history of who changed what.
 - **Adds in one line.** `Buy milk #shopping due:friday p:high @home`
+- **Filters precisely.** `#bug,urgent -@home or overdue`, saved as a
+  **context** that stays on, and put away until later with `wait:`.
+- **Moves over from Taskwarrior.** `task export | tjek import -`
 - **Shows the same tasks five ways:** a list, a calendar with tracked time,
   projects with a timeline, tags, and a kanban board. Plus a stats page.
 - **Tracks time.** Start and stop a timer on a task with `t`.
