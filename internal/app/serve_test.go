@@ -100,8 +100,17 @@ func TestSyncClientServerRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("client sync: %v", err)
 	}
-	if sum.received != 2 {
-		t.Errorf("expected 2 tasks back, got %d", sum.received)
+	// The summary counts changes: the client's one new task went out, and
+	// the server's one came in.
+	if sum.sent != 1 || sum.received != 1 {
+		t.Errorf("first sync: sent %d, received %d; want 1 and 1", sum.sent, sum.received)
+	}
+	again, err := runClientSync(ch, cfg, 5*time.Second, rank.DefaultBiases(), defaultBoardConfig().wire())
+	if err != nil {
+		t.Fatalf("second sync: %v", err)
+	}
+	if again.sent != 0 || again.received != 0 {
+		t.Errorf("a sync with nothing new: sent %d, received %d; want 0 and 0", again.sent, again.received)
 	}
 
 	// Both sides now hold both tasks.

@@ -408,7 +408,7 @@ func runClientSync(h *sql.DB, cfg syncConfig, timeout time.Duration, b rank.Bias
 	// guard also keeps the fs watcher from waking the TUI on an unchanged
 	// periodic pull.
 	resp.Tasks = shared.withoutShared(resp.Tasks)
-	merged, _, err := mergeIntoStore(h, resp.Tasks, b)
+	merged, changed, err := mergeIntoStore(h, resp.Tasks, b)
 	if err != nil {
 		return syncSummary{}, err
 	}
@@ -424,11 +424,17 @@ func runClientSync(h *sql.DB, cfg syncConfig, timeout time.Duration, b rank.Bias
 	if err := logDroppedEdits(dropped); err != nil {
 		fmt.Fprintf(os.Stderr, "tjek sync: warning: could not write sync log: %v\n", err)
 	}
-	// Count live tasks only: the wire sets include every tombstone ever made,
-	// so raw lengths would overstate forever ("received 400" on a no-op sync).
+	// The exchange is the whole set both ways, so its size says nothing; the
+	// summary counts changes. Sent is the tasks changed here since the last
+	// sync, deletions included: the edits this sync carried. Received is the
+	// tasks the merge changed here. A sync with nothing new reads 0 and 0.
+	received := 0
+	if changed {
+		received = len(changedTasks(local, shared.withoutShared(merged)))
+	}
 	sum := syncSummary{
-		sent:          countLive(local),
-		received:      countLive(resp.Tasks),
+		sent:          changedSince(local, lastSync),
+		received:      received,
 		conflicts:     len(dropped),
 		versionGap:    tasksync.VersionGapWarning(resp.ServerVersion, appVersion),
 		serverVersion: resp.ServerVersion,
@@ -440,10 +446,12 @@ func runClientSync(h *sql.DB, cfg syncConfig, timeout time.Duration, b rank.Bias
 	return sum, nil
 }
 
-func countLive(ts []todo.Todo) int {
+// changedSince counts the tasks changed after at: edited, closed, commented,
+// deleted. A zero at (no sync yet) counts every task.
+func changedSince(ts []todo.Todo, at time.Time) int {
 	n := 0
 	for i := range ts {
-		if !ts[i].Deleted {
+		if ts[i].ModifiedAt.After(at) || ts[i].DeletedAt.After(at) {
 			n++
 		}
 	}
