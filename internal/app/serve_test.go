@@ -318,3 +318,29 @@ func TestServeStateRoundTrip(t *testing.T) {
 		t.Errorf("LastClientSync = %v, want %v", st.LastClientSync, now.UTC())
 	}
 }
+
+// A task stamped by a device whose clock runs ahead arrives once, and an
+// idle sync after it counts nothing: the counts compare digests, not clocks.
+func TestSyncCountsIgnoreAnotherDevicesClock(t *testing.T) {
+	srv, ts := newTestServer(t)
+	ahead := todo.New("stamped ahead")
+	ahead.ModifiedAt = time.Now().Add(3 * time.Minute)
+	saveTodos(t, srv.db, []todo.Todo{ahead})
+
+	ch := openTestDB(t)
+	cfg := syncConfig{URL: ts.URL, Token: "tok"}
+	first, err := runClientSync(ch, cfg, 5*time.Second, rank.DefaultBiases(), defaultBoardConfig().wire())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.received != 1 {
+		t.Errorf("first sync received %d, want 1", first.received)
+	}
+	again, err := runClientSync(ch, cfg, 5*time.Second, rank.DefaultBiases(), defaultBoardConfig().wire())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.sent != 0 || again.received != 0 {
+		t.Errorf("idle sync after a task from a clock ahead: sent %d, received %d", again.sent, again.received)
+	}
+}

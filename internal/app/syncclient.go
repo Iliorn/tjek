@@ -2,9 +2,11 @@ package app
 
 import (
 	"database/sql"
+	"encoding/binary"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"hash/fnv"
 	"os"
 	"time"
 
@@ -129,6 +131,9 @@ type syncState struct {
 	Sent      int       `json:"sent"`
 	Received  int       `json:"received"`
 	Conflicts int       `json:"conflicts"`
+	// Seen is every task's syncDigest as the sync left the store, packed
+	// (packDigests), so the next sync can count what changed here since.
+	Seen []byte `json:"seen,omitempty"`
 }
 
 func syncStatePath() string {
@@ -146,6 +151,7 @@ func writeSyncState(sum syncSummary) error {
 		Sent:      sum.sent,
 		Received:  sum.received,
 		Conflicts: sum.conflicts,
+		Seen:      sum.seen,
 	}
 	b, err := json.MarshalIndent(st, "", "  ")
 	if err != nil {
@@ -367,6 +373,8 @@ type syncSummary struct {
 	// package-level global the renderer reads, so the install has to happen on
 	// the loop that owns it (handleSyncDone).
 	board *tasksync.Board
+	// seen is the store's digests after this sync, for syncState.Seen.
+	seen []byte
 }
 
 // runClientSync pushes the local full task set (including tombstones) to the
@@ -408,7 +416,7 @@ func runClientSync(h *sql.DB, cfg syncConfig, timeout time.Duration, b rank.Bias
 	// guard also keeps the fs watcher from waking the TUI on an unchanged
 	// periodic pull.
 	resp.Tasks = shared.withoutShared(resp.Tasks)
-	merged, changed, err := mergeIntoStore(h, resp.Tasks, b)
+	merged, _, err := mergeIntoStore(h, resp.Tasks, b)
 	if err != nil {
 		return syncSummary{}, err
 	}
@@ -417,24 +425,43 @@ func runClientSync(h *sql.DB, cfg syncConfig, timeout time.Duration, b rank.Bias
 	// edits made here since then can have lost. A missing or corrupt state file
 	// reads as zero → log everything, the conservative recovery-net default.
 	var lastSync time.Time
+	var seen map[uint64]bool
 	if st, ok, _ := readSyncState(); ok {
-		lastSync = st.LastSync
+		lastSync, seen = st.LastSync, unpackDigests(st.Seen)
 	}
 	dropped := tasksync.DroppedLocalEdits(local, merged, lastSync)
 	if err := logDroppedEdits(dropped); err != nil {
 		fmt.Fprintf(os.Stderr, "tjek sync: warning: could not write sync log: %v\n", err)
 	}
 	// The exchange is the whole set both ways, so its size says nothing; the
-	// summary counts changes. Sent is the tasks changed here since the last
-	// sync, deletions included: the edits this sync carried. Received is the
-	// tasks the merge changed here. A sync with nothing new reads 0 and 0.
+	// summary counts changes, by digest, which no clock can skew. Sent is
+	// the tasks that differ from how the last sync left them, deletions
+	// included: the edits this sync carried. Received is the tasks the server
+	// answered differently from how they were sent, so an edit made here
+	// during the round trip is not counted as one from elsewhere. A sync
+	// with nothing new reads 0 and 0.
+	sent := 0
+	sentDigests := make(map[uint64]bool, len(local))
+	for i := range local {
+		d := syncDigest(local[i])
+		sentDigests[d] = true
+		if !seen[d] {
+			sent++
+		}
+	}
+	if seen == nil { // no digests kept yet (a first sync, or an older state file)
+		sent = changedSince(local, lastSync)
+	}
 	received := 0
-	if changed {
-		received = len(changedTasks(local, shared.withoutShared(merged)))
+	for i := range resp.Tasks {
+		if !sentDigests[syncDigest(resp.Tasks[i])] {
+			received++
+		}
 	}
 	sum := syncSummary{
-		sent:          changedSince(local, lastSync),
+		sent:          sent,
 		received:      received,
+		seen:          packDigests(shared.withoutShared(merged)),
 		conflicts:     len(dropped),
 		versionGap:    tasksync.VersionGapWarning(resp.ServerVersion, appVersion),
 		serverVersion: resp.ServerVersion,
@@ -444,6 +471,36 @@ func runClientSync(h *sql.DB, cfg syncConfig, timeout time.Duration, b rank.Bias
 	// must not fail an otherwise-successful sync.
 	_ = writeSyncState(sum)
 	return sum, nil
+}
+
+// syncDigest is a task's version as sync sees it: a hash of its canonical
+// form (tasksync.CanonicalJSON), the same on every device and every run,
+// which taskVersion's per-process seed is not.
+func syncDigest(t todo.Todo) uint64 {
+	h := fnv.New64a()
+	h.Write(tasksync.CanonicalJSON(t))
+	return h.Sum64()
+}
+
+// packDigests is the tasks' digests as 8 bytes each, for syncState.Seen.
+func packDigests(ts []todo.Todo) []byte {
+	out := make([]byte, 0, 8*len(ts))
+	for i := range ts {
+		out = binary.LittleEndian.AppendUint64(out, syncDigest(ts[i]))
+	}
+	return out
+}
+
+// unpackDigests reads packDigests back, nil when there is nothing kept.
+func unpackDigests(b []byte) map[uint64]bool {
+	if len(b) < 8 {
+		return nil
+	}
+	out := make(map[uint64]bool, len(b)/8)
+	for ; len(b) >= 8; b = b[8:] {
+		out[binary.LittleEndian.Uint64(b)] = true
+	}
+	return out
 }
 
 // changedSince counts the tasks changed after at: edited, closed, commented,
