@@ -2,6 +2,7 @@ package app
 
 import (
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -88,7 +89,7 @@ func TestTaskwarriorFieldsComeAcross(t *testing.T) {
 	if !reflect.DeepEqual(bike.Tags, []string{"errand", "big-spend"}) {
 		t.Errorf("tags = %v", bike.Tags)
 	}
-	wantDue := localDay(time.Date(2026, 10, 20, 22, 0, 0, 0, time.UTC))
+	wantDue := startOfDay(time.Date(2026, 10, 20, 22, 0, 0, 0, time.UTC).Local())
 	if !bike.DueDate.Equal(wantDue) {
 		t.Errorf("due = %v, want %v", bike.DueDate, wantDue)
 	}
@@ -134,7 +135,7 @@ func TestTaskwarriorFieldsComeAcross(t *testing.T) {
 		t.Error("wait:someday should become a someday start")
 	}
 	taxes := twByTitle(t, tasks, "File the taxes")[0]
-	if want := localDay(time.Date(2026, 10, 15, 22, 0, 0, 0, time.UTC)).Add(9 * time.Hour); !taxes.StartDate.Equal(want) {
+	if want := startOfDay(time.Date(2026, 10, 15, 22, 0, 0, 0, time.UTC).Local()).Add(9 * time.Hour); !taxes.StartDate.Equal(want) {
 		t.Errorf("scheduled → start %v, want %v", taxes.StartDate, want)
 	}
 	report := twByTitle(t, tasks, "Write the report")[0]
@@ -204,5 +205,27 @@ func TestTaskwarriorImportToastSaysWhatWasNotKept(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Errorf("toast %q lacks %q", got, want)
 		}
+	}
+}
+
+// A link spelled in another case than its task's UUID still finds it, and a
+// link to a recurring template is reported as left out, not as deleted.
+func TestTaskwarriorLinksIgnoreCase(t *testing.T) {
+	data := `[
+{"description":"blocker","entry":"20260901T080000Z","status":"pending","uuid":"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"},
+{"description":"template","entry":"20260901T080000Z","status":"recurring","recur":"weekly","uuid":"ffffffff-bbbb-4ccc-8ddd-eeeeeeeeeeee"},
+{"description":"blocked","entry":"20260901T080000Z","status":"pending","uuid":"11111111-2222-4333-8444-555555555555",
+ "depends":["AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE","ffffffff-bbbb-4ccc-8ddd-eeeeeeeeeeee"]}
+]`
+	file, err := parseTaskwarrior([]byte(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	blocked := twByTitle(t, file.tasks, "Blocked")[0]
+	if !slices.Equal(blocked.Dependencies, []string{"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"}) {
+		t.Errorf("dependencies = %v", blocked.Dependencies)
+	}
+	if notes := strings.Join(file.notes, "\n"); !strings.Contains(notes, "recurring template") || strings.Contains(notes, "to deleted tasks") {
+		t.Errorf("notes = %q", notes)
 	}
 }

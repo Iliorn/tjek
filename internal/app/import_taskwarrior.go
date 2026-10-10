@@ -133,6 +133,16 @@ func parseTaskwarrior(data []byte) (importFile, error) {
 		return importFile{}, fmt.Errorf("malformed Taskwarrior export: %w", err)
 	}
 
+	// UUIDs compare as Taskwarrior writes them, in lower case, whatever case
+	// the file spells one in, so a link always finds its task.
+	for i := range tw {
+		t := &tw[i]
+		t.UUID, t.Parent = strings.ToLower(t.UUID), strings.ToLower(t.Parent)
+		for j, dep := range t.Depends {
+			t.Depends[j] = strings.ToLower(dep)
+		}
+	}
+
 	unknown := map[string]bool{}
 	for _, fields := range raw {
 		for key := range fields {
@@ -182,7 +192,7 @@ func parseTaskwarrior(data []byte) (importFile, error) {
 			continue
 		}
 		task := todo.Todo{
-			ID:         strings.ToLower(t.UUID),
+			ID:         t.UUID,
 			Title:      todo.CapitalizeTitle(t.Description),
 			Status:     todo.Pending,
 			Priority:   twPriority(t.Priority),
@@ -204,7 +214,7 @@ func parseTaskwarrior(data []byte) (importFile, error) {
 			if todo.IsSomeday(t.Due.Time) {
 				somedayDue++
 			} else {
-				task.DueDate = localDay(t.Due.Time)
+				task.DueDate = startOfDay(t.Due.Local())
 			}
 		}
 		task.StartDate = twStart(t)
@@ -215,7 +225,7 @@ func parseTaskwarrior(data []byte) (importFile, error) {
 		}
 		for _, dep := range t.Depends {
 			if keep[dep] {
-				task.Dependencies = append(task.Dependencies, strings.ToLower(dep))
+				task.Dependencies = append(task.Dependencies, dep)
 			} else {
 				depsDropped++
 			}
@@ -261,8 +271,8 @@ func parseTaskwarrior(data []byte) (importFile, error) {
 		left = append(left, "due:someday")
 	}
 	if depsDropped > 0 {
-		notes = append(notes, fmt.Sprintf("%d dependency link(s) to deleted tasks dropped", depsDropped))
-		left = append(left, fmt.Sprintf(tr("%d links to deleted tasks"), depsDropped))
+		notes = append(notes, fmt.Sprintf("%d dependency link(s) dropped: to tasks not in the file, deleted, or a recurring template", depsDropped))
+		left = append(left, fmt.Sprintf(tr("%d links to tasks left out"), depsDropped))
 	}
 	if len(unknown) > 0 {
 		keys := make([]string, 0, len(unknown))
@@ -286,20 +296,13 @@ func twStart(t twTask) time.Time {
 			return todo.Someday
 		}
 		if !d.IsZero() {
-			return localDay(d).Add(9 * time.Hour)
+			return startOfDay(d.Local()).Add(9 * time.Hour)
 		}
 	}
 	if !t.Start.IsZero() {
 		return t.Start.Local()
 	}
 	return time.Time{}
-}
-
-// localDay is the local calendar day d falls on, at midnight, the way tjek
-// stores a due date.
-func localDay(d time.Time) time.Time {
-	l := d.Local()
-	return time.Date(l.Year(), l.Month(), l.Day(), 0, 0, 0, 0, time.Local)
 }
 
 func twPriority(p string) todo.Priority {

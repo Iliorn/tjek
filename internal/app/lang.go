@@ -844,7 +844,7 @@ var daTranslations = map[string]string{
 	"not kept: %s":                                              "ikke med: %s",
 	"%d deleted":                                                "%d slettede",
 	"%d repeat rules":                                           "%d gentagelsesregler",
-	"%d links to deleted tasks":                                 "%d links til slettede opgaver",
+	"%d links to tasks left out":                                "%d links til udeladte opgaver",
 	"tab completes the name · enter confirms · esc cancels":     "tab fuldfører navnet · enter bekræfter · esc annullerer",
 
 	// ── Adding tasks ──
@@ -1664,7 +1664,7 @@ var deTranslations = map[string]string{
 	"not kept: %s":                                              "nicht übernommen: %s",
 	"%d deleted":                                                "%d gelöschte",
 	"%d repeat rules":                                           "%d Wiederholungsregeln",
-	"%d links to deleted tasks":                                 "%d Verweise auf gelöschte Aufgaben",
+	"%d links to tasks left out":                                "%d Verweise auf ausgelassene Aufgaben",
 	"tab completes the name · enter confirms · esc cancels":     "Tab vervollständigt · Enter bestätigt · Esc bricht ab",
 
 	// ── Adding tasks ──
