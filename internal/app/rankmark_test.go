@@ -55,10 +55,17 @@ func TestMarkingATagMovesItsTasks(t *testing.T) {
 		t.Fatal("a third b should leave #next as usual")
 	}
 
-	// A rename carries the mark to the new name.
+	// A rename carries the mark to the new name, and keeps it on the old,
+	// so undoing the rename finds the tag as it was.
 	m = script(t, m, "b")
-	m.renameTagGlobally("next", "now")
-	if m.rank.Biases.Marks.Get("#now") != 1 || m.rank.Biases.Marks.Get("#next") != 0 {
+	m.pushUndo("rename tag")
+	m.markModified(m.renameTagGlobally("next", "now")...)
+	if m.rank.Biases.Marks.Get("#now") != 1 {
 		t.Errorf("after rename: marks = %+v", m.rank.Biases.Marks)
+	}
+	m = script(t, m, "u")
+	m.ensureCache()
+	if got := m.get(tagged.ID); got == nil || !slices.Contains(got.Tags, "next") || m.rank.Biases.Marks.Get("#next") != 1 {
+		t.Errorf("after undo: tags %v, marks %+v", got.Tags, m.rank.Biases.Marks)
 	}
 }
