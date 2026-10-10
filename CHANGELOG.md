@@ -31,6 +31,7 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 - Starting the timer on a task with a later start date moves its start to now.
 - A filter's `#work` matches that tag exactly once it exists, not `#homework`.
+- `#home,travel` when adding gives the task both tags, as a filter reads it.
 
 ### Fixed
 

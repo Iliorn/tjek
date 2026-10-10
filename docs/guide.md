@@ -194,7 +194,7 @@ tags and projects, most recently used first; `tab` inserts the highlighted
 one, `↑/↓` pick another. Projects whose name contains a space aren't offered
 there, since the field splits on spaces; set those from the detail pane's `@`
 picker. Tags are lowercase, and spaces become `-` (`Deep Work` becomes
-`#deep-work`).
+`#deep-work`). A comma adds several at once: `#home,travel`.
 
 Dates: `today` · `tomorrow` · `next week` · `monday` · `15-06-25` · `+3d` ·
 `+2w` · `+1m` · `-2d` (counting back)

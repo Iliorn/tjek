@@ -2,6 +2,7 @@ package app
 
 import (
 	"crypto/sha256"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -1521,5 +1522,13 @@ func TestMonthStepsKeepToTheMonth(t *testing.T) {
 		if err != nil || got.Format("02-01-06") != c.want {
 			t.Errorf("on %s, %q = %s, %v; want %s", c.now, c.in, got.Format("02-01-06"), err, c.want)
 		}
+	}
+}
+
+// #a,b adds both tags, as a filter's #a,b asks for either.
+func TestQuickAddCommaListsTags(t *testing.T) {
+	p := parseQuickAdd("plan trip #home,travel #home")
+	if p.title != "plan trip" || !slices.Equal(p.tags, []string{"home", "travel"}) {
+		t.Errorf("title %q, tags %v", p.title, p.tags)
 	}
 }

@@ -935,8 +935,12 @@ func parseQuickAdd(input string) parsedTask {
 		lower := canonicalInputToken(strings.ToLower(word))
 		switch {
 		case strings.HasPrefix(word, "#"):
-			if tag := todo.NormalizeTag(word); tag != "" {
-				result.tags = append(result.tags, tag)
+			// A comma lists several, as it does in a filter (parseFilter),
+			// where a tag with a comma in it could never be asked for.
+			for _, part := range strings.Split(word, ",") {
+				if tag := todo.NormalizeTag(part); tag != "" && !slices.Contains(result.tags, tag) {
+					result.tags = append(result.tags, tag)
+				}
 			}
 		case strings.HasPrefix(lower, "due:"):
 			if d, err := parseDueDate(strings.TrimPrefix(lower, "due:")); err == nil {
