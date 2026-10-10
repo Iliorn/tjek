@@ -313,3 +313,18 @@ func TestSearchPreviewShowsWhereverTheGrammarRuns(t *testing.T) {
 		}
 	}
 }
+
+// After a comma the part being typed completes on its own: "#home,tr" offers
+// tags for "tr", and accepting one replaces only that part.
+func TestQuickAddCompletesAfterAComma(t *testing.T) {
+	sigil, query, _, _, ok := quickAddToken("trip #home,tr", 13)
+	if !ok || sigil != "#" || query != "tr" {
+		t.Fatalf("token = %q %q %v", sigil, query, ok)
+	}
+	if got, pos, ok := acceptQuickAddSuggestion("trip #home,tr", 13, "travel"); !ok || got != "trip #home,travel " || pos != 18 {
+		t.Errorf("accept = %q at %d", got, pos)
+	}
+	if got, _, _ := acceptQuickAddSuggestion("trip #ho,tr", 8, "home"); got != "trip #home,tr" {
+		t.Errorf("first part = %q", got)
+	}
+}

@@ -44,10 +44,32 @@ func quickAddToken(value string, pos int) (sigil, query string, start, end int, 
 		end++
 	}
 	tok := string(runes[start:end])
-	if s := tok[:1]; s == "#" || s == "@" {
-		return s, string([]rune(tok)[1:]), start, end, true
+	s := tok[:1]
+	if s != "#" && s != "@" {
+		return "", "", 0, 0, false
 	}
-	return "", "", 0, 0, false
+	// In "#home,tr" the part around the caret is the query: the add field
+	// and the filter read each comma-separated part as a name of its own.
+	// The first part's span starts at the sigil, a later part's after its
+	// comma, which is how acceptQuickAddSuggestion tells them apart.
+	segStart, segEnd := start+1, end
+	for i := pos - 1; i > start; i-- {
+		if runes[i] == ',' {
+			segStart = i + 1
+			break
+		}
+	}
+	for i := pos; i < end; i++ {
+		if runes[i] == ',' {
+			segEnd = i
+			break
+		}
+	}
+	spanStart := segStart
+	if segStart == start+1 {
+		spanStart = start
+	}
+	return s, string(runes[segStart:segEnd]), spanStart, segEnd, true
 }
 
 // quickAddSuggestions returns the completion candidates for the token under
@@ -140,9 +162,12 @@ func acceptQuickAddSuggestion(value string, pos int, choice string) (string, int
 		return value, pos, false
 	}
 	runes := []rune(value)
-	token := sigil + choice
+	token := choice
+	if string(runes[start]) == sigil {
+		token = sigil + choice // the first part, sigil and all
+	}
 	tail := string(runes[end:])
-	if !strings.HasPrefix(tail, " ") {
+	if !strings.HasPrefix(tail, " ") && !strings.HasPrefix(tail, ",") {
 		token += " "
 	}
 	next := string(runes[:start]) + token + tail
