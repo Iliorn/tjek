@@ -54,6 +54,11 @@ func TestContextSavedFromTheFilterStaysOn(t *testing.T) {
 	if g := m.cache.projectGroups["Garden"]; g != nil && g.open > 0 {
 		t.Errorf("Garden counts %d open tasks outside the context", g.open)
 	}
+	for _, x := range m.statsScopedTodos() {
+		if x.Project == "Garden" {
+			t.Error("Stats counts a task outside the context")
+		}
+	}
 
 	// A / filter narrows inside the context.
 	m = script(t, m, "/", "p:high", "enter")

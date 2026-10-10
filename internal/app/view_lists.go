@@ -314,7 +314,7 @@ func renderProgressBar(pct float64, barW int) string {
 // the page is scoped.
 func (m model) statsScopedTodos() []*todo.Todo {
 	all := m.allTodos()
-	if m.searchQuery == "" {
+	if m.searchQuery == "" && len(m.cache.outside) == 0 {
 		return all
 	}
 	match := compileSearchWith(m.searchQuery, m.searchEnv())
