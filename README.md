@@ -3,7 +3,7 @@
 A keyboard-driven task manager for the terminal that tells you what to do next.
 
 [![CI](https://github.com/Iliorn/tjek/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/Iliorn/tjek/actions/workflows/ci.yml?query=branch%3Amain)
-![Go](https://img.shields.io/badge/Go-1.26-00ADD8?style=flat&logo=go)
+![Go](https://img.shields.io/badge/Go-1.25-00ADD8?style=flat&logo=go)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey?style=flat)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat)
 
