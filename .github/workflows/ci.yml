@@ -157,32 +157,8 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Per-package coverage floors
-        run: |
-          # pipefail so a test failure here is not swallowed by tee.
-          set -o pipefail
-          declare -A floor=(
-            ["github.com/Iliorn/tjek/internal/app"]=78
-            ["github.com/Iliorn/tjek/tasksync"]=92
-            ["github.com/Iliorn/tjek/hlc"]=90
-            ["github.com/Iliorn/tjek/todo"]=96
-          )
-          go test -cover -timeout 5m ./... | tee /tmp/cover.txt
-          rc=0
-          for pkg in "${!floor[@]}"; do
-            pct=$(awk -v p="$pkg" '$2 == p { for (i = 1; i <= NF; i++) if ($i ~ /%$/) { sub(/%/, "", $i); print $i } }' /tmp/cover.txt)
-            if [ -z "$pct" ]; then
-              echo "::error::no coverage reported for $pkg"
-              rc=1
-              continue
-            fi
-            if awk -v got="$pct" -v want="${floor[$pkg]}" 'BEGIN { exit !(got < want) }'; then
-              echo "::error::$pkg coverage $pct% is below the ${floor[$pkg]}% floor"
-              rc=1
-            else
-              echo "$pkg: $pct% (floor ${floor[$pkg]}%)"
-            fi
-          done
-          exit $rc
+        # The floors live in the script, which scripts/check.sh runs too.
+        run: scripts/coverage.sh
 
   lint:
     runs-on: ubuntu-latest

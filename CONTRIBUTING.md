@@ -12,16 +12,21 @@ go vet ./...
 golangci-lint run ./...
 ```
 
-Those four are what CI runs, on Linux, Windows and macOS, plus `go test -race`.
+Those are what CI runs, on Linux, Windows and macOS, plus `go test -race`, the
+per-package coverage floors (`scripts/coverage.sh`) and `govulncheck`.
 `scripts/check.sh` runs them together (gofmt, vet, golangci-lint, the shuffled
-suite; `--race` adds the race run), and it can run before every push:
+suite with its coverage floors, govulncheck; `--race` adds the race run), and
+it can run before every push:
 
 ```sh
 git config core.hooksPath .githooks   # once per clone
 ```
 
 A lint finding costs one line to fix locally and a red `main` for everyone
-after it once it is pushed, so the hook is worth the few seconds.
+after it once it is pushed, so the hook is worth the minute it takes.
+govulncheck can still fail with no change of ours, when Go publishes new
+advisories; the fix is then moving go.mod's `toolchain` line to the Go
+release that patches them.
 
 Tests must never touch your real task store. `TestMain` redirects the home
 directory for the whole test binary; `TestStorageStaysInsideTheTestHome` fails
