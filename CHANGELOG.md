@@ -13,6 +13,8 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+## [1.55.0] - 2026-10-11
+
 ### Added
 
 - Dates take eom, soq, "end of month" and the like, with a count after them: `eom-2d`.
