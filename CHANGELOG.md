@@ -34,6 +34,10 @@ belongs in the commit message, where it is kept next to the code it explains.
 - A filter's `#work` matches that tag exactly once it exists, not `#homework`.
 - `#home,travel` when adding gives the task both tags, as a filter reads it.
 
+### Security
+
+- Built with Go 1.26.9, which fixes nine standard-library flaws in `net/http` and TLS.
+
 ### Fixed
 
 - `tjek show` prints a repeating task's rule.
