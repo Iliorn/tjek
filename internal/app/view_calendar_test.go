@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -220,22 +221,71 @@ func TestCalendarComingUpListsAParentsDeadlineOnce(t *testing.T) {
 	}
 }
 
-// The month panel grows with the window, and what it gains goes to the names
-// in Coming up: at 22 cells a title clipped after a word or two.
-func TestComingUpNamesUseAWideWindow(t *testing.T) {
-	title := "Send the quarterly report"
+// Coming up sits in the agenda, where the window's width goes to the names,
+// and the month panel stays the grid's width however wide the window.
+func TestComingUpIsInTheAgenda(t *testing.T) {
+	title := "Send the quarterly report to the whole board"
 	task := todo.New(title)
 	task.DueDate = startOfDay(time.Now()).AddDate(0, 0, 1)
 	m := modelWithTasks(t, task)
 	m.termWidth, m.termHeight = 120, 30
 	m.switchTab(tabCalendar)
-	if out := ansi.Strip(m.View()); !strings.Contains(out, title) {
+	out := ansi.Strip(m.View())
+	if !strings.Contains(out, title) {
 		t.Errorf("a 120-column calendar clips %q in Coming up:\n%s", title, out)
 	}
-	for _, w := range []int{calSideBySideMinWidth, 80, 200} {
-		if got := calPanelWidthFor(w); got < calPanelWidth || got > calPanelMaxWidth || w-got-4 < minInnerWidth {
-			t.Errorf("width %d: month panel %d leaves the timeline too little, or is out of bounds", w, got)
+	for _, line := range strings.Split(out, "\n") {
+		if i := strings.Index(line, title); i >= 0 {
+			// The agenda is the left pane: the row's first border closes
+			// after the title, not before it.
+			if b := strings.Index(line[i:], "│"); b < 0 || strings.Count(line[:i], "│") != 1 {
+				t.Errorf("Coming up is not in the agenda, the left pane:\n%s", line)
+			}
 		}
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, localizedMonthYear(m.calendar.selected)) {
+			start := strings.LastIndex(line, "╭")
+			if got := ansi.StringWidth(line[start:]); got != calPanelWidth+2 {
+				t.Errorf("month panel is %d cells wide, want the fixed %d:\n%s", got, calPanelWidth+2, line)
+			}
+		}
+	}
+
+	// The narrow calendar has no month panel, and keeps Coming up all the same.
+	m.termWidth = calSideBySideMinWidth - 1
+	if out := ansi.Strip(m.View()); !strings.Contains(out, "Coming up") {
+		t.Errorf("the narrow calendar lost Coming up:\n%s", out)
+	}
+}
+
+// A day too long for its pane still shows Coming up's heading and first task,
+// and the timeline scrolls in what is left.
+func TestAgendaKeepsComingUpOnALongDay(t *testing.T) {
+	day := localMidnight(0)
+	var tasks []todo.Todo
+	for i := range 12 {
+		x := todo.New(fmt.Sprintf("Tracked %d", i))
+		x.Project = "work"
+		x.TimeEntries = []todo.TimeEntry{{ID: fmt.Sprintf("e%d", i), StartedAt: day.Add(time.Duration(i) * time.Hour), StoppedAt: day.Add(time.Duration(i)*time.Hour + 30*time.Minute)}}
+		tasks = append(tasks, x)
+	}
+	due := todo.New("Renew passport")
+	due.DueDate = day.AddDate(0, 0, 2)
+	tasks = append(tasks, due)
+	m := modelWithTasks(t, tasks...)
+	m.switchTab(tabCalendar)
+	m.calendar.selected = day
+	lines := m.renderAgendaLines(60, 16)
+	got := ansi.Strip(strings.Join(lines, "\n"))
+	if len(lines) > 16 {
+		t.Errorf("the agenda drew %d rows into 16:\n%s", len(lines), got)
+	}
+	if !strings.Contains(got, "Coming up") || !strings.Contains(got, "Renew passport") {
+		t.Errorf("a long day pushed Coming up out:\n%s", got)
+	}
+	if !strings.Contains(got, "⋮") {
+		t.Errorf("want the timeline clipped with ⋮:\n%s", got)
 	}
 }
 

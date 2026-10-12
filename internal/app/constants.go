@@ -196,11 +196,9 @@ const (
 	statsOldestMinW = 12
 	statsValueWidth = 12
 
-	// calPanelWidth is the month panel's width in a window just wide enough to
-	// hold it beside the timeline, and calPanelMaxWidth as far as it grows in
-	// a wide one (calPanelWidthFor).
-	calPanelWidth    = 22
-	calPanelMaxWidth = 44
+	// calPanelWidth is the month panel's width: the grid and its totals,
+	// whatever the window, which the agenda beside it takes the rest of.
+	calPanelWidth = 22
 
 	// calSideBySideMinWidth is the narrowest window that fits the fixed-width
 	// month grid beside a usable day timeline (grid + timeline floor + the

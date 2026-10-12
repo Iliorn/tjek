@@ -225,14 +225,14 @@ func (m model) buildCalendarContent(w, outerH int) string {
 	if w < calSideBySideMinWidth {
 		return m.buildCalendarNarrow(w, innerH)
 	}
-	calW := calPanelWidthFor(w)
+	calW := calPanelWidth
 	tlW := w - calW - 4
 	if tlW < minInnerWidth {
 		tlW = minInnerWidth
 	}
 
 	calLines := m.renderMonthCalendarLines(calW - 2)
-	tlLines := m.renderTimelineLines(tlW-2, innerH)
+	tlLines := m.renderAgendaLines(tlW-2, innerH)
 
 	fitLines := func(lines []string, h, contentW int) []string {
 		if len(lines) > h {
@@ -246,17 +246,12 @@ func (m model) buildCalendarContent(w, outerH int) string {
 	}
 	// The month panel is as tall as what it shows — the grid and the day's
 	// and month's totals — rather than stretched to the window: the empty
-	// rows under it would frame nothing. The timeline keeps the full height,
+	// rows under it would frame nothing. The agenda keeps the full height,
 	// since it scrolls through the day.
 	for len(calLines) > 0 && strings.TrimSpace(ansi.Strip(calLines[len(calLines)-1])) == "" {
 		calLines = calLines[:len(calLines)-1]
 	}
-	// What the grid only marks, by name, in the rows the panel has left: a
-	// blank, the heading, and a row at least, less the blank at the foot.
-	if rows := innerH - len(calLines) - 3; rows >= 1 {
-		calLines = append(calLines, m.renderComingUpLines(calW-2, rows)...)
-	}
-	calLines = fitLines(calLines, min(len(calLines)+1, innerH), calW-2)
+	calLines = fitLines(calLines, min(len(calLines), innerH), calW-2)
 	tlLines = fitLines(tlLines, innerH, tlW-2)
 
 	// Accent border on the pane that owns keystrokes — same contract as the
@@ -272,14 +267,6 @@ func (m model) buildCalendarContent(w, outerH int) string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, tlPanel, calPanel)
 }
 
-// calPanelWidthFor is the month panel's width in a calendar w cells wide: a
-// third of it, between calPanelWidth and calPanelMaxWidth. What the panel
-// gains spreads the grid and goes to the task names in its Coming up list,
-// which clip after a word or two at the narrowest width.
-func calPanelWidthFor(w int) int {
-	return min(max(w/3, calPanelWidth), calPanelMaxWidth)
-}
-
 // buildCalendarNarrow is the single-pane calendar for windows too small to
 // hold the month grid beside the timeline. The timeline takes the full width
 // with no floor, so it clips to the window instead of overflowing it.
@@ -287,7 +274,7 @@ func (m model) buildCalendarNarrow(w, innerH int) string {
 	if w < 0 {
 		w = 0 // borders only; a floor here would push the box past the window
 	}
-	lines := m.renderTimelineLines(w-2, innerH)
+	lines := m.renderAgendaLines(w-2, innerH)
 	if len(lines) > innerH {
 		lines = lines[:innerH]
 	}
@@ -375,7 +362,7 @@ func (m model) renderMonthCalendarLines(innerW int) []string {
 	return lines
 }
 
-// comingUpDays is how far ahead of the selected day the month panel lists
+// comingUpDays is how far ahead of the selected day the agenda lists
 // deadlines: a week, the span the grid's due marks are read across.
 const comingUpDays = 7
 
@@ -394,9 +381,10 @@ func dueWithParent(tasks map[string]*todo.Todo, t *todo.Todo) bool {
 }
 
 // renderComingUpLines lists the open tasks due in the week from the selected
-// day, soonest first, under the month grid: the names behind its due marks,
-// moving with the cursor so the week ahead can be read from any day. At most
-// maxRows rows, the last saying how many more there are.
+// day, soonest first, under the day's agenda: the names behind the month
+// grid's due marks, moving with the cursor so the week ahead can be read from
+// any day. At most maxRows task rows, the last saying how many more there are,
+// after a blank and the heading.
 func (m model) renderComingUpLines(w, maxRows int) []string {
 	from := startOfDay(m.calendar.selected)
 	until := from.AddDate(0, 0, comingUpDays)
@@ -530,6 +518,35 @@ func (m model) calendarTimelineTitle(base string, boxW int) string {
 	}
 	return title
 }
+
+// renderAgendaLines is the day's pane: its timeline, then Coming up in the
+// rows the timeline leaves. A day too long for both keeps Coming up to its
+// heading, first task and a count of the rest, and scrolls the timeline in
+// what remains; a pane too short even for that shows the timeline alone.
+func (m model) renderAgendaLines(innerW, innerH int) []string {
+	const minUp = 4 // a blank, the heading, a task, a count of the rest
+	lines := m.renderTimelineLines(innerW, innerH)
+	free := innerH - len(lines)
+	if free < minUp {
+		if innerH-minUp < agendaMinTimeline {
+			return lines
+		}
+		free = minUp
+		lines = m.renderTimelineLines(innerW, innerH-free)
+	}
+	// Indented by the timeline's cursor gutter, so the two read as one column.
+	for _, l := range m.renderComingUpLines(innerW-2, free-2) {
+		if l != "" {
+			l = "  " + l
+		}
+		lines = append(lines, l)
+	}
+	return lines
+}
+
+// agendaMinTimeline is the fewest rows the timeline keeps when Coming up
+// shares the pane with it: an entry, its project line and the ⋮ below.
+const agendaMinTimeline = 3
 
 func (m model) renderTimelineLines(innerW, innerH int) []string {
 	acts := m.activitiesForDay(m.calendar.selected)
