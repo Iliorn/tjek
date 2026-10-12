@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="{{.Lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="tjek">
+<title>tjek</title>
+<style>
+:root { {{.Theme}}
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--fg); font: 15px/1.4 var(--mono);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+main { max-width: 640px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+.top { display: flex; align-items: baseline; justify-content: space-between; padding: 18px 18px 10px; }
+.brand { font-weight: 700; font-size: 19px; color: var(--accent); }
+.count { font-size: 12px; color: var(--muted); }
+
+form.add { display: flex; gap: 8px; padding: 0 14px 12px; }
+input {
+  font: 16px var(--mono); color: var(--fg); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; min-width: 0;
+}
+form.add input { flex: 1; }
+input::placeholder { color: var(--muted); }
+input:focus { outline: 2px solid var(--blue); outline-offset: -1px; border-color: transparent; }
+button, .btn {
+  font: 600 15px var(--mono); border: 0; border-radius: 10px; cursor: pointer;
+  background: var(--accent); color: var(--bg); padding: 0 16px; text-decoration: none;
+  display: inline-grid; place-items: center;
+}
+button:focus-visible, .btn:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.btn.quiet { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+
+.msg { margin: 0 14px 12px; padding: 10px 12px; border-radius: 10px; font-size: 13px; border: 1px solid var(--red); color: var(--red); overflow-wrap: anywhere; }
+
+ul { list-style: none; margin: 0; padding: 0; }
+li.task { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: start; padding: 11px 18px 11px 14px; border-top: 1px solid var(--line); }
+li.task:first-child { border-top: 0; }
+li.task.fresh { animation: fresh 1.6s ease-out; }
+@keyframes fresh { from { background: var(--surface); } to { background: transparent; } }
+li.task form { margin: 0; }
+.check {
+  width: 24px; height: 24px; margin-top: 1px; border-radius: 50%; border: 2px solid var(--muted);
+  background: transparent; padding: 0;
+}
+.check:hover, .check:active { border-color: var(--green); background: var(--surface); }
+.body { min-width: 0; display: grid; gap: 4px; }
+.title { overflow-wrap: anywhere; }
+.overdue .title { color: var(--red); }
+.meta { display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 12px; color: var(--muted); }
+.late { color: var(--red); }
+.soon { color: var(--yellow); }
+.tag { color: var(--purple); }
+.prio { color: var(--accent); }
+.score { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 2px; }
+.empty { padding: 28px 18px; color: var(--muted); }
+
+.section { font-size: 11px; color: var(--muted); padding: 18px 18px 6px; letter-spacing: .06em; text-transform: uppercase; }
+.closed li { padding: 5px 18px; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.closed li::before { content: "✓ "; color: var(--green); }
+
+.toast {
+  position: fixed; left: 14px; right: 14px; bottom: calc(18px + env(safe-area-inset-bottom));
+  max-width: 612px; margin: 0 auto; background: var(--fg); color: var(--bg);
+  font-size: 14px; padding: 11px 14px; border-radius: 10px; overflow-wrap: anywhere;
+  animation: toast 3s ease-in forwards; pointer-events: none;
+}
+@keyframes toast { 0%, 75% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+
+.panel { flex: 1; display: grid; align-content: center; gap: 18px; padding: 0 28px 80px; }
+.panel .brand { font-size: 30px; }
+.panel p { margin: 0; color: var(--muted); font-size: 14px; }
+.panel label { font-size: 12px; color: var(--muted); display: grid; gap: 6px; }
+.panel form { display: grid; gap: 14px; margin: 0; }
+.panel button, .panel .btn { padding: 12px; }
+.panel .msg { margin: 0; }
+.actions { display: grid; gap: 10px; }
+
+@media (prefers-reduced-motion: reduce) { li.task.fresh { animation: none; } .toast { animation-duration: 6s; } }
+</style>
+</head>
+<body>
+<main>
+{{- if .Login}}
+  <section class="panel">
+    <span class="brand">tjek</span>
+    <p>{{.L.SignIn}}</p>
+    {{- if .Error}}<p class="msg" role="alert">{{.Error}}</p>{{end}}
+    <form method="post" action="/login">
+      <label for="token">{{.L.TokenLabel}}
+        <input id="token" name="token" type="password" autocomplete="current-password" required>
+      </label>
+      <button type="submit">{{.L.LogIn}}</button>
+    </form>
+  </section>
+{{- else if .Confirm}}
+  <section class="panel">
+    <span class="brand">tjek</span>
+    <p>{{.Confirm.Question}}</p>
+    <form method="post" action="/done" class="actions">
+      <input type="hidden" name="id" value="{{.Confirm.ID}}">
+      <input type="hidden" name="subtasks" value="leave">
+      <button type="submit">{{.L.CloseIt}}</button>
+      <a class="btn quiet" href="/">{{.L.Cancel}}</a>
+    </form>
+  </section>
+{{- else}}
+  <header class="top"><span class="brand">tjek</span><span class="count">{{.Count}}</span></header>
+  <form class="add" method="post" action="/add" autocomplete="off">
+    <input id="line" name="line" value="{{.Line}}" placeholder="{{.L.Placeholder}}" aria-label="{{.L.NewTask}}" enterkeyhint="done" autocapitalize="sentences">
+    <button type="submit">{{.L.Add}}</button>
+  </form>
+  {{- if .Error}}<p class="msg" role="alert">{{.Error}}</p>{{end}}
+  {{- if .Rows}}
+  <ul>
+    {{- range .Rows}}
+    <li class="task{{if .Overdue}} overdue{{end}}{{if .Fresh}} fresh{{end}}">
+      <form method="post" action="/done">
+        <input type="hidden" name="id" value="{{.ID}}">
+        <button class="check" type="submit" aria-label="{{printf $.L.MarkDone .Title}}"></button>
+      </form>
+      <div class="body">
+        <span class="title">{{.Title}}</span>
+        {{- if or .Due .Priority .Subtasks .Project .Tags .Blocked}}
+        <div class="meta">
+          {{- if .Due}}<span class="{{.DueClass}}">{{.Due}}</span>{{end}}
+          {{- if .Priority}}<span class="prio">{{.Priority}}</span>{{end}}
+          {{- if .Subtasks}}<span>{{.Subtasks}}</span>{{end}}
+          {{- if .Project}}<span>@{{.Project}}</span>{{end}}
+          {{- range .Tags}}<span class="tag">#{{.}}</span>{{end}}
+          {{- if .Blocked}}<span>{{.Blocked}}</span>{{end}}
+        </div>
+        {{- end}}
+      </div>
+      <span class="score">{{.Score}}</span>
+    </li>
+    {{- end}}
+  </ul>
+  {{- else}}
+  <p class="empty">{{.L.Empty}}</p>
+  {{- end}}
+  {{- if .Closed}}
+  <div class="section">{{.ClosedHead}}</div>
+  <ul class="closed">
+    {{- range .Closed}}<li>{{.}}</li>{{end}}
+  </ul>
+  {{- end}}
+  {{- if .Toast}}<div class="toast" role="status">{{.Toast}}</div>{{end}}
+{{- end}}
+</main>
+</body>
+</html>

@@ -60,7 +60,7 @@ var cliCommandSpecs = []cliCommandSpec{
 	{name: "sync", summary: "sync with the configured server", flags: []string{
 		"accept-stale", "adopt-local", "adopt-remote", "quiet", "recover", "save", "status", "token", "url"}},
 	{name: "share", summary: "share a project through a file", flags: []string{"merge"}},
-	{name: "serve", summary: "run the sync server", flags: []string{"listen", "new-token", "tls-cert", "tls-key", "token"}},
+	{name: "serve", summary: "run the sync server", flags: []string{"listen", "new-token", "tls-cert", "tls-key", "token", "web"}},
 	{name: "doctor", summary: "report this installation's health", flags: []string{"json"}},
 	{name: "update", summary: "install the latest release", flags: []string{"check", "y"}},
 	{name: "suggest", summary: "suggest dependency links between tasks", flags: []string{"list"}},

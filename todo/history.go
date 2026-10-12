@@ -17,7 +17,7 @@ type Event struct {
 	// name known.
 	Author string `json:"author,omitempty"`
 	// Source says how the change was made when it was not by hand in the
-	// app: SourceCLI or SourceAuto.
+	// app: SourceCLI, SourceWeb or SourceAuto.
 	Source string `json:"source,omitempty"`
 	Action string `json:"action"`
 	// Fields names what an edit changed: Field keys, plus FieldTags and
@@ -39,6 +39,7 @@ const (
 // Event sources. The zero value is a change made by hand in the app.
 const (
 	SourceCLI  = "cli"
+	SourceWeb  = "web"
 	SourceAuto = "auto"
 )
 

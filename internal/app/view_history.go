@@ -126,16 +126,16 @@ func historyWhat(r historyRow) string {
 }
 
 // historyWho is a row's "who": the person, marked when the change came from
-// the command line, or "automatic" when tjek made it.
+// the command line or the web page, or "automatic" when tjek made it.
 func historyWho(r historyRow) string {
 	switch r.source {
 	case todo.SourceAuto:
 		return tr("automatic")
-	case todo.SourceCLI:
+	case todo.SourceCLI, todo.SourceWeb:
 		if r.author == "" {
-			return "cli"
+			return r.source
 		}
-		return r.author + " · cli"
+		return r.author + " · " + r.source
 	}
 	return r.author
 }

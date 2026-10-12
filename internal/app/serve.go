@@ -87,6 +87,7 @@ func cliServe(args []string) int {
 	tlsCert := fs.String("tls-cert", "",
 		"serve https with this PEM certificate (e.g. from `tailscale cert` or Let's Encrypt; re-read when renewed)")
 	tlsKey := fs.String("tls-key", "", "the PEM private key for --tls-cert")
+	web := fs.Bool("web", false, "also serve a page at / to see, add and close tasks from a phone's browser, behind the same token")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -135,9 +136,13 @@ func cliServe(args []string) int {
 		defer stop()
 	}
 
+	handler := srv.Handler()
+	if *web {
+		handler = newWebUI(*token, srv.Hub, tlsConfig != nil).handler(handler)
+	}
 	httpServer := &http.Server{
 		Addr:              *listen,
-		Handler:           srv.Handler(),
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		TLSConfig:         tlsConfig,
 	}
@@ -160,6 +165,9 @@ func cliServe(args []string) int {
 		scheme = "https"
 	}
 	fmt.Fprintf(os.Stderr, "tjek serve: listening on %s://%s (POST /v1/sync)\n", scheme, *listen)
+	if *web {
+		fmt.Fprintf(os.Stderr, "tjek serve: the web page is at %s://%s/\n", scheme, *listen)
+	}
 	if err := serveOn(httpServer, ln); err != nil && err != http.ErrServerClosed {
 		fmt.Fprintf(os.Stderr, "tjek serve: %v\n", err)
 		return 1

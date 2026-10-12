@@ -37,6 +37,28 @@ The server keeps its own `tasks.db` and answers on:
 - `GET  /v1/health`: a liveness check
 - `GET  /v1/events`: a stream that tells connected clients to pull now
 
+## Your tasks on a phone
+
+`--web` adds a page at the server's address for a phone's browser: your open
+tasks in the order the Tasks tab shows them, a line to add one with the same
+words as the app (`Buy milk #shopping due:friday`), and a circle to close one.
+
+```sh
+tjek serve --listen 100.x.y.z:8765 --web
+```
+
+Open `http://100.x.y.z:8765/` on a phone that is on the same tailnet and type
+the server's token once; the browser remembers it until the token changes.
+The page uses the theme and language set on the server, and a change made on
+it reaches your other devices within a second, as any sync does. Add it to
+the home screen and it opens like an app.
+
+The page is only as reachable as the server, so keep it on Tailscale or a
+LAN. For a name and https on a tailnet, point a DNS record at the server's
+Tailscale address (with Cloudflare, as "DNS only"), get a certificate for that
+name with a DNS challenge (`lego --dns cloudflare`, or certbot's Cloudflare
+plugin), and pass it with `--tls-cert` and `--tls-key`.
+
 ## Point a device at it
 
 ```sh

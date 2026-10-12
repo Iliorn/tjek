@@ -13,6 +13,10 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+### Added
+
+- `tjek serve --web` adds a page to see, add and close tasks from a phone's browser.
+
 ## [1.55.0] - 2026-10-11
 
 ### Added

@@ -1089,6 +1089,22 @@ var daTranslations = map[string]string{
 	"↑/↓ move · → open · ← up · enter picks the file · / type a path · esc cancels":                                                "↑/↓ flyt · → åbn · ← op · enter vælger filen · / skriv en sti · esc annullerer",
 	"↑/↓ move · → open · ← up · enter picks the marked folder · space this one · / type a path · esc cancels":                      "↑/↓ flyt · → åbn · ← op · enter vælger den markerede mappe · mellemrum denne · / skriv en sti · esc annullerer",
 	"↑/↓ move · → open · ← up · enter picks the marked folder · space this one · x turns export off · / type a path · esc cancels": "↑/↓ flyt · → åbn · ← op · enter vælger den markerede mappe · mellemrum denne · x slår eksport fra · / skriv en sti · esc annullerer",
+
+	// The web page (web.go).
+	"Buy milk #shopping due:friday":       "Køb mælk #indkøb frist:fredag",
+	"New task":                            "Ny opgave",
+	"Mark done: %s":                       "Markér som færdig: %s",
+	"Added: %s":                           "Tilføjet: %s",
+	"Done: %s":                            "Færdig: %s",
+	"Nothing open. Add a task above.":     "Intet åbent. Tilføj en opgave ovenfor.",
+	"Close '%s' with %d open subtask(s)?": "Luk '%s' med %d åbne delopgave(r)?",
+	"Close it":                            "Luk den",
+	"Cancel":                              "Fortryd",
+	"Log in":                              "Log ind",
+	"Enter the server's sync token. This browser remembers it afterwards.": "Skriv serverens synk.token. Browseren husker det bagefter.",
+	"Wrong token. The server has it in sync.json, or in TJEK_SYNC_TOKEN.":  "Forkert token. Serveren har det i sync.json eller i TJEK_SYNC_TOKEN.",
+	"Could not load the tasks: %v":                                         "Kunne ikke indlæse opgaverne: %v",
+	"Could not save: %v":                                                   "Kunne ikke gemme: %v",
 }
 var deTranslations = map[string]string{
 	// Header / chrome
@@ -1909,4 +1925,20 @@ var deTranslations = map[string]string{
 	"↑/↓ move · → open · ← up · enter picks the file · / type a path · esc cancels":                                                "↑/↓ bewegen · → öffnen · ← hoch · Enter wählt die Datei · / Pfad eingeben · Esc bricht ab",
 	"↑/↓ move · → open · ← up · enter picks the marked folder · space this one · / type a path · esc cancels":                      "↑/↓ bewegen · → öffnen · ← hoch · Enter wählt den markierten Ordner · Leertaste diesen · / Pfad eingeben · Esc bricht ab",
 	"↑/↓ move · → open · ← up · enter picks the marked folder · space this one · x turns export off · / type a path · esc cancels": "↑/↓ bewegen · → öffnen · ← hoch · Enter wählt den markierten Ordner · Leertaste diesen · x schaltet den Export aus · / Pfad eingeben · Esc bricht ab",
+
+	// The web page (web.go).
+	"Buy milk #shopping due:friday":       "Milch kaufen #einkauf fällig:freitag",
+	"New task":                            "Neue Aufgabe",
+	"Mark done: %s":                       "Als erledigt markieren: %s",
+	"Added: %s":                           "Hinzugefügt: %s",
+	"Done: %s":                            "Erledigt: %s",
+	"Nothing open. Add a task above.":     "Nichts offen. Füge oben eine Aufgabe hinzu.",
+	"Close '%s' with %d open subtask(s)?": "'%s' mit %d offenen Teilaufgabe(n) schließen?",
+	"Close it":                            "Schließen",
+	"Cancel":                              "Abbrechen",
+	"Log in":                              "Anmelden",
+	"Enter the server's sync token. This browser remembers it afterwards.": "Gib das Sync-Token des Servers ein. Der Browser merkt es sich danach.",
+	"Wrong token. The server has it in sync.json, or in TJEK_SYNC_TOKEN.":  "Falsches Token. Der Server hat es in sync.json oder in TJEK_SYNC_TOKEN.",
+	"Could not load the tasks: %v":                                         "Die Aufgaben konnten nicht geladen werden: %v",
+	"Could not save: %v":                                                   "Konnte nicht speichern: %v",
 }

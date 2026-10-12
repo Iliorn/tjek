@@ -333,7 +333,7 @@ var cliHelpBlocks = []helpBlock{
 		{"tjek import <file>|-", "merge an export file into the local store (- = stdin)"},
 	}},
 	{"Sync (cross-device):", []helpRow{
-		{"tjek serve [--listen=ADDR] [--token=T] [--tls-cert=F --tls-key=F]", "run the sync server (self-hosted; binds 127.0.0.1:8765 by default); --tls-cert/--tls-key serve https with that PEM pair, re-read when the files are renewed"},
+		{"tjek serve [--listen=ADDR] [--token=T] [--tls-cert=F --tls-key=F] [--web]", "run the sync server (self-hosted; binds 127.0.0.1:8765 by default); --tls-cert/--tls-key serve https with that PEM pair, re-read when the files are renewed; --web adds a page for a phone's browser"},
 		{"tjek sync [--url=U] [--token=T] [--save]", `push/pull once against a sync server (--save stores config). Auto-sync runs on its own once configured (set "auto_sync":false in sync.json to disable); conflicts log to sync.log`},
 		{"tjek sync --status", "print the last sync time/result (local only, no network)"},
 		{"tjek sync --accept-stale", `rejoin after being offline past the deletion-memory window (~6 months; both auto-sync and a manual "tjek sync" refuse until then, so tasks deleted elsewhere can't resurrect)`},

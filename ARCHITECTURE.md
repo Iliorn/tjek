@@ -617,6 +617,17 @@ and Bubble Tea glue stay in the app.
   `tailscale cert` and Let's Encrypt renew in place. A failed reload keeps the
   last good pair. The TUI's in-process server stays plain; `healthAnswers`
   probes plain, then https.
+- **`web.go`**: the phone page of `tjek serve --web`, in the app rather than
+  `tasksync`, which stays UI-free. `webUI.handler` sends `/v1/` to the sync
+  handler untouched and the rest to the page, behind
+  `http.CrossOriginProtection`. Plain HTML and forms from `web.tmpl`, no
+  script; every string is translated in Go (`webLabels`), so the translation
+  test sees it. Sign-in is the sync token, kept as a cookie that is a MAC of
+  it (`webSession`). Writes go through `parseQuickAdd`/`applyTo` and
+  `closeTasks`, the code `add` and `done` use, sign their history
+  `todo.SourceWeb`, rebase onto the stored rows (`SaveOnto`) and ring the hub.
+  `webUI.mu` serializes requests, since each applies the settings' language,
+  a global.
 - **The board's column list syncs** (`boardsync.go`, `tasksync/board.go`) as
   one optional field each way (`Request.Board`/`Response.Board`), so a stage
   name means the same column on every device. No protocol bump: an older peer
