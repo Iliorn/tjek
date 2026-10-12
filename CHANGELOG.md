@@ -13,6 +13,8 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+## [1.57.1] - 2026-10-12
+
 ### Fixed
 
 - A description saved on Windows, or a tab in a task, no longer breaks the pane borders.
