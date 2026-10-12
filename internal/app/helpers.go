@@ -40,6 +40,56 @@ func clamp(val, min, max int) int {
 // ellipsis is the one-cell marker every clipped string ends in.
 const ellipsis = "…"
 
+// cleanText makes user text safe to draw on one line of the cell grid: a
+// tab, newline or carriage return becomes a space, and every other control
+// character is dropped, ESC and the C1 controls among them. Text from a
+// paste, an editor, an import or another device can then neither move the
+// cursor (a \r overwrites the pane's border) nor carry escape sequences of
+// its own. A caller drawing several lines splits on \n first.
+func cleanText(s string) string {
+	if !hasControl(s) {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		switch {
+		case r == '\t', r == '\n', r == '\r':
+			b.WriteByte(' ')
+		case r < 0x20, r == 0x7f, r >= 0x80 && r < 0xa0:
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// hasControl is cleanText's fast path: a byte scan that finds no control
+// character in the text that almost all of it is. 0xc2 opens the UTF-8 form
+// of the C1 controls (U+0080–U+009F), and of other characters, which the slow
+// path then tells apart.
+func hasControl(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if c := s[i]; c < 0x20 || c == 0x7f || c == 0xc2 {
+			return true
+		}
+	}
+	return false
+}
+
+// normalizeNewlines turns Windows (\r\n) and old Mac (\r) line ends into \n.
+// Text from an editor or a pipe on Windows arrives with \r\n, and a \r kept
+// in a line sends the terminal's cursor back to its start when it is drawn.
+func normalizeNewlines(s string) string {
+	if !strings.Contains(s, "\r") {
+		return s
+	}
+	return strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\r", "\n")
+}
+
+// truncate clips plain text to max runes, ending a clipped string in the
+// ellipsis. It also cleans it (cleanText), since nearly every piece of user
+// text on screen is drawn through here.
 func truncate(s string, max int) string {
 	// A width budget computed from the terminal size (termWidth-6 and friends)
 	// goes negative on a very small window. Clamping here rather than at every
@@ -48,6 +98,7 @@ func truncate(s string, max int) string {
 	if max <= 0 {
 		return ""
 	}
+	s = cleanText(s)
 	r := []rune(s)
 	if len(r) <= max {
 		return s
@@ -125,7 +176,7 @@ func wrapText(s string, width int) []string {
 	if width < 1 {
 		width = 1
 	}
-	runes := []rune(s)
+	runes := []rune(cleanText(s))
 	lines := make([]string, 0, (len(runes)/width)+1)
 	for len(runes) > 0 {
 		if len(runes) <= width {
@@ -199,7 +250,7 @@ func renderTagsPart(tags []string) string {
 	var sb strings.Builder
 	sb.Grow(len(tags) * 12)
 	for _, tag := range tags {
-		sb.WriteString(tagStyle.Render("⟨#"+tag+"⟩") + " ")
+		sb.WriteString(tagStyle.Render("⟨#"+cleanText(tag)+"⟩") + " ")
 	}
 	return sb.String()
 }
@@ -211,7 +262,7 @@ func renderTagsPart(tags []string) string {
 func rowTagWords(tags []string) []string {
 	words := make([]string, len(tags), len(tags)+1)
 	for i, tag := range tags {
-		words[i] = "#" + tag
+		words[i] = "#" + cleanText(tag)
 	}
 	return words
 }
@@ -886,7 +937,7 @@ func readNotesFile(taskID string) (string, error) {
 		}
 		return "", err
 	}
-	return string(data), nil
+	return normalizeNewlines(string(data)), nil
 }
 
 func cleanupNotesFile(taskID string) {

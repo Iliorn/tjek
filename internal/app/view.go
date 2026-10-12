@@ -149,7 +149,9 @@ func withBorderTitleChip(rendered, title, chip string, boxW int, focused bool) s
 			chip, chipW = "", 0
 		}
 	}
-	title = ansi.Truncate(title, maxTitle-chipW, "…")
+	// Plain text: the title is styled below. It is often a task's title, so
+	// it is cleaned like any user text; a tab in it widened the whole frame.
+	title = ansi.Truncate(cleanText(title), maxTitle-chipW, "…")
 	titleW := ansi.StringWidth(title) + chipW
 	fillW := boxW - titleW - 3
 	if fillW < 1 {

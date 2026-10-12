@@ -148,7 +148,7 @@ func (m model) renderDetailPage1(t *todo.Todo) string {
 	}
 	projectVal := unsetVal(tr("not set"), fieldProject)
 	if t.Project != "" {
-		projectVal = t.Project
+		projectVal = cleanText(t.Project)
 	}
 	notesVal := unsetVal(tr("none (press enter or 'n' to edit)"), fieldNotes)
 	if t.Notes != "" {

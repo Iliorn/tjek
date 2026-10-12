@@ -765,7 +765,7 @@ func (m model) renderTimelineSub(a dayActivity, innerW int, hasNext bool) string
 
 	projPlain := ""
 	if a.project != "" {
-		projPlain = "[" + a.project + "]"
+		projPlain = "[" + cleanText(a.project) + "]"
 	}
 	tagsPlainW := 0
 	for _, tag := range a.tags {

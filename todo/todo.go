@@ -418,6 +418,14 @@ func (t *Todo) SetStage(s string) {
 func NormalizeTag(tag string) string {
 	tag = strings.TrimSpace(tag)
 	tag = strings.TrimPrefix(tag, "#")
+	// A control character has no place in a name, and drawn it moves the
+	// terminal's cursor; whitespace among them is already a word break.
+	tag = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) && !unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	}, tag)
 	return strings.ToLower(strings.Join(strings.Fields(tag), "-"))
 }
 

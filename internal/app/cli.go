@@ -709,5 +709,5 @@ func noteFlagText(v string, r io.Reader) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimRight(string(b), "\n"), nil
+	return strings.TrimRight(normalizeNewlines(string(b)), "\n"), nil
 }
