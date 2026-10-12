@@ -89,7 +89,8 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("reading the font: %w", err)
 	}
-	var pngs [][]byte
+	var images [][]byte
+	var largest []byte
 	for _, size := range sizes {
 		img, err := render(f, size)
 		if err != nil {
@@ -99,17 +100,27 @@ func run() error {
 		if err := png.Encode(&b, img); err != nil {
 			return err
 		}
-		pngs = append(pngs, b.Bytes())
+		largest = b.Bytes()
+		// Only the 256 is a PNG in the .ico; the rest are bitmaps. Windows
+		// reads a PNG at any size, but the taskbar and the console window
+		// draw the transparent pixels of a small PNG frame black, which put
+		// the mark on a black square. Bitmaps with an alpha channel are what
+		// every part of Windows draws right, and Microsoft's own guidance.
+		if size < 256 {
+			images = append(images, encodeDIB(img))
+		} else {
+			images = append(images, largest)
+		}
 	}
 	dir := filepath.Join(root, "packaging", "icon")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
 	ico := filepath.Join(dir, "tjek.ico")
-	if err := os.WriteFile(ico, encodeICO(sizes, pngs), 0o644); err != nil {
+	if err := os.WriteFile(ico, encodeICO(sizes, images), 0o644); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, "tjek.png"), pngs[len(pngs)-1], 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "tjek.png"), largest, 0o644); err != nil {
 		return err
 	}
 	cmd := exec.Command("go", "run", winres, "simply",
@@ -234,8 +245,44 @@ func inkFraction(size int) float64 {
 	return 0.70
 }
 
-// encodeICO packs PNG images into an .ico: a header, a directory entry per
-// image, then the images. A size of 256 is written as 0, as the format has it.
+// encodeDIB is img as an icon bitmap: a BITMAPINFOHEADER of twice the
+// height, for the colour rows and the mask under them; 32-bit BGRA rows
+// bottom up, with straight alpha; then the 1-bit AND mask, set where a pixel
+// is fully transparent, for whatever still reads it.
+func encodeDIB(img *image.NRGBA) []byte {
+	w, h := img.Bounds().Dx(), img.Bounds().Dy()
+	maskStride := (w + 31) / 32 * 4
+	var b bytes.Buffer
+	le := func(v any) { _ = binary.Write(&b, binary.LittleEndian, v) }
+	le(uint32(40))                   // biSize
+	le(int32(w))                     // biWidth
+	le(int32(2 * h))                 // biHeight: colour and mask
+	le(uint16(1))                    // biPlanes
+	le(uint16(32))                   // biBitCount
+	le(uint32(0))                    // biCompression: BI_RGB
+	le(uint32(w*h*4 + maskStride*h)) // biSizeImage
+	le([4]uint32{0, 0, 0, 0})        // resolution and palette: unused
+	for y := h - 1; y >= 0; y-- {
+		for x := range w {
+			c := img.NRGBAAt(x, y)
+			b.Write([]byte{c.B, c.G, c.R, c.A})
+		}
+	}
+	for y := h - 1; y >= 0; y-- {
+		row := make([]byte, maskStride)
+		for x := range w {
+			if img.NRGBAAt(x, y).A == 0 {
+				row[x/8] |= 0x80 >> (x % 8)
+			}
+		}
+		b.Write(row)
+	}
+	return b.Bytes()
+}
+
+// encodeICO packs images, each a PNG or a bitmap, into an .ico: a header, a
+// directory entry per image, then the images. A size of 256 is written as 0,
+// as the format has it.
 func encodeICO(sizes []int, pngs [][]byte) []byte {
 	var b bytes.Buffer
 	le := func(v any) { _ = binary.Write(&b, binary.LittleEndian, v) }
