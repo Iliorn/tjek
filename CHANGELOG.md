@@ -13,6 +13,8 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+## [1.58.0] - 2026-10-12
+
 ### Changed
 
 - `p` on the Tags or Projects tab ranks its tasks higher or lower, in place of `b`.
