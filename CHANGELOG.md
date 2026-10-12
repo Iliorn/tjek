@@ -13,6 +13,8 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+## [1.57.2] - 2026-10-12
+
 ### Fixed
 
 - Windows: an update no longer fails with "Access is denied" while an older tjek still runs.
