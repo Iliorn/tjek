@@ -1376,7 +1376,7 @@ func (m model) renderDrillTaskList(tasks []todo.Todo, s *groupSummary, showProje
 
 // Settings is one pane of grouped rows, laid out in two columns when the
 // terminal is wide enough. The groups say which control belongs to what
-// ("Listen" and "Server token" are the sync server's own). Titles are held in English and
+// ("Listen address" and "Token" are the sync server's own). Titles are held in English and
 // passed through tr() at render time — a package var would freeze them before
 // applyLang runs.
 type settingsGroup struct {
@@ -1412,10 +1412,10 @@ var settingsGroups = []settingsGroup{
 		settingAging,
 	}},
 	{title: "Sync", rows: []int{
-		settingSyncAuto,
-		settingSyncBoard,
 		settingSyncServer,
 		settingSyncToken,
+		settingSyncAuto,
+		settingSyncBoard,
 		settingSyncNow,
 	}},
 	{title: "Shared projects", rows: []int{
@@ -1470,8 +1470,31 @@ func (m model) settingsRowVisible(id int) bool {
 	switch id {
 	case settingServerListen, settingServerToken:
 		return m.inprocServer != nil || m.serverExternal
+	// Likewise the rows that act on a sync connection wait for one: until the
+	// address and token are in, Automatic and Sync now could only answer
+	// "set the server first", and the page's intro says so instead.
+	case settingSyncAuto, settingSyncBoard, settingSyncNow:
+		return m.syncCfg.ready()
 	}
 	return true
+}
+
+// settingsIntro is the line or two under the section bar that says what a page
+// is for. Sync and Server read alike and do opposite things — one connects to
+// a server, the other makes this machine one — so those two pages open by
+// saying which they are.
+func (m model) settingsIntro(g settingsGroup) []string {
+	switch g.title {
+	case "Sync":
+		intro := []string{tr("Connect this device to the tjek server one of your machines runs, so they share tasks.")}
+		if !m.syncCfg.ready() {
+			intro = append(intro, tr("Set the server's address and token to start syncing."))
+		}
+		return intro
+	case "Server":
+		return []string{tr("Make this machine the server your other devices sync with. One machine is enough.")}
+	}
+	return nil
 }
 
 // settingsEditsText marks the rows whose enter opens a text editor. They render
@@ -1614,14 +1637,14 @@ func (m model) renderSettingsSection(w int) (string, int) {
 		settingLanguage:          tr("Language"),
 		settingDetailPos:         tr("Detail pane"),
 		settingStages:            tr("Board columns"),
-		settingSyncAuto:          tr("Automatic"),
-		settingSyncBoard:         tr("Share board columns"),
-		settingSyncServer:        tr("Sync server"),
-		settingSyncToken:         tr("Sync token"),
+		settingSyncAuto:          tr("Sync automatically"),
+		settingSyncBoard:         tr("Sync board columns"),
+		settingSyncServer:        tr("Server address"),
+		settingSyncToken:         tr("Token"),
 		settingSyncNow:           tr("Sync now"),
-		settingServerOn:          tr("Enabled"),
-		settingServerListen:      tr("Listen"),
-		settingServerToken:       tr("Server token"),
+		settingServerOn:          tr("Run server here"),
+		settingServerListen:      tr("Listen address"),
+		settingServerToken:       tr("Token"),
 		settingVersion:           tr("Version"),
 		settingCheckUpdate:       tr("Check for updates"),
 		settingExportFolder:      tr("Auto-export folder"),
@@ -1665,13 +1688,9 @@ func (m model) renderSettingsSection(w int) (string, int) {
 	if m.hideWaiting {
 		hideWaitingVal = tr("On")
 	}
-	syncAutoVal := "‹ " + tr("needs server") + " ›"
-	if m.syncCfg.ready() {
-		if m.autoSync {
-			syncAutoVal = "‹ " + tr("On") + " ›"
-		} else {
-			syncAutoVal = "‹ " + tr("Off") + " ›"
-		}
+	syncAutoVal := tr("Off")
+	if m.autoSync {
+		syncAutoVal = tr("On")
 	}
 	syncBoardVal := tr("Off")
 	if m.boardCfg.sync {
@@ -1717,7 +1736,7 @@ func (m model) renderSettingsSection(w int) (string, int) {
 		settingLanguage:          "‹ " + activeLang.displayName() + " ›",
 		settingDetailPos:         "‹ " + trDetailPos(m.detailPos) + " ›",
 		settingStages:            m.boardCfg.stagesDisplay(),
-		settingSyncAuto:          syncAutoVal,
+		settingSyncAuto:          "‹ " + syncAutoVal + " ›",
 		settingSyncBoard:         "‹ " + syncBoardVal + " ›",
 		settingSyncServer:        syncServerVal,
 		settingSyncToken:         syncTokenVal,
@@ -1784,6 +1803,14 @@ func (m model) renderSettingsSection(w int) (string, int) {
 	// carries no heading of its own.
 	g := settingsGroups[settingsGroupOf(m.settingsCursor)]
 	var lines []string
+	if intro := m.settingsIntro(g); len(intro) > 0 {
+		for _, para := range intro {
+			for _, line := range wrapText(para, w-4) {
+				lines = append(lines, "  "+dimStyle.Render(line))
+			}
+		}
+		lines = append(lines, "")
+	}
 	selected := -1
 	for _, id := range m.visibleGroupRows(g) {
 		if id == m.settingsCursor {

@@ -11,11 +11,24 @@ func TestSyncSettingsRenderUnconfigured(t *testing.T) {
 	m.autoSync = autoSyncEnabled(m.syncCfg)
 	m.settingsCursor = settingSyncServer
 
+	// Unconfigured, the page is the address and the token, and says that
+	// they are what is missing; the rows that act on a connection wait.
 	out := m.renderSettingsList()
-	for _, want := range []string{"Sync", "Sync server", "Sync token", "Sync now", "needs server", "not set"} {
+	for _, want := range []string{"Server address", "Token", "not set", "Set the server's address and token"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("unconfigured settings should show %q; got:\n%s", want, out)
 		}
+	}
+	for _, gone := range []string{"Sync automatically", "Sync board columns", "Sync now"} {
+		if strings.Contains(out, gone) {
+			t.Errorf("%q should wait for a server; got:\n%s", gone, out)
+		}
+	}
+
+	// The address alone is not enough to sync, so the rows still wait.
+	m.syncCfg.URL = "http://100.122.178.43:8765"
+	if out := m.renderSettingsList(); strings.Contains(out, "Sync now") {
+		t.Errorf("Sync now should wait for the token too; got:\n%s", out)
 	}
 }
 
@@ -34,6 +47,14 @@ func TestSyncSettingsRenderConfiguredMasksToken(t *testing.T) {
 	}
 	if !strings.Contains(out, "‹ On ›") {
 		t.Errorf("auto-sync should read On when configured; got:\n%s", out)
+	}
+	for _, want := range []string{"Sync automatically", "Sync board columns", "Sync now"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("configured settings should show %q; got:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "Set the server's address and token") {
+		t.Errorf("the setup line should go once sync is configured; got:\n%s", out)
 	}
 }
 

@@ -19,7 +19,10 @@ func TestServerSettingsRender(t *testing.T) {
 	if !strings.Contains(out, "‹ Off ›") {
 		t.Errorf("an idle server row should read Off; got:\n%s", out)
 	}
-	for _, gone := range []string{"Listen", "Server token", "needs token"} {
+	if !strings.Contains(out, "Make this machine the server") {
+		t.Errorf("the Server page should say what it is for; got:\n%s", out)
+	}
+	for _, gone := range []string{"Listen address", "Token", "needs token"} {
 		if strings.Contains(out, gone) {
 			t.Errorf("%q should be hidden while the server is off; got:\n%s", gone, out)
 		}
@@ -33,7 +36,7 @@ func TestServerSettingsRender(t *testing.T) {
 	if strings.Contains(out, "hunter2-secret") {
 		t.Errorf("server token must be masked; got:\n%s", out)
 	}
-	for _, want := range []string{"Listen", "Server token", "100.122.178.43:8765", "external"} {
+	for _, want := range []string{"Listen address", "Token", "100.122.178.43:8765", "external"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("a running server should show %q; got:\n%s", want, out)
 		}
