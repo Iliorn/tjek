@@ -195,13 +195,19 @@ func completedFieldVisible(t *todo.Todo) bool {
 }
 
 // detailSectionJump moves the detail cursor to the next/previous section
-// head.
+// head, round from the last section to the first and back, so any section
+// is a few presses away in either direction.
 func (m *model) detailSectionJump(dir int) {
-	next := detailSectionOf(m.detail.field) + dir
-	for next >= 0 && next < len(detailSections) && !m.detailSectionShown(next) {
-		next += dir
+	n := len(detailSections)
+	cur := detailSectionOf(m.detail.field)
+	next := cur
+	for range n {
+		next = (next + dir + n) % n
+		if m.detailSectionShown(next) {
+			break
+		}
 	}
-	if next < 0 || next >= len(detailSections) {
+	if next == cur {
 		return
 	}
 	m.detail.field = detailSections[next].first

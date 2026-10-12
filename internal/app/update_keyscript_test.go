@@ -1524,7 +1524,8 @@ func TestScriptBoardColumnIconsFromSettings(t *testing.T) {
 }
 
 // → walks every section of the detail pane in document order, one press each,
-// and the bar at the top of the pane lights the one the cursor is in.
+// and the bar at the top of the pane lights the one the cursor is in. Past
+// either end it goes round to the other.
 func TestScriptDetailSectionsInOrder(t *testing.T) {
 	m := modelWithTasks(t, todo.New("Sectioned task"))
 	m.termWidth, m.termHeight = 160, 40
@@ -1542,8 +1543,12 @@ func TestScriptDetailSectionsInOrder(t *testing.T) {
 		}
 	}
 	m = script(t, m, "right")
+	if got := detailSectionOf(m.detail.field); got != 0 {
+		t.Errorf("→ past the last section should go round to the first, got section %d", got)
+	}
+	m = script(t, m, "left")
 	if got := detailSectionOf(m.detail.field); got != len(detailSections)-1 {
-		t.Errorf("→ past the last section should stay on it, got section %d", got)
+		t.Errorf("← from the first section should go round to the last, got section %d", got)
 	}
 	for i := len(detailSections) - 2; i >= 0; i-- {
 		m = script(t, m, "left")

@@ -1541,11 +1541,15 @@ func settingsGroupOf(id int) int {
 	return 0
 }
 
-// settingsGroupJump moves the cursor to the first row of the group dir away
-// from the cursor's, skipping a group with no row it can land on, and stays
-// put past either end: ←/→, as in the detail pane.
+// settingsGroupJump moves the cursor to the first row of the next or previous
+// group from the cursor's, skipping a group with no row it can land on, and
+// goes round from the last group to the first and back: ←/→, as in the
+// detail pane.
 func (m *model) settingsGroupJump(dir int) {
-	for g := settingsGroupOf(m.settingsCursor) + dir; g >= 0 && g < len(settingsGroups); g += dir {
+	n := len(settingsGroups)
+	cur := settingsGroupOf(m.settingsCursor)
+	for step := 1; step < n; step++ {
+		g := ((cur+dir*step)%n + n) % n
 		for _, id := range settingsGroups[g].rows {
 			if settingsSelectable(id) && m.settingsRowVisible(id) {
 				m.settingsCursor = id

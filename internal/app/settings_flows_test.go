@@ -650,7 +650,7 @@ func TestScriptEditName(t *testing.T) {
 }
 
 // ←/→ (and pgup/pgdn) step the cursor to the first row of the previous
-// or next group, skipping rows it cannot land on, and stop at the ends.
+// or next group, skipping rows it cannot land on, and go round past the ends.
 func TestSettingsArrowsJumpBetweenGroups(t *testing.T) {
 	m := settingsModel(t)
 	m.settingsCursor = settingsGroups[0].rows[0]
@@ -663,18 +663,15 @@ func TestSettingsArrowsJumpBetweenGroups(t *testing.T) {
 			t.Fatalf("→ landed on a row the cursor cannot stop on (%d)", m.settingsCursor)
 		}
 	}
-	last := m.settingsCursor
-	if m = sendKey(t, m, "right"); m.settingsCursor != last {
-		t.Error("→ past the last group moved the cursor")
-	}
 	m = sendKey(t, m, "pgup")
 	if got := settingsGroupOf(m.settingsCursor); got != len(settingsGroups)-2 {
 		t.Errorf("pgup: in group %d, want %d", got, len(settingsGroups)-2)
 	}
-	for i := 0; i < len(settingsGroups); i++ {
-		m = sendKey(t, m, "left")
+	m = sendKey(t, m, "pgdown")
+	if m = sendKey(t, m, "right"); m.settingsCursor != settingsGroups[0].rows[0] {
+		t.Errorf("→ past the last group: cursor %d, want round to the first row", m.settingsCursor)
 	}
-	if m.settingsCursor != settingsGroups[0].rows[0] {
-		t.Errorf("← to the start: cursor %d, want the first row", m.settingsCursor)
+	if m = sendKey(t, m, "left"); settingsGroupOf(m.settingsCursor) != len(settingsGroups)-1 {
+		t.Errorf("← from the first group: in group %d, want round to the last", settingsGroupOf(m.settingsCursor))
 	}
 }
