@@ -340,31 +340,39 @@ func TestCycleLangVisitsEveryLanguageAndWraps(t *testing.T) {
 
 // ── Grouped Preferences pane ────────────────────────────────────────────────
 
-// The cursor walks the whole list without stopping on Version. Enter on that
-// row did nothing, so a stop there was a keypress that looked broken; the skip
-// lives in settingsNavOrder so every caller inherits it.
+// The cursor never stops on Version. Enter on that row did nothing, so a stop
+// there was a keypress that looked broken.
 func TestSettingsCursorSkipsTheVersionRow(t *testing.T) {
 	m := settingsModel(t)
-	m.settingsCursor = settingAutoCloseParent
-	seen := map[int]bool{m.settingsCursor: true}
-	for i := 0; i < numSettingsRows*2; i++ {
-		m = sendKey(t, m, "down")
-		if m.settingsCursor == settingVersion {
-			t.Fatalf("the cursor stopped on the Version row after %d presses", i+1)
+	m.settingsCursor = settingCheckUpdate
+	for _, key := range []string{"down", "down", "up", "up"} {
+		if m = sendKey(t, m, key); m.settingsCursor != settingCheckUpdate {
+			t.Fatalf("%s on About moved to row %d; Check for updates is its only stop", key, m.settingsCursor)
 		}
+	}
+}
+
+// ↑/↓ go round within the page, as the other lists do, rather than running
+// on into the next group: ←/→ turn the pages.
+func TestSettingsCursorWrapsWithinItsPage(t *testing.T) {
+	m := settingsModel(t)
+	rows := settingsGroups[0].rows
+	m.settingsCursor = rows[0]
+	seen := map[int]bool{}
+	for i := range rows {
 		seen[m.settingsCursor] = true
-	}
-	for _, row := range []int{settingCheckUpdate, settingAging, settingServerOn} {
-		if !seen[row] {
-			t.Errorf("row %d is unreachable going down", row)
+		if m = sendKey(t, m, "down"); settingsGroupOf(m.settingsCursor) != 0 {
+			t.Fatalf("down %d left General for group %q", i+1, settingsGroups[settingsGroupOf(m.settingsCursor)].title)
 		}
 	}
-	// And the same on the way back up.
-	for i := 0; i < numSettingsRows*2; i++ {
-		m = sendKey(t, m, "up")
-		if m.settingsCursor == settingVersion {
-			t.Fatalf("the cursor stopped on the Version row going up, after %d presses", i+1)
-		}
+	if m.settingsCursor != rows[0] {
+		t.Errorf("down past the last row landed on %d, want the first (%d)", m.settingsCursor, rows[0])
+	}
+	if len(seen) != len(rows) {
+		t.Errorf("down visited %d of General's %d rows", len(seen), len(rows))
+	}
+	if m = sendKey(t, m, "up"); m.settingsCursor != rows[len(rows)-1] {
+		t.Errorf("up from the first row landed on %d, want the last (%d)", m.settingsCursor, rows[len(rows)-1])
 	}
 }
 

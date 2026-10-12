@@ -1592,25 +1592,23 @@ func (m model) settingsSectionBar(width int) string {
 	return sectionBar(labels, settingsGroupOf(m.settingsCursor), true, width)
 }
 
-// settingsCursorStep advances the settings cursor by delta along the visual
-// traversal order, clamping at the ends so up at the top / down at the bottom
-// are no-ops.
+// settingsCursorStep moves the settings cursor by delta within its page,
+// going round from the last row to the first and back, as the other lists
+// do. ↓ on a page's last row used to carry on into the next group, so
+// looping through one page's few rows meant turning pages instead; ←/→
+// already turn them.
 func (m model) settingsCursorStep(cur, delta int) int {
-	order := m.settingsNavOrder()
-	idx := 0
-	for i, id := range order {
-		if id == cur {
-			idx = i
-			break
+	var order []int
+	for _, id := range settingsGroups[settingsGroupOf(cur)].rows {
+		if settingsSelectable(id) && m.settingsRowVisible(id) {
+			order = append(order, id)
 		}
 	}
-	idx += delta
-	if idx < 0 {
-		idx = 0
-	} else if idx >= len(order) {
-		idx = len(order) - 1
+	if len(order) == 0 {
+		return cur
 	}
-	return order[idx]
+	idx := max(slices.Index(order, cur), 0)
+	return order[((idx+delta)%len(order)+len(order))%len(order)]
 }
 
 // renderSettingsSection builds the unboxed Settings content and, with it, the
