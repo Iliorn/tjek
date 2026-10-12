@@ -13,6 +13,12 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+## [1.57.3] - 2026-10-12
+
+### Fixed
+
+- Windows: the icon no longer sits on a black square on the taskbar and in Explorer.
+
 ## [1.57.2] - 2026-10-12
 
 ### Fixed
