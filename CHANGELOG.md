@@ -13,6 +13,8 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+## [1.56.0] - 2026-10-12
+
 ### Added
 
 - `tjek serve --web` adds a page to see, add and close tasks from a phone's browser.
