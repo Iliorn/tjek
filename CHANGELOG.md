@@ -18,6 +18,7 @@ belongs in the commit message, where it is kept next to the code it explains.
 - `p` on the Tags or Projects tab ranks its tasks higher or lower, in place of `b`.
 - The Settings tab opens on General rather than Appearance.
 - Settings: Sync and Server say what each is for, and Sync waits for an address and token.
+- Windows: the icon's [✓] is set tighter and fills its slot, as large as the icons beside it.
 
 ## [1.57.3] - 2026-10-12
 

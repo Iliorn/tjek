@@ -6,8 +6,9 @@
 // dark outline and no background: the mark as a terminal would print it,
 // standing on whatever the taskbar or desktop is. The outline is what keeps
 // the white legible on a light one. Each size is drawn from the font itself,
-// not scaled from another, and the text fills more of the square the smaller
-// it gets, so it still reads on a taskbar.
+// not scaled from another, set tighter than the font's advances so it is
+// nearly as tall as it is wide, and fills more of the square the smaller it
+// gets, so it stands as large as the square logos beside it on a taskbar.
 //
 // It writes packaging/icon/tjek.ico and tjek.png, then rsrc_windows_amd64.syso
 // in the module root, which `go build` links into a Windows amd64 binary on
@@ -174,9 +175,13 @@ func render(f *opentype.Font, size int) (*image.NRGBA, error) {
 	// so text and outline together fill inkFraction of the square.
 	r := math.Max(1, math.Round(s/24))
 
-	// Size the face so the ink is that wide, then centre the ink box, not
-	// the advance box: the brackets' side bearings would otherwise push it
-	// off centre.
+	// The glyphs are set one by one, ink box to ink box, glyphGap apart,
+	// rather than at the font's advances: a monospace bracket sits in a cell
+	// as wide as an M, and that air made the mark so much wider than tall
+	// that, fitted to the width, it stood at half the height of the square
+	// logos beside it on a taskbar. The face is sized so the set ink fills
+	// the width or the height, whichever it reaches first, and the ink box,
+	// not the advance box, is centred.
 	face := func(pt float64) (font.Face, error) {
 		return opentype.NewFace(f, &opentype.FaceOptions{Size: pt, DPI: 72, Hinting: font.HintingNone})
 	}
@@ -184,23 +189,48 @@ func render(f *opentype.Font, size int) (*image.NRGBA, error) {
 	if err != nil {
 		return nil, err
 	}
-	b, _ := font.BoundString(probe, text)
-	fc, err := face(s * (s*inkFraction(size) - 2*r) / (float64(b.Max.X-b.Min.X) / 64))
+	w, h, _ := setInk(probe)
+	fc, err := face(s * math.Min((s*inkFraction(size)-2*r)/w, (s*inkHeight-2*r)/h))
 	if err != nil {
 		return nil, err
 	}
-	b, _ = font.BoundString(fc, text)
-	inkW, inkH := float64(b.Max.X-b.Min.X)/64, float64(b.Max.Y-b.Min.Y)/64
-	x := (s-inkW)/2 - float64(b.Min.X)/64
-	y := (s-inkH)/2 - float64(b.Min.Y)/64
+	inkW, inkH, top := setInk(fc)
+	x := (s - inkW) / 2
+	y := (s-inkH)/2 - top
 	mask := image.NewAlpha(img.Bounds())
-	d := &font.Drawer{Dst: mask, Src: image.Opaque, Face: fc,
-		Dot: fixed.Point26_6{X: fixed.Int26_6(x * 64), Y: fixed.Int26_6(y * 64)}}
-	d.DrawString(text)
+	for _, ch := range text {
+		gb, _ := font.BoundString(fc, string(ch))
+		d := &font.Drawer{Dst: mask, Src: image.Opaque, Face: fc,
+			Dot: fixed.Point26_6{X: fixed.Int26_6((x - float64(gb.Min.X)/64) * 64), Y: fixed.Int26_6(y * 64)}}
+		d.DrawString(string(ch))
+		x += float64(gb.Max.X-gb.Min.X)/64 + glyphGap*inkH
+	}
 
 	draw.DrawMask(img, img.Bounds(), &image.Uniform{outline}, image.Point{}, dilate(mask, r), image.Point{}, draw.Over)
 	draw.DrawMask(img, img.Bounds(), &image.Uniform{ink}, image.Point{}, mask, image.Point{}, draw.Over)
 	return img, nil
+}
+
+// glyphGap is the space between one glyph's ink and the next, as a share of
+// the mark's height; inkHeight is the most of the square's height the mark
+// and its outline may take.
+const (
+	glyphGap  = 0.10
+	inkHeight = 0.90
+)
+
+// setInk is the width and height of text's ink set glyph by glyph, glyphGap
+// apart, and its top as an offset from the baseline (negative: above it).
+func setInk(fc font.Face) (w, h, top float64) {
+	b, _ := font.BoundString(fc, text)
+	h, top = float64(b.Max.Y-b.Min.Y)/64, float64(b.Min.Y)/64
+	n := 0
+	for _, ch := range text {
+		gb, _ := font.BoundString(fc, string(ch))
+		w += float64(gb.Max.X-gb.Min.X) / 64
+		n++
+	}
+	return w + float64(n-1)*glyphGap*h, h, top
 }
 
 // dilate grows mask by r pixels in every direction: each pixel takes the
@@ -233,16 +263,12 @@ func dilate(mask *image.Alpha, r float64) *image.Alpha {
 // fill: more at the small sizes, where every pixel of the glyphs counts.
 func inkFraction(size int) float64 {
 	switch {
-	case size <= 16:
-		return 0.92
 	case size <= 24:
-		return 0.86
-	case size <= 32:
-		return 0.80
+		return 0.98
 	case size <= 48:
-		return 0.74
+		return 0.96
 	}
-	return 0.70
+	return 0.94
 }
 
 // encodeDIB is img as an icon bitmap: a BITMAPINFOHEADER of twice the
