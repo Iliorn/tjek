@@ -217,27 +217,7 @@ func cliAdd(args []string) int {
 			}
 		}
 		// Quick-add tokens override the --like clone.
-		if parsed.hasPriority {
-			t.Priority = parsed.priority
-		}
-		if parsed.hasSize {
-			t.Size = parsed.size
-		}
-		if !parsed.dueDate.IsZero() {
-			t.DueDate = parsed.dueDate
-		}
-		if !parsed.startDate.IsZero() {
-			t.SetStartDate(parsed.startDate)
-		}
-		if parsed.project != "" {
-			t.Project = parsed.project
-		}
-		for _, tag := range parsed.tags {
-			t.AddTag(tag)
-		}
-		if parsed.recurrence != "" {
-			t.Recurrence = parsed.recurrence
-		}
+		parsed.applyTo(&t)
 		for _, id := range tokenDepIDs[i] {
 			t.AddDependency(id)
 		}

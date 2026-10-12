@@ -71,47 +71,104 @@ func cliDone(args []string) int {
 	// the TUI toggle; --cascade forces it regardless.
 	settings, _ := loadSettings()
 	autoCascade := *cascade || settings.AutoCloseSubtasks
-	timers := cliTimerScope()
-	children, get := sliceTaskLookups(todos)
-	var dirty, cascaded, skipped, stopped []*todo.Todo
-	var spawned []todo.Todo
-	closed := make(map[string]bool)
 	var stdinScan *bufio.Scanner
+	// Guard (e71788f0): closing a parent with open subtasks hides them
+	// everywhere but `export`. Decide whether to cascade, close the parent
+	// only, or abort — mirroring the TUI's confirm-close-parent prompt.
+	ask := func(t *todo.Todo, pending int) (cascade, proceed bool) {
+		if !stdinIsTTY() {
+			// Non-interactive: don't break scripts, but surface it loudly
+			// so the subtasks aren't silently orphaned.
+			fmt.Fprintf(os.Stderr, "warning: closing %s %q leaves %d pending subtask(s) hidden under it; rerun with --cascade to close them, or 'tjek done <subtask>'\n",
+				t.ID[:8], t.Title, pending)
+			return false, true
+		}
+		if stdinScan == nil {
+			stdinScan = bufio.NewScanner(os.Stdin)
+		}
+		fmt.Fprintf(os.Stderr, "%s %q has %d pending subtask(s). Close them too? [y]es / [n]o parent only / [a]bort: ",
+			t.ID[:8], t.Title, pending)
+		ans := ""
+		if stdinScan.Scan() {
+			ans = strings.ToLower(strings.TrimSpace(stdinScan.Text()))
+		}
+		switch ans {
+		case "y", "yes":
+			return true, true
+		case "n", "no":
+			return false, true
+		}
+		fmt.Fprintf(os.Stderr, "aborted: %s left open\n", t.ID[:8])
+		return false, false
+	}
+	out := closeTasks(repo.ranker(), todos, targets, comment, cliTimerScope(), autoCascade, ask)
+	if saveSet := out.saveSet(); len(saveSet) > 0 {
+		if err := repo.Save(saveSet, nil); err != nil {
+			fmt.Fprintf(os.Stderr, "save: %v\n", err)
+			return 1
+		}
+	}
+	for _, t := range out.stopped {
+		fmt.Fprintf(os.Stderr, "stopped: %s  %s\n", t.ID[:8], t.Title)
+	}
+	for _, t := range out.closed {
+		fmt.Printf("done  %s  %s\n", t.ID[:8], t.Title)
+	}
+	for _, t := range out.cascaded {
+		fmt.Printf("done  %s  %s  (subtask)\n", t.ID[:8], t.Title)
+	}
+	for _, t := range out.spawned {
+		due := ""
+		if !t.DueDate.IsZero() {
+			due = "  due " + t.DueDate.Format("02-01-06")
+		}
+		fmt.Printf("recur %s  %s%s\n", t.ID[:8], t.Title, due)
+	}
+	for _, t := range out.skipped {
+		fmt.Fprintf(os.Stderr, "already done: %s\n", t.Title)
+	}
+	return 0
+}
+
+// closeOutcome is what closeTasks did: the targets it closed, the pending
+// subtasks it closed with them, the next instances of repeating tasks, the
+// tasks whose timer it stopped, and the targets that were already done.
+type closeOutcome struct {
+	closed, cascaded, stopped, skipped []*todo.Todo
+	spawned                            []todo.Todo
+}
+
+// saveSet is everything closeTasks changed or created, ready for a Save.
+func (o closeOutcome) saveSet() []*todo.Todo {
+	set := make([]*todo.Todo, 0, len(o.closed)+len(o.cascaded)+len(o.spawned))
+	set = append(set, o.closed...)
+	set = append(set, o.cascaded...)
+	for i := range o.spawned {
+		set = append(set, &o.spawned[i])
+	}
+	return set
+}
+
+// closeTasks closes targets, which point into todos, the way `done` and the
+// web page do: a running timer stops, a repeating task spawns its next
+// instance with its subtasks, and the rank at close is kept. A target with
+// pending subtasks closes them too when autoCascade is set; otherwise ask
+// decides, and proceed=false leaves that target open. Nothing is saved.
+func closeTasks(rk rank.Ranker, todos []todo.Todo, targets []*todo.Todo, comment string, timers timerScope, autoCascade bool, ask func(t *todo.Todo, pending int) (cascade, proceed bool)) closeOutcome {
+	children, get := sliceTaskLookups(todos)
+	var out closeOutcome
+	closed := make(map[string]bool)
 	for _, t := range targets {
 		if t.Status == todo.Done || closed[t.ID] {
-			skipped = append(skipped, t)
+			out.skipped = append(out.skipped, t)
 			continue
 		}
-		// Guard (e71788f0): closing a parent with open subtasks hides them
-		// everywhere but `export`. Decide whether to cascade, close the parent
-		// only, or abort — mirroring the TUI's confirm-close-parent prompt.
 		pending := pendingDescendants(children, get, t.ID)
 		doCascade := autoCascade
 		if len(pending) > 0 && !autoCascade {
-			if stdinIsTTY() {
-				if stdinScan == nil {
-					stdinScan = bufio.NewScanner(os.Stdin)
-				}
-				fmt.Fprintf(os.Stderr, "%s %q has %d pending subtask(s). Close them too? [y]es / [n]o parent only / [a]bort: ",
-					t.ID[:8], t.Title, len(pending))
-				ans := ""
-				if stdinScan.Scan() {
-					ans = strings.ToLower(strings.TrimSpace(stdinScan.Text()))
-				}
-				switch ans {
-				case "y", "yes":
-					doCascade = true
-				case "n", "no":
-					// close the parent only
-				default:
-					fmt.Fprintf(os.Stderr, "aborted: %s left open\n", t.ID[:8])
-					continue
-				}
-			} else {
-				// Non-interactive: don't break scripts, but surface it loudly
-				// so the subtasks aren't silently orphaned.
-				fmt.Fprintf(os.Stderr, "warning: closing %s %q leaves %d pending subtask(s) hidden under it; rerun with --cascade to close them, or 'tjek done <subtask>'\n",
-					t.ID[:8], t.Title, len(pending))
+			var proceed bool
+			if doCascade, proceed = ask(t, len(pending)); !proceed {
+				continue
 			}
 		}
 		// Comment lands BEFORE Toggle so the timeline reads "added the why,
@@ -123,21 +180,21 @@ func cliDone(args []string) int {
 		// open entry; the TUI auto-stops, so the CLI matches.
 		if who := timers.owner(t); t.TimerRunningBy(who) {
 			t.StopTimerBy(who)
-			stopped = append(stopped, t)
+			out.stopped = append(out.stopped, t)
 		}
-		rank.CaptureRankAtDone(repo.ranker(), todoPtrs(todos), t)
+		rank.CaptureRankAtDone(rk, todoPtrs(todos), t)
 		t.Toggle()
 		closed[t.ID] = true
-		dirty = append(dirty, t)
+		out.closed = append(out.closed, t)
 		if t.IsRecurring() {
 			// A next instance already in the store was spawned by an earlier
 			// close, here or on another device; it keeps whatever it has.
 			if next, ok := buildNextRecurrence(*t); ok && get(next.ID) == nil {
-				spawned = append(spawned, next)
+				out.spawned = append(out.spawned, next)
 				// Clone the subtree onto the new parent so a recurring
 				// "weekly review" keeps its checklist on each spawn. Same
 				// date-shifted semantics as the TUI path.
-				spawned = append(spawned, cloneSubtreeResetFrom(children, get, t.ID, next.ID, dueShiftDays(*t, next))...)
+				out.spawned = append(out.spawned, cloneSubtreeResetFrom(children, get, t.ID, next.ID, dueShiftDays(*t, next))...)
 			}
 		}
 		if doCascade {
@@ -147,53 +204,24 @@ func cliDone(args []string) int {
 				}
 				if who := timers.owner(s); s.TimerRunningBy(who) {
 					s.StopTimerBy(who)
-					stopped = append(stopped, s)
+					out.stopped = append(out.stopped, s)
 				}
-				rank.CaptureRankAtDone(repo.ranker(), todoPtrs(todos), s)
+				rank.CaptureRankAtDone(rk, todoPtrs(todos), s)
 				s.Toggle()
 				s.Auto = true
 				closed[s.ID] = true
-				cascaded = append(cascaded, s)
+				out.cascaded = append(out.cascaded, s)
 			}
 		}
 	}
-	saveSet := make([]*todo.Todo, 0, len(dirty)+len(cascaded)+len(spawned))
-	saveSet = append(saveSet, dirty...)
-	saveSet = append(saveSet, cascaded...)
-	for i := range spawned {
+	for i := range out.spawned {
 		// One removed before (a deleted instance) comes back under the same
 		// ID and must outrank its tombstone, as the TUI's touchRestored does.
-		if d := tombstoneDeletedAt(db, spawned[i].ID); !d.Before(spawned[i].ModifiedAt) {
-			spawned[i].ModifiedAt = todo.StampModified(d)
-		}
-		saveSet = append(saveSet, &spawned[i])
-	}
-	if len(saveSet) > 0 {
-		if err := repo.Save(saveSet, nil); err != nil {
-			fmt.Fprintf(os.Stderr, "save: %v\n", err)
-			return 1
+		if d := tombstoneDeletedAt(db, out.spawned[i].ID); !d.Before(out.spawned[i].ModifiedAt) {
+			out.spawned[i].ModifiedAt = todo.StampModified(d)
 		}
 	}
-	for _, t := range stopped {
-		fmt.Fprintf(os.Stderr, "stopped: %s  %s\n", t.ID[:8], t.Title)
-	}
-	for _, t := range dirty {
-		fmt.Printf("done  %s  %s\n", t.ID[:8], t.Title)
-	}
-	for _, t := range cascaded {
-		fmt.Printf("done  %s  %s  (subtask)\n", t.ID[:8], t.Title)
-	}
-	for _, t := range spawned {
-		due := ""
-		if !t.DueDate.IsZero() {
-			due = "  due " + t.DueDate.Format("02-01-06")
-		}
-		fmt.Printf("recur %s  %s%s\n", t.ID[:8], t.Title, due)
-	}
-	for _, t := range skipped {
-		fmt.Fprintf(os.Stderr, "already done: %s\n", t.Title)
-	}
-	return 0
+	return out
 }
 
 // ── reopen ───────────────────────────────────────────────────────────────────

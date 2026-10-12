@@ -1016,6 +1016,34 @@ func parseQuickAdd(input string) parsedTask {
 	return result
 }
 
+// applyTo sets the fields the line's tokens named on t, leaving the rest as
+// they are, so a caller can layer tokens over a clone (`add --like`) and
+// flags over the tokens. The dep: refs need the task set and are the
+// caller's to resolve.
+func (p parsedTask) applyTo(t *todo.Todo) {
+	if p.hasPriority {
+		t.Priority = p.priority
+	}
+	if p.hasSize {
+		t.Size = p.size
+	}
+	if !p.dueDate.IsZero() {
+		t.DueDate = p.dueDate
+	}
+	if !p.startDate.IsZero() {
+		t.SetStartDate(p.startDate)
+	}
+	if p.project != "" {
+		t.Project = p.project
+	}
+	for _, tag := range p.tags {
+		t.AddTag(tag)
+	}
+	if p.recurrence != "" {
+		t.Recurrence = p.recurrence
+	}
+}
+
 // ── Time formatting ───────────────────────────────────────────────────────────
 
 func startOfDay(t time.Time) time.Time {
