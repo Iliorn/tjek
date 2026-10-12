@@ -1532,3 +1532,56 @@ func TestQuickAddCommaListsTags(t *testing.T) {
 		t.Errorf("title %q, tags %v", p.title, p.tags)
 	}
 }
+
+// An earlier update's binary still running from path.old cannot be removed
+// or replaced on Windows; the next update moves the binary to path.old-1
+// rather than failing. A non-empty directory at path.old stands in for the
+// locked file: neither Remove nor Rename can get it out of the way either.
+func TestMoveAsideStepsPastALockedOld(t *testing.T) {
+	dir := t.TempDir()
+	exe := filepath.Join(dir, "tjek.exe")
+	if err := os.WriteFile(exe, []byte("new"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(exe+".old", "held"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got, err := moveAside(exe)
+	if err != nil {
+		t.Fatalf("moveAside: %v", err)
+	}
+	if got != exe+".old-1" {
+		t.Errorf("moved to %q, want %q", got, exe+".old-1")
+	}
+	if _, err := os.Stat(exe); !os.IsNotExist(err) {
+		t.Errorf("the binary is still at its path (err %v)", err)
+	}
+
+	// With path.old free, it is the name used, as before.
+	exe2 := filepath.Join(dir, "other.exe")
+	if err := os.WriteFile(exe2, []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := moveAside(exe2); err != nil || got != exe2+".old" {
+		t.Errorf("moveAside = %q, %v; want %q", got, err, exe2+".old")
+	}
+}
+
+func TestRemoveLeftoverBinaries(t *testing.T) {
+	dir := t.TempDir()
+	exe := filepath.Join(dir, "tjek.exe")
+	for _, name := range []string{"tjek.exe", "tjek.exe.old", "tjek.exe.old-1", "tjek.exe.old-7", "tjek.exe.older", "notes.md"} {
+		if err := os.WriteFile(filepath.Join(dir, name), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	removeLeftoverBinaries(exe)
+	var left []string
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		left = append(left, e.Name())
+	}
+	if got := strings.Join(left, " "); got != "notes.md tjek.exe tjek.exe.older" {
+		t.Errorf("left %q, want the binary and the unrelated files only", got)
+	}
+}

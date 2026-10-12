@@ -1444,9 +1444,8 @@ func selfUpdate() error {
 	if runtime.GOOS == "windows" {
 		// Windows forbids overwriting a running executable, but allows
 		// renaming it. Move it aside, then copy the new binary into place.
-		oldPath := execPath + ".old"
-		_ = os.Remove(oldPath)
-		if err := os.Rename(execPath, oldPath); err != nil {
+		oldPath, err := moveAside(execPath)
+		if err != nil {
 			return fmt.Errorf("could not move old binary aside: %w", err)
 		}
 		if err := copyFile(tmpFile, execPath); err != nil {
@@ -1471,6 +1470,54 @@ func selfUpdate() error {
 		return fmt.Errorf("could not replace binary: %w", err)
 	}
 	return nil
+}
+
+// moveAside renames the binary at path out of the way, to path.old, or when
+// that name holds a file that cannot be removed, to the first free
+// path.old-N. The usual reason it cannot: an earlier update moved a binary
+// there that is still running, in another window or a `tjek serve`, and
+// Windows keeps a running executable from being deleted or replaced, so the
+// update failed with "Access is denied" until every old tjek was closed.
+// removeLeftoverBinaries deletes them all once they are no longer running.
+func moveAside(path string) (string, error) {
+	var firstErr error
+	for i := range moveAsideTries {
+		old := path + ".old"
+		if i > 0 {
+			old = fmt.Sprintf("%s.old-%d", path, i)
+		}
+		_ = os.Remove(old)
+		err := os.Rename(path, old)
+		if err == nil {
+			return old, nil
+		}
+		if firstErr == nil {
+			firstErr = err
+		}
+	}
+	return "", firstErr
+}
+
+// moveAsideTries bounds the names moveAside tries: a few old binaries can be
+// running at once, ten cannot reasonably be, and past that the rename fails
+// for a reason another name will not mend.
+const moveAsideTries = 10
+
+// removeLeftoverBinaries deletes what earlier self-updates moved aside from
+// the binary at execPath: path.old and every path.old-N. One still running
+// cannot be deleted yet, and is left for a later start.
+func removeLeftoverBinaries(execPath string) {
+	_ = os.Remove(execPath + ".old")
+	dir, base := filepath.Split(execPath)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), base+".old-") && !e.IsDir() {
+			_ = os.Remove(filepath.Join(dir, e.Name()))
+		}
+	}
 }
 
 func copyFile(srcPath, dstPath string) error {

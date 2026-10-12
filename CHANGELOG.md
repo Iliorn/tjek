@@ -15,6 +15,7 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ### Fixed
 
+- Windows: an update no longer fails with "Access is denied" while an older tjek still runs.
 - Windows: after an update, Explorer is told the file changed, so it shows the new icon.
 
 ## [1.57.1] - 2026-10-12

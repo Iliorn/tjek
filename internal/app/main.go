@@ -29,9 +29,9 @@ func Main(version string) {
 	restoreConsole := prepareConsole()
 	defer restoreConsole()
 
-	// Remove leftover binary from a previous Windows self-update, if any.
+	// Remove the binaries earlier Windows self-updates moved aside, if any.
 	if execPath, err := os.Executable(); err == nil {
-		_ = os.Remove(execPath + ".old")
+		removeLeftoverBinaries(execPath)
 	}
 
 	// An install from before the rename: move its files and its binary to
