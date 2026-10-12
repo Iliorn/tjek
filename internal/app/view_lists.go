@@ -330,6 +330,15 @@ func (m model) statsScopedTodos() []*todo.Todo {
 // statsLabelCell is a Stats label padded to the label column, clipped so at
 // least one space is left before the value: a translated label longer than
 // the column would otherwise run straight into its number.
+// daysBack is the start of the n days that end with today, today among them.
+// The Stats windows are the last n days rather than calendar weeks and
+// months, so a count does not drop to nothing on a Monday or the 1st.
+func daysBack(today time.Time, n int) time.Time { return today.AddDate(0, 0, 1-n) }
+
+// daysAhead is the end, exclusive, of the n days after today: the window of
+// the deadlines that follow the ones due today, which are counted on their own.
+func daysAhead(today time.Time, n int) time.Time { return today.AddDate(0, 0, n+1) }
+
 func statsLabelCell(label string) string {
 	return padRight(truncate(label, statsLabelWidth-1), statsLabelWidth)
 }
@@ -341,11 +350,11 @@ func (m model) renderStatsList() string {
 	now := m.frameTime
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	tomorrow := today.AddDate(0, 0, 1)
-	weekAhead := today.AddDate(0, 0, 7)
-	weekAgo := today.AddDate(0, 0, -7)
-	twoWeeksAgo := today.AddDate(0, 0, -14)
-	monthAgo := today.AddDate(0, -1, 0)
-	twoMonthsAgo := today.AddDate(0, -2, 0)
+	weekAhead := daysAhead(today, 7)
+	weekAgo := daysBack(today, 7)
+	twoWeeksAgo := daysBack(today, 14)
+	monthAgo := daysBack(today, 30)
+	twoMonthsAgo := daysBack(today, 60)
 
 	var activeTasks, overdueTasks, dueToday, dueThisWeek int
 	var doneToday, doneThisWeek, doneThisMonth, doneLastWeek, donePrevMonth int
@@ -525,7 +534,7 @@ func (m model) renderStatsList() string {
 			stat(sb, tr("Overdue"), 0, 0, false)
 		}
 		stat(sb, tr("Due today"), dueToday, 0, false)
-		stat(sb, tr("Due this week"), dueThisWeek, 0, false)
+		stat(sb, tr("Due next 7 days"), dueThisWeek, 0, false)
 		stat(sb, tr("Active total"), activeTasks, 0, false)
 		// How often a completed task sat in the engine's top-5 at close —
 		// the feedback loop for tuning the sequence biases. Hidden until
@@ -563,7 +572,7 @@ func (m model) renderStatsList() string {
 		})
 	}
 
-	flow := flowSection(tr("Flow (last 7 days)"), tr("vs last week"), createdThisWeek, doneThisWeek, doneLastWeek)
+	flow := flowSection(tr("Flow (last 7 days)"), tr("vs the 7 before"), createdThisWeek, doneThisWeek, doneLastWeek)
 	flow30 := flowSection(tr("Flow (last 30 days)"), tr("vs prior 30d"), createdThisMonth, doneThisMonth, donePrevMonth)
 
 	throughput := section(func(sb *strings.Builder) {
@@ -605,8 +614,8 @@ func (m model) renderStatsList() string {
 	velocity := section(func(sb *strings.Builder) {
 		sb.WriteString(statsHeaderStyle.Render(tr("  Completion velocity")) + "\n")
 		stat(sb, tr("Today"), doneToday, 0, false)
-		stat(sb, tr("This week"), doneThisWeek, 0, false)
-		stat(sb, tr("This month"), doneThisMonth, 0, false)
+		stat(sb, tr("Last 7 days"), doneThisWeek, 0, false)
+		stat(sb, tr("Last 30 days"), doneThisMonth, 0, false)
 		if doneThisWeek > 0 {
 			sb.WriteString(detailLabelStyle.Render(statsLabelCell(tr("  Avg (7d)"))) +
 				normalStyle.Render(fmt.Sprintf(tr("%.1f tasks/day"), float64(doneThisWeek)/7.0)) + "\n")

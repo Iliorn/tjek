@@ -278,8 +278,10 @@ type statsSummary struct {
 func computeStats(todos []todo.Todo, now time.Time) statsSummary {
 	today := startOfDay(now)
 	tomorrow := today.AddDate(0, 0, 1)
-	weekAhead := today.AddDate(0, 0, 7)
-	weekAgo := today.AddDate(0, 0, -7)
+	// The same windows as the Stats tab: the 7 days after today, and the 7
+	// that end with it.
+	weekAhead := daysAhead(today, 7)
+	weekAgo := daysBack(today, 7)
 	var s statsSummary
 	for _, t := range todos {
 		if t.ParentID != "" {
@@ -408,12 +410,12 @@ func cliStats(args []string) int {
 			text = fmt.Sprintf("%d due today · %d active", s.DueToday, s.Active)
 		}
 		tracked := formatDurationCompact(time.Duration(s.TrackedTodayMinutes) * time.Minute)
-		tooltip := fmt.Sprintf("active %d · overdue %d · due today %d · due this week %d · done today %d · tracked today %s",
+		tooltip := fmt.Sprintf("active %d · overdue %d · due today %d · due in 7 days %d · done today %d · tracked today %s",
 			s.Active, s.Overdue, s.DueToday, s.DueThisWeek, s.DoneToday, tracked)
 		return emitJSON(map[string]string{"text": text, "tooltip": tooltip, "class": class})
 	default:
 		tracked := formatDurationCompact(time.Duration(s.TrackedTodayMinutes) * time.Minute)
-		line := fmt.Sprintf("active %d · overdue %d · due today %d · due this week %d · done today %d · tracked today %s",
+		line := fmt.Sprintf("active %d · overdue %d · due today %d · due in 7 days %d · done today %d · tracked today %s",
 			s.Active, s.Overdue, s.DueToday, s.DueThisWeek, s.DoneToday, tracked)
 		// Hidden until rank-stamped completions exist, so a fresh install
 		// doesn't advertise a 0/0 metric.

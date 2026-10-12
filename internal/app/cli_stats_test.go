@@ -137,3 +137,29 @@ func TestRenderSeqAnalysisTextTable(t *testing.T) {
 		}
 	}
 }
+
+// TestStatsWeekIsTheLastSevenDays pins the window's edges: the 7 days that
+// end with today, today among them, and the 7 days after today. A window
+// from today-7 counted eight days and called them a week.
+func TestStatsWeekIsTheLastSevenDays(t *testing.T) {
+	now := time.Date(2026, 6, 18, 12, 0, 0, 0, time.UTC)
+	today := startOfDay(now)
+	done := func(daysAgo int) todo.Todo {
+		x := todo.New("done")
+		x.Status = todo.Done
+		x.CompletedAt = today.AddDate(0, 0, -daysAgo).Add(time.Hour)
+		return x
+	}
+	due := func(daysAhead int) todo.Todo {
+		x := todo.New("due")
+		x.DueDate = today.AddDate(0, 0, daysAhead)
+		return x
+	}
+	got := computeStats([]todo.Todo{done(6), done(7), due(7), due(8)}, now)
+	if got.DoneThisWeek != 1 {
+		t.Errorf("done in the last 7 days = %d, want 1 (six days ago counts, seven does not)", got.DoneThisWeek)
+	}
+	if got.DueThisWeek != 1 {
+		t.Errorf("due in the next 7 days = %d, want 1 (in seven days counts, eight does not)", got.DueThisWeek)
+	}
+}
