@@ -528,13 +528,6 @@ func (m model) renderStatusLine() string {
 	if m.tab == tabTags && m.tagTabSearchQuery != "" {
 		chips = append(chips, searchChipStyle.Render("/"+m.tagTabSearchQuery))
 	}
-	// Hidden tasks are listed under the Tasks list (renderWaitingBlock). Only
-	// when that list leaves no room for them are they counted here instead,
-	// so they are not forgotten; ? explains the count.
-	if n := m.cache.waitingTop; n > 0 && m.tab == tabTasks && !m.showHistory && !searchShowsWaiting(m.searchQuery) &&
-		!m.waitingBlockShown(m.listSpareRows()) {
-		chips = append(chips, helpStyle.Render(fmt.Sprintf(tr("%d waiting"), n)))
-	}
 	left := strings.Join(chips, " ")
 
 	var right []string
@@ -1515,7 +1508,6 @@ func (m model) helpBodyLines() []string {
 		{tr("! sync"), tr("server runs another version: update the older end")},
 		{tr("FOCUS"), tr("the focus filter is on: today + overdue only")},
 		{"/…", tr("a filter is narrowing the list")},
-		{fmt.Sprintf(tr("%d waiting"), 3), fmt.Sprintf(tr("tasks hidden until their start date: /%s shows them"), inputWord("waiting"))},
 	}})
 
 	// Reference section: date-input grammar. Not key bindings, so it lives

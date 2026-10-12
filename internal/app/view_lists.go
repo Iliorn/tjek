@@ -910,18 +910,6 @@ func (m model) renderTaskList() string {
 	return b.String()
 }
 
-// listSpareRows is how many rows the Tasks list leaves empty at the bottom of
-// its pane, as renderTaskList draws it: what the blocks under it may fill.
-func (m model) listSpareRows() int {
-	maxVisible := m.taskListRows()
-	total := m.visibleActiveLen()
-	start := m.listOffset
-	if start > total {
-		start = 0
-	}
-	return maxVisible - min(maxVisible, total-start)
-}
-
 // waitingBlockShown reports whether the Tasks list has the block of tasks
 // waiting for their start date under it, given free spare rows. It wants the
 // three rows the closed-today block does, and stands aside while a filter is
@@ -934,9 +922,10 @@ func (m model) waitingBlockShown(free int) bool {
 // their start date, soonest first, each with the day it starts; it returns
 // the rows it used. It is a read-out like the closed-today block below it:
 // the tasks are out of the list on purpose, so the rows carry no cursor; ?
-// names the filter that brings them into the list to be worked on. A count
-// of them on the status line, away from the list, read as something stuck
-// that could be neither seen nor cleared.
+// names the filter that brings them into the list to be worked on. Without
+// room for it (a long list, an open detail pane) nothing stands in for it: a
+// count of them on the status line, away from the list, read as something
+// stuck that could be neither seen nor cleared.
 func (m model) renderWaitingBlock(b *strings.Builder, free int) int {
 	if !m.waitingBlockShown(free) {
 		return 0

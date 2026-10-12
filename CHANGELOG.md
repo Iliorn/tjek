@@ -20,6 +20,7 @@ belongs in the commit message, where it is kept next to the code it explains.
 ### Changed
 
 - The "Waiting to start" heading leaves `/waiting` to the `?` help, beside the ◷ rows.
+- The status line no longer counts waiting tasks; they show only under the Tasks list.
 
 ## [1.59.0] - 2026-10-12
 
