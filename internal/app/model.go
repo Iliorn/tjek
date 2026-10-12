@@ -648,10 +648,11 @@ func initialModel(repo Repository) model {
 		themeName:         th.name,
 		detailPos:         detailPosFromSettings(settings.DetailPosition),
 		columns:           listColumnsFromSettings(settings.Columns),
-		// The top of the one settings pane. The zero value is a row ID, not a
-		// position, and it happens to be the first bias knob — which opened
-		// the tab with the cursor parked in the middle of the list.
-		settingsCursor: settingTheme,
+		// The top of the one settings pane, General's first row. The zero
+		// value is a row ID, not a position, and it happens to be the first
+		// bias knob — which opened the tab with the cursor parked in the
+		// middle of the list.
+		settingsCursor: settingName,
 		expandedTasks:  make(map[string]bool),
 		editorCmd:      resolveEditorCmd(),
 		frameTime:      time.Now(),

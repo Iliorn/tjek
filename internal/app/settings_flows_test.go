@@ -474,8 +474,9 @@ func TestSettingsBackspaceUndoesEnterOnEveryToggleRow(t *testing.T) {
 	}
 }
 
-// General leads the pane, with Appearance (Theme, Language) right after it.
-func TestSettingsOpensWithAppearance(t *testing.T) {
+// General leads the pane and the tab opens on it, with Appearance (Theme,
+// Language) right after it.
+func TestSettingsOpensWithGeneral(t *testing.T) {
 	if settingsGroups[0].title != "General" {
 		t.Fatalf("the first settings group is %q, want General", settingsGroups[0].title)
 	}
@@ -484,18 +485,20 @@ func TestSettingsOpensWithAppearance(t *testing.T) {
 		t.Fatalf("the second settings group is %q %v, want Theme then Language", first.title, first.rows)
 	}
 	m := settingsModel(t)
-	m.settingsCursor = settingTheme
+	if m.settingsCursor != settingsGroups[0].rows[0] {
+		t.Fatalf("Settings opens on row %d, want General's first (%d)", m.settingsCursor, settingsGroups[0].rows[0])
+	}
 	content, selected := m.renderSettingsSection(60)
 	if selected != 0 {
-		t.Errorf("Theme renders on pane line %d, want 0 (the page's first row)", selected)
+		t.Errorf("the opening row renders on pane line %d, want 0 (the page's first row)", selected)
 	}
 	lines := strings.Split(ansi.Strip(content), "\n")
-	if !strings.Contains(lines[0], tr("Theme")) {
-		t.Errorf("first pane line is %q, want Theme", lines[0])
+	if !strings.Contains(lines[0], tr("Your name")) {
+		t.Errorf("first pane line is %q, want Your name", lines[0])
 	}
 	// And the bar lights the page it opens on.
-	if bar := m.settingsSectionBar(200); !strings.Contains(bar, sectionCurrentStyle.Render(tr("Appearance"))) {
-		t.Errorf("the section bar does not light Appearance: %q", bar)
+	if bar := m.settingsSectionBar(200); !strings.Contains(bar, sectionCurrentStyle.Render(tr("General"))) {
+		t.Errorf("the section bar does not light General: %q", bar)
 	}
 }
 
