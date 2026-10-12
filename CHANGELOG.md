@@ -13,6 +13,8 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+## [1.59.0] - 2026-10-12
+
 ### Changed
 
 - In Settings, ↑/↓ go round within the page instead of running on into the next one.
