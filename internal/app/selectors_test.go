@@ -742,10 +742,29 @@ func TestWaitingTaskIsHiddenUntilItsStartDate(t *testing.T) {
 	if m.cache.waitingTop != 2 {
 		t.Errorf("waitingTop = %d, want 2", m.cache.waitingTop)
 	}
-	// The status line says how to see them, not just how many there are.
-	if line := ansi.Strip(m.renderStatusLine()); !strings.Contains(line, "2 waiting · /waiting shows them") {
-		t.Errorf("status line = %q, want the count and the filter that shows them", line)
+	// They are listed under the list, soonest first with the day each
+	// starts, under a heading that names the filter showing them; the status
+	// line, away from the list, keeps quiet while they fit there.
+	w, h := m.termWidth, m.termHeight
+	m.termWidth, m.termHeight = 110, 30
+	list := ansi.Strip(m.renderTaskList())
+	head := strings.Index(list, "Waiting to start (2) · /waiting shows them")
+	dated, putOff := strings.Index(list, later.Title+" · starts "), strings.Index(list, someday.Title+" · starts someday")
+	if head < 0 || dated < head || putOff < dated {
+		t.Errorf("want the waiting block, dated task before the someday one:\n%s", list)
 	}
+	if line := ansi.Strip(m.renderStatusLine()); strings.Contains(line, "waiting") {
+		t.Errorf("status line = %q; the block under the list already shows them", line)
+	}
+	// With no room under the list, the status line counts them instead.
+	m.termHeight = 8
+	if line := ansi.Strip(m.renderStatusLine()); !strings.Contains(line, "2 waiting") {
+		t.Errorf("status line = %q; with no room for the block it should count them", line)
+	}
+	if strings.Contains(ansi.Strip(m.renderTaskList()), "Waiting to start") {
+		t.Error("the block drew without room for it")
+	}
+	m.termWidth, m.termHeight = w, h
 	if !m.cache.waiting[sub.ID] {
 		t.Error("the subtask of a waiting task should wait with it")
 	}

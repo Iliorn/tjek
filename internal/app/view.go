@@ -528,11 +528,12 @@ func (m model) renderStatusLine() string {
 	if m.tab == tabTags && m.tagTabSearchQuery != "" {
 		chips = append(chips, searchChipStyle.Render("/"+m.tagTabSearchQuery))
 	}
-	// Hidden tasks are counted so they are not forgotten, and the chip names
-	// the filter that shows them: "1 waiting" alone left a reader with a
-	// count of something they could neither see nor clear.
-	if n := m.cache.waitingTop; n > 0 && !searchShowsWaiting(m.searchQuery) {
-		chips = append(chips, helpStyle.Render(trCount("%d waiting · /%s shows them", n, n, inputWord("waiting"))))
+	// Hidden tasks are listed under the Tasks list (renderWaitingBlock). Only
+	// when that list leaves no room for them are they counted here instead,
+	// so they are not forgotten; ? explains the count.
+	if n := m.cache.waitingTop; n > 0 && m.tab == tabTasks && !m.showHistory && !searchShowsWaiting(m.searchQuery) &&
+		!m.waitingBlockShown(m.listSpareRows()) {
+		chips = append(chips, helpStyle.Render(fmt.Sprintf(tr("%d waiting"), n)))
 	}
 	left := strings.Join(chips, " ")
 

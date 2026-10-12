@@ -1,7 +1,9 @@
 package app
 
 import (
+	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/Iliorn/tjek/rank"
@@ -20,10 +22,12 @@ type cacheState struct {
 	blockedSet  map[string]bool // tasks waiting on an unfinished dependency
 	blockerSet  map[string]bool // tasks an unfinished task depends on
 	// waiting is the tasks hidden until their start date (waitingSet), nil
-	// when nothing waits or hiding is off; waitingTop counts the top-level
-	// ones for the status line.
-	waiting    map[string]bool
-	waitingTop int
+	// when nothing waits or hiding is off; waitingList is the top-level ones
+	// in the context and not shown already, soonest start first, for the
+	// block under the Tasks list, and waitingTop counts them.
+	waiting     map[string]bool
+	waitingList []todo.Todo
+	waitingTop  int
 	// outside is the tasks the active context does not match (context.go),
 	// nil when no context is on.
 	outside map[string]bool
@@ -146,12 +150,19 @@ func (m *model) refreshCaches() {
 	}
 	// The status line counts what is waiting out of sight: the waiting
 	// top-level tasks inside the context that it does not show already.
-	m.cache.waitingTop = 0
+	m.cache.waitingList = m.cache.waitingList[:0]
 	for id := range m.cache.waiting {
 		if t := m.get(id); t != nil && t.ParentID == "" && !m.cache.outside[id] && !m.cache.contextAsks[id] {
-			m.cache.waitingTop++
+			m.cache.waitingList = append(m.cache.waitingList, *t)
 		}
 	}
+	slices.SortFunc(m.cache.waitingList, func(a, b todo.Todo) int {
+		if c := a.StartDate.Compare(b.StartDate); c != 0 {
+			return c
+		}
+		return strings.Compare(a.ID, b.ID)
+	})
+	m.cache.waitingTop = len(m.cache.waitingList)
 
 	m.cache.active, m.cache.done = selectActiveDoneRanked(all, m.cache.rankScore, m.frameTime, m.rank.ScoreAt(m.frameTime), m.searchQuery, m.searchEnv(), m.focusFilter, m.taskSort, m.historySort, m.listVisibility())
 

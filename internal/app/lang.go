@@ -96,7 +96,7 @@ var countOne = map[language]map[string]string{
 		"due in %d days; the ramp adds points daily": "due in %d day; the ramp adds points daily",
 		"%s (%d entries)":                            "%s (%d entry)",
 		"%d entries · %s":                            "%d entry · %s",
-		"%d waiting · /%s shows them":                "%d waiting · /%s shows it",
+		"  Waiting to start (%d) · /%s shows them":   "  Waiting to start (%d) · /%s shows it",
 	},
 	langDA: {
 		"%d done":                     "%d færdig",
@@ -106,9 +106,9 @@ var countOne = map[language]map[string]string{
 		"%d days overdue":             "%d dag forfalden",
 		"created %d days ago":         "oprettet for %d dag siden",
 		"due in %d days; the ramp adds points daily": "forfalder om %d dag; rampen giver point hver dag",
-		"%s (%d entries)":             "%s (%d post)",
-		"%d entries · %s":             "%d post · %s",
-		"%d waiting · /%s shows them": "%d venter · /%s viser den",
+		"%s (%d entries)":                          "%s (%d post)",
+		"%d entries · %s":                          "%d post · %s",
+		"  Waiting to start (%d) · /%s shows them": "  Venter på start (%d) · /%s viser den",
 	},
 	langDE: {
 		"%d days overdue":                            "%d Tag überfällig",
@@ -961,7 +961,7 @@ var daTranslations = map[string]string{
 	"start date, hidden until then (or %s)":                             "startdato, skjult indtil da (eller %s)",
 	"hidden until %s":                                                   "skjult indtil %s",
 	"%d waiting":                                                        "%d venter",
-	"%d waiting · /%s shows them":                                       "%d venter · /%s viser dem",
+	"  Waiting to start (%d) · /%s shows them":                          "  Venter på start (%d) · /%s viser dem",
 	"tasks hidden until their start date: /%s shows them":               "opgaver skjult indtil deres startdato: /%s viser dem",
 	"anything else fuzzy-matches the title, or the description as text": "alt andet fuzzy-matcher titlen, eller beskrivelsen som tekst",
 
@@ -1798,7 +1798,7 @@ var deTranslations = map[string]string{
 	"start date, hidden until then (or %s)":                             "Startdatum, bis dahin ausgeblendet (oder %s)",
 	"hidden until %s":                                                   "ausgeblendet bis %s",
 	"%d waiting":                                                        "%d wartend",
-	"%d waiting · /%s shows them":                                       "%d wartend · /%s zeigt sie",
+	"  Waiting to start (%d) · /%s shows them":                          "  Wartet auf Start (%d) · /%s zeigt sie",
 	"tasks hidden until their start date: /%s shows them":               "bis zum Startdatum ausgeblendete Aufgaben: /%s zeigt sie",
 	"anything else fuzzy-matches the title, or the description as text": "alles andere trifft den Titel unscharf oder die Beschreibung als Text",
 

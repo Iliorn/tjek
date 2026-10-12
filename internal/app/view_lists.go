@@ -879,8 +879,56 @@ func (m model) renderTaskList() string {
 		}
 		b.WriteString(m.renderSubtaskLine(t, subIdx, len(siblings), cols, i, m.cursor, true))
 	}
-	m.renderClosedTodayBlock(b, maxVisible-(endIdx-startIdx))
+	free := maxVisible - (endIdx - startIdx)
+	free -= m.renderWaitingBlock(b, free)
+	m.renderClosedTodayBlock(b, free)
 	return b.String()
+}
+
+// listSpareRows is how many rows the Tasks list leaves empty at the bottom of
+// its pane, as renderTaskList draws it: what the blocks under it may fill.
+func (m model) listSpareRows() int {
+	maxVisible := m.taskListRows()
+	total := m.visibleActiveLen()
+	start := m.listOffset
+	if start > total {
+		start = 0
+	}
+	return maxVisible - min(maxVisible, total-start)
+}
+
+// waitingBlockShown reports whether the Tasks list has the block of tasks
+// waiting for their start date under it, given free spare rows. It wants the
+// three rows the closed-today block does, and stands aside while a filter is
+// on: a search narrows the list, and /waiting puts those tasks in it.
+func (m model) waitingBlockShown(free int) bool {
+	return free >= 3 && !m.showHistory && m.searchQuery == "" && !m.focusFilter && len(m.cache.waitingList) > 0
+}
+
+// renderWaitingBlock draws, under the active tasks, the tasks hidden until
+// their start date, soonest first, each with the day it starts; it returns
+// the rows it used. It is a read-out like the closed-today block below it:
+// the tasks are out of the list on purpose, so the rows carry no cursor, and
+// the heading names the filter that brings them into the list to be worked
+// on. A count of them on the status line, away from the list, read as
+// something stuck that could be neither seen nor cleared.
+func (m model) renderWaitingBlock(b *strings.Builder, free int) int {
+	if !m.waitingBlockShown(free) {
+		return 0
+	}
+	list := m.cache.waitingList
+	n := len(list)
+	shown := min(n, free-2)
+	avail := max(m.termWidth-12, 8)
+	b.WriteString("\n")
+	label := trCount("  Waiting to start (%d) · /%s shows them", n, n, inputWord("waiting"))
+	b.WriteString(dimStyle.Render(label) + "\n")
+	for i := 0; i < shown; i++ {
+		when := " · " + startsLong(list[i].StartDate)
+		title := truncate(list[i].Title, max(avail-runeLen(when), 8))
+		b.WriteString(fastDim.render("   ◷ "+title+when) + "\n")
+	}
+	return 2 + shown
 }
 
 // renderClosedTodayBlock fills unused rows at the bottom of the list pane with

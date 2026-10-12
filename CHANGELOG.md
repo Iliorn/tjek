@@ -16,6 +16,7 @@ belongs in the commit message, where it is kept next to the code it explains.
 ### Changed
 
 - In Settings, ↑/↓ go round within the page instead of running on into the next one.
+- Tasks waiting for their start date are listed under the Tasks list, with the day each starts.
 
 ## [1.58.1] - 2026-10-12
 
