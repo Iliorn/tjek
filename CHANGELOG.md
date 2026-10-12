@@ -13,6 +13,8 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+## [1.58.1] - 2026-10-12
+
 ### Changed
 
 - Windows: the icon's check is green, as a done ✓ is in the app.
