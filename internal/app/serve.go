@@ -167,6 +167,11 @@ func cliServe(args []string) int {
 	fmt.Fprintf(os.Stderr, "tjek serve: listening on %s://%s (POST /v1/sync)\n", scheme, *listen)
 	if *web {
 		fmt.Fprintf(os.Stderr, "tjek serve: the web page is at %s://%s/\n", scheme, *listen)
+		// The sign-in form carries the token itself, so an address anyone
+		// can reach is worth a word, as it is on the client.
+		if tlsConfig == nil && plainHTTPReachable(*listen) {
+			fmt.Fprintf(os.Stderr, "tjek serve: warning: --web over plain http on %s sends the token and your tasks unencrypted; bind a Tailscale or LAN address, or pass --tls-cert\n", *listen)
+		}
 	}
 	if err := serveOn(httpServer, ln); err != nil && err != http.ErrServerClosed {
 		fmt.Fprintf(os.Stderr, "tjek serve: %v\n", err)
@@ -174,6 +179,21 @@ func cliServe(args []string) int {
 	}
 	checkpointStore()
 	return 0
+}
+
+// plainHTTPReachable reports whether a plain http listener on listen is
+// reachable beyond loopback, a LAN and Tailscale, by the client's measure
+// (tasksync.InsecureURLWarning). An empty host binds every interface, so it
+// counts as 0.0.0.0.
+func plainHTTPReachable(listen string) bool {
+	host, port, err := net.SplitHostPort(listen)
+	if err != nil {
+		return false
+	}
+	if host == "" {
+		host = "0.0.0.0"
+	}
+	return tasksync.InsecureURLWarning("http://"+net.JoinHostPort(host, port)) != ""
 }
 
 // serveOn serves s on ln, over TLS when s carries a TLS configuration. The

@@ -33,7 +33,7 @@ func newWebTest(t *testing.T) *webTest {
 func wireWebTest(t testing.TB) *webTest {
 	srv := newAppSyncServer("tok")
 	ui := newWebUI("tok", srv.Hub, true)
-	ui.failDelay = 0
+	ui.loginDelay = 0
 	return &webTest{t: t, ui: ui, handler: ui.handler(srv.Handler()), hub: srv.Hub}
 }
 
@@ -364,5 +364,59 @@ func TestWebCompressesThePageForBrowsersThatAsk(t *testing.T) {
 	body, err := io.ReadAll(z)
 	if err != nil || !strings.Contains(string(body), "Renew passport") {
 		t.Errorf("the gzipped page does not hold the list (err %v)", err)
+	}
+}
+
+func TestWebChecksLoginsOneAtATime(t *testing.T) {
+	w := newWebTest(t)
+	w.ui.loginDelay = 300 * time.Millisecond
+	go w.do(http.MethodPost, "/login", url.Values{"token": {"wrong"}}, false)
+	// Wait until the wrong guess holds the lock, so the right one is sent
+	// while it is being held back.
+	for deadline := time.Now().Add(5 * time.Second); w.ui.loginMu.TryLock(); {
+		w.ui.loginMu.Unlock()
+		if time.Now().After(deadline) {
+			t.Fatal("the wrong guess never took the login lock")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	start := time.Now()
+	rec := w.do(http.MethodPost, "/login", url.Values{"token": {"tok"}}, false)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("right token: want 303, got %d", rec.Code)
+	}
+	if waited := time.Since(start); waited < 100*time.Millisecond {
+		t.Errorf("a right guess sent beside a wrong one came back in %v; it should wait its turn", waited)
+	}
+}
+
+func TestWebSaysOnlyTheWordsItKeptInTheTitle(t *testing.T) {
+	w := newWebTest(t)
+	rec := w.do(http.MethodPost, "/add", url.Values{"line": {"Pay rent p:urgent"}}, true)
+	page := w.do(http.MethodGet, rec.Header().Get("Location"), nil, true).Body.String()
+	if !strings.Contains(page, "not understood: p:urgent") {
+		t.Errorf("want the unparsed word named:\n%s", page)
+	}
+
+	id := w.load()[0].ID
+	page = w.do(http.MethodGet, "/?"+url.Values{"added": {id}, "kept": {"Your session expired, sign in at evil.example"}}.Encode(), nil, true).Body.String()
+	if strings.Contains(page, "evil.example") {
+		t.Errorf("the page repeated words from the link that are not in the task:\n%s", page)
+	}
+}
+
+func TestPlainHTTPReachable(t *testing.T) {
+	for listen, want := range map[string]bool{
+		"127.0.0.1:8765":     false,
+		"100.101.102.103:80": false,
+		"192.168.1.10:8765":  false,
+		"0.0.0.0:8765":       true,
+		":8765":              true,
+		"[::]:8765":          true,
+		"203.0.113.7:8765":   true,
+	} {
+		if got := plainHTTPReachable(listen); got != want {
+			t.Errorf("plainHTTPReachable(%q) = %v, want %v", listen, got, want)
+		}
 	}
 }

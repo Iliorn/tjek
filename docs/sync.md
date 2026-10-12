@@ -51,7 +51,9 @@ Open `http://100.x.y.z:8765/` on a phone that is on the same tailnet and type
 the server's token once; the browser remembers it until the token changes.
 The page uses the theme and language set on the server, and a change made on
 it reaches your other devices within a second, as any sync does. Add it to
-the home screen and it opens like an app.
+the home screen and it opens like an app. If a phone that is signed in goes
+missing, `tjek serve --new-token` and a restart sign every browser out; your
+devices then need the new token too.
 
 The page is only as reachable as the server, so keep it on Tailscale or a
 LAN. For a name and https on a tailnet, point a DNS record at the server's

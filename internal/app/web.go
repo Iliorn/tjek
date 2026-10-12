@@ -13,6 +13,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -34,7 +35,8 @@ import (
 //
 // Access is the sync token: typed once on a login form, then carried as a
 // cookie derived from it (webSession), so changing the token signs every
-// browser out. Failed logins wait a second each, one at a time.
+// browser out. Logins are checked one at a time, and a wrong one holds the
+// next back for a second.
 
 //go:embed web.tmpl
 var webTemplateSrc string
@@ -55,17 +57,18 @@ type webUI struct {
 	hub     *tasksync.Hub
 	// secure marks the cookie https-only, set when the server serves TLS.
 	secure bool
-	// failDelay is how long a failed login waits, under failMu, so guesses
-	// from every client together run at one per failDelay.
-	failDelay time.Duration
-	failMu    sync.Mutex
+	// loginDelay is how long a wrong token holds loginMu, which every login
+	// takes before it compares, so guesses from every client together are
+	// checked at one per loginDelay.
+	loginDelay time.Duration
+	loginMu    sync.Mutex
 	// mu serializes the page's requests: each loads, edits and saves the
 	// store, and applies the settings' language, which is a global.
 	mu sync.Mutex
 }
 
 func newWebUI(token string, hub *tasksync.Hub, secure bool) *webUI {
-	return &webUI{token: token, session: webSession(token), hub: hub, secure: secure, failDelay: time.Second}
+	return &webUI{token: token, session: webSession(token), hub: hub, secure: secure, loginDelay: time.Second}
 }
 
 // webSession is the cookie value a token signs in with. A MAC of a fixed
@@ -99,10 +102,16 @@ func (w *webUI) signedIn(r *http.Request) bool {
 func (w *webUI) handleLogin(rw http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(rw, r.Body, webFormLimit)
 	got := r.PostFormValue("token")
-	if subtle.ConstantTimeCompare([]byte(got), []byte(w.token)) != 1 {
-		w.failMu.Lock()
-		time.Sleep(w.failDelay)
-		w.failMu.Unlock()
+	// The compare runs under the lock. Comparing first and only then waiting
+	// would delay the answer to a wrong guess, not the guessing: of many
+	// guesses sent at once, a right one would come straight back.
+	w.loginMu.Lock()
+	ok := subtle.ConstantTimeCompare([]byte(got), []byte(w.token)) == 1
+	if !ok {
+		time.Sleep(w.loginDelay)
+	}
+	w.loginMu.Unlock()
+	if !ok {
 		w.mu.Lock()
 		defer w.mu.Unlock()
 		page := w.newPage(webSettings())
@@ -144,13 +153,11 @@ func (w *webUI) handleList(rw http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query()
 	page.fill(todos, settings, time.Now(), q.Get("added"))
-	if id := q.Get("added"); id != "" {
-		if t := findByID(todos, id); t != nil {
-			page.Toast = fmt.Sprintf(tr("Added: %s"), t.Title)
+	if t := findByID(todos, q.Get("added")); t != nil {
+		page.Toast = fmt.Sprintf(tr("Added: %s"), t.Title)
+		if kept := keptWords(t.Title, q.Get("kept")); kept != "" {
+			page.Error = fmt.Sprintf(tr("Kept in the title, not understood: %s"), kept)
 		}
-	}
-	if kept := q.Get("kept"); kept != "" {
-		page.Error = fmt.Sprintf(tr("Kept in the title, not understood: %s"), kept)
 	}
 	if id := q.Get("done"); id != "" {
 		if t := findByID(todos, id); t != nil {
@@ -293,6 +300,24 @@ func webLoad(settings appSettings) (*sqliteRepo, []todo.Todo, error) {
 		repo.SetRanker(repo.ranker().Refreshed(time.Now(), todoPtrs(todos)))
 	}
 	return repo, todos, err
+}
+
+// keptWords is the add redirect's list of words the grammar did not take,
+// when every one of them is in the new task's title, where they were kept;
+// otherwise "". The list comes back in the URL, and a link that put its own
+// words there would otherwise have the page say them.
+func keptWords(title, kept string) string {
+	words := strings.Fields(kept)
+	if len(words) == 0 {
+		return ""
+	}
+	inTitle := strings.Fields(title)
+	for _, w := range words {
+		if !slices.Contains(inTitle, w) {
+			return ""
+		}
+	}
+	return strings.Join(words, " ")
 }
 
 // findByID returns the task with exactly this ID, pointing into todos. The
@@ -492,6 +517,9 @@ func (w *webUI) render(rw http.ResponseWriter, r *http.Request, status int, page
 	h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
 	h.Set("Referrer-Policy", "no-referrer")
 	h.Set("X-Content-Type-Options", "nosniff")
+	if w.secure {
+		h.Set("Strict-Transport-Security", "max-age=31536000")
+	}
 	h.Set("Vary", "Accept-Encoding")
 	// The rows repeat the same markup, so a long list shrinks some twentyfold
 	// (160 kB to 7 kB for 300 tasks): on a phone's connection that is most of
