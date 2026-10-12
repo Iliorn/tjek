@@ -1453,6 +1453,9 @@ func selfUpdate() error {
 			_ = os.Rename(oldPath, execPath) // restore on failure
 			return fmt.Errorf("could not install new binary: %w", err)
 		}
+		// The new binary sits at the old one's path, where Explorer would
+		// go on drawing the old icon from its cache.
+		notifyShellChanged(execPath)
 		return nil
 	}
 

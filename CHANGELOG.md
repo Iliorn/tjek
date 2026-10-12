@@ -13,6 +13,10 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+### Fixed
+
+- Windows: after an update, Explorer is told the file changed, so it shows the new icon.
+
 ## [1.57.1] - 2026-10-12
 
 ### Fixed
