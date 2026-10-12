@@ -370,7 +370,15 @@ func TestWebCompressesThePageForBrowsersThatAsk(t *testing.T) {
 func TestWebChecksLoginsOneAtATime(t *testing.T) {
 	w := newWebTest(t)
 	w.ui.loginDelay = 300 * time.Millisecond
-	go w.do(http.MethodPost, "/login", url.Values{"token": {"wrong"}}, false)
+	// The wrong guess runs beside the test, and must be done before it ends:
+	// left running, it draws its page during the next test, which has a
+	// webUI, and so a lock, of its own around the same global language.
+	wrongDone := make(chan struct{})
+	go func() {
+		defer close(wrongDone)
+		w.do(http.MethodPost, "/login", url.Values{"token": {"wrong"}}, false)
+	}()
+	defer func() { <-wrongDone }()
 	// Wait until the wrong guess holds the lock, so the right one is sent
 	// while it is being held back.
 	for deadline := time.Now().Add(5 * time.Second); w.ui.loginMu.TryLock(); {
