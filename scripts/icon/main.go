@@ -2,10 +2,10 @@
 //
 //	go run -C scripts/icon .
 //
-// The icon is "[✓]" in white, set in JetBrains Mono ExtraBold, with a thin
+// The icon is "[✓]", white brackets round a green check, set in JetBrains Mono ExtraBold, with a thin
 // dark outline and no background: the mark as a terminal would print it,
 // standing on whatever the taskbar or desktop is. The outline is what keeps
-// the white legible on a light one. Each size is drawn from the font itself,
+// the white and the green legible on a light one. Each size is drawn from the font itself,
 // not scaled from another, set tighter than the font's advances so it is
 // nearly as tall as it is wide, and fills more of the square the smaller it
 // gets, so it stands as large as the square logos beside it on a taskbar.
@@ -64,10 +64,12 @@ const (
 	root = "../.."
 )
 
-// The text is ink, ringed by outline, the Tokyo Night base the icon's tile
-// used to be.
+// The brackets are ink and the check is check, the green the app's default
+// theme (TokyoNight) draws a done ✓ in, all ringed by outline, the Tokyo
+// Night base the icon's tile used to be.
 var (
 	ink     = color.NRGBA{0xff, 0xff, 0xff, 0xff}
+	check   = color.NRGBA{0xa8, 0xff, 0x78, 0xff}
 	outline = color.NRGBA{0x16, 0x17, 0x21, 0xff}
 )
 
@@ -197,17 +199,29 @@ func render(f *opentype.Font, size int) (*image.NRGBA, error) {
 	inkW, inkH, top := setInk(fc)
 	x := (s - inkW) / 2
 	y := (s-inkH)/2 - top
-	mask := image.NewAlpha(img.Bounds())
+	// Each glyph goes into the mask of its own colour and into all, which
+	// the outline is grown from. The glyphs do not touch, so each colour is
+	// drawn once over the outline and no white fringes the green.
+	all := image.NewAlpha(img.Bounds())
+	brackets := image.NewAlpha(img.Bounds())
+	tick := image.NewAlpha(img.Bounds())
 	for _, ch := range text {
 		gb, _ := font.BoundString(fc, string(ch))
-		d := &font.Drawer{Dst: mask, Src: image.Opaque, Face: fc,
-			Dot: fixed.Point26_6{X: fixed.Int26_6((x - float64(gb.Min.X)/64) * 64), Y: fixed.Int26_6(y * 64)}}
-		d.DrawString(string(ch))
+		dot := fixed.Point26_6{X: fixed.Int26_6((x - float64(gb.Min.X)/64) * 64), Y: fixed.Int26_6(y * 64)}
+		own := brackets
+		if ch == '✓' {
+			own = tick
+		}
+		for _, dst := range []*image.Alpha{all, own} {
+			d := &font.Drawer{Dst: dst, Src: image.Opaque, Face: fc, Dot: dot}
+			d.DrawString(string(ch))
+		}
 		x += float64(gb.Max.X-gb.Min.X)/64 + glyphGap*inkH
 	}
 
-	draw.DrawMask(img, img.Bounds(), &image.Uniform{outline}, image.Point{}, dilate(mask, r), image.Point{}, draw.Over)
-	draw.DrawMask(img, img.Bounds(), &image.Uniform{ink}, image.Point{}, mask, image.Point{}, draw.Over)
+	draw.DrawMask(img, img.Bounds(), &image.Uniform{outline}, image.Point{}, dilate(all, r), image.Point{}, draw.Over)
+	draw.DrawMask(img, img.Bounds(), &image.Uniform{ink}, image.Point{}, brackets, image.Point{}, draw.Over)
+	draw.DrawMask(img, img.Bounds(), &image.Uniform{check}, image.Point{}, tick, image.Point{}, draw.Over)
 	return img, nil
 }
 
