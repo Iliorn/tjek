@@ -16,6 +16,7 @@ belongs in the commit message, where it is kept next to the code it explains.
 ### Changed
 
 - Windows: the icon's check is green, as a done ✓ is in the app.
+- The status line's "1 waiting" says how to see the task: `/waiting shows it`.
 
 ## [1.58.0] - 2026-10-12
 

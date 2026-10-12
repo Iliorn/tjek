@@ -742,6 +742,10 @@ func TestWaitingTaskIsHiddenUntilItsStartDate(t *testing.T) {
 	if m.cache.waitingTop != 2 {
 		t.Errorf("waitingTop = %d, want 2", m.cache.waitingTop)
 	}
+	// The status line says how to see them, not just how many there are.
+	if line := ansi.Strip(m.renderStatusLine()); !strings.Contains(line, "2 waiting · /waiting shows them") {
+		t.Errorf("status line = %q, want the count and the filter that shows them", line)
+	}
 	if !m.cache.waiting[sub.ID] {
 		t.Error("the subtask of a waiting task should wait with it")
 	}
