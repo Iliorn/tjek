@@ -726,12 +726,6 @@ func (m model) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "r":
 			return m.handleListRename()
 
-		case "b":
-			if key := m.selectedGroupKey(); key != "" {
-				m.cycleRankMark(key)
-				return m, clearErrAfter()
-			}
-
 		case "S":
 			if m.tab == tabProjects && !m.projectTaskMode {
 				if projects := m.allProjectsForList(); m.projectCursor < len(projects) {
@@ -771,6 +765,12 @@ func (m model) updateList(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "p":
+			// On the Tags and Projects lists p steps the group's rank mark,
+			// the nearest thing a tag or project has to a priority.
+			if key := m.selectedGroupKey(); key != "" {
+				m.cycleRankMark(key)
+				return m, clearErrAfter()
+			}
 			if (m.tab == tabTasks && !m.showHistory) || m.drilledIntoTasks() {
 				if t := m.currentTodo(); t != nil && m.cyclePriority(t, 1) {
 					m.flashInfo(tr("A subtask can't outrank its parent"))

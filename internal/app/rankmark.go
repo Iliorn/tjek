@@ -2,7 +2,7 @@ package app
 
 import "fmt"
 
-// rankmark.go — b on the Tags and Projects tabs marks a tag or a project to
+// rankmark.go — p on the Tags and Projects tabs marks a tag or a project to
 // rank its tasks higher or lower than the rest, by one priority step
 // (rank.MarkStep). The marks live in rank.Biases beside the Sequencer knobs,
 // so every scorer — the lists, the CLI, the Settings preview — reads them, and

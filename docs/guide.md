@@ -161,7 +161,7 @@ percentage, their causes, the margins to the rows either side, and when the
 ranking will move on its own.
 
 Some tags and projects matter more than their tasks' priorities say, or
-less: `#next`, `@side-project`. On the Tags or Projects tab, `b` marks the
+less: `#next`, `@side-project`. On the Tags or Projects tab, `p` marks the
 selected one to rank its tasks **higher** (▲ beside its name), then
 **lower** (▼), then as usual again. A mark is worth one priority step either
 way, so a medium task in a ▲ project ranks with the high ones; a task with

@@ -65,7 +65,7 @@ type appSettings struct {
 	SeqAgingDisabled bool `json:"seq_aging_disabled"`
 
 	// RankHigher and RankLower are the tags ("#name") and projects ("@name")
-	// marked with b on the Tags and Projects tabs (rank.Marks).
+	// marked with p on the Tags and Projects tabs (rank.Marks).
 	RankHigher []string `json:"rank_higher,omitempty"`
 	RankLower  []string `json:"rank_lower,omitempty"`
 

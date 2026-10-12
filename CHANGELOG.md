@@ -13,6 +13,10 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+### Changed
+
+- `p` on the Tags or Projects tab ranks its tasks higher or lower, in place of `b`.
+
 ## [1.57.3] - 2026-10-12
 
 ### Fixed
