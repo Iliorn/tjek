@@ -2,11 +2,12 @@
 //
 //	go run -C scripts/icon .
 //
-// The icon is "[✓]" in white, set in JetBrains Mono ExtraBold, on a dark
-// rounded tile in the Tokyo Night base: the mark as a terminal would print
-// it. Each size is drawn from the font itself, not scaled from another, and
-// the text fills more of the tile the smaller it gets, so it still reads on
-// a taskbar.
+// The icon is "[✓]" in white, set in JetBrains Mono ExtraBold, with a thin
+// dark outline and no background: the mark as a terminal would print it,
+// standing on whatever the taskbar or desktop is. The outline is what keeps
+// the white legible on a light one. Each size is drawn from the font itself,
+// not scaled from another, and the text fills more of the square the smaller
+// it gets, so it still reads on a taskbar.
 //
 // It writes packaging/icon/tjek.ico and tjek.png, then rsrc_windows_amd64.syso
 // in the module root, which `go build` links into a Windows amd64 binary on
@@ -62,11 +63,11 @@ const (
 	root = "../.."
 )
 
-// The tile runs from tileTop to tileBottom down its height; the text is ink.
+// The text is ink, ringed by outline, the Tokyo Night base the icon's tile
+// used to be.
 var (
-	tileTop    = color.NRGBA{0x24, 0x28, 0x3b, 0xff}
-	tileBottom = color.NRGBA{0x16, 0x17, 0x21, 0xff}
-	ink        = color.NRGBA{0xff, 0xff, 0xff, 0xff}
+	ink     = color.NRGBA{0xff, 0xff, 0xff, 0xff}
+	outline = color.NRGBA{0x16, 0x17, 0x21, 0xff}
 )
 
 // sizes are the sizes Windows asks an icon for, at 100% to 200% scaling.
@@ -153,38 +154,18 @@ func fetchFont() ([]byte, error) {
 	return nil, fmt.Errorf("the font release has no %s", fontFile)
 }
 
-// render draws the icon at size pixels square: the tile, then the text with
-// its ink centred.
+// render draws the icon at size pixels square on a transparent ground: the
+// outline, then the text over it, with the ink centred.
 func render(f *opentype.Font, size int) (*image.NRGBA, error) {
 	img := image.NewNRGBA(image.Rect(0, 0, size, size))
 	s := float64(size)
-	r := 0.22 * s // corner radius
-	for y := range size {
-		row := lerp(tileTop, tileBottom, float64(y)/s)
-		for x := range size {
-			// Coverage of the rounded square, from 4x4 samples per pixel.
-			cov := 0
-			for sy := range 4 {
-				for sx := range 4 {
-					px, py := float64(x)+(float64(sx)+0.5)/4, float64(y)+(float64(sy)+0.5)/4
-					dx := math.Max(0, math.Max(r-px, px-(s-r)))
-					dy := math.Max(0, math.Max(r-py, py-(s-r)))
-					if dx*dx+dy*dy <= r*r {
-						cov++
-					}
-				}
-			}
-			if cov > 0 {
-				c := row
-				c.A = uint8(255 * cov / 16)
-				img.SetNRGBA(x, y, c)
-			}
-		}
-	}
+	// The outline's width, a pixel at the smallest sizes; the text is sized
+	// so text and outline together fill inkFraction of the square.
+	r := math.Max(1, math.Round(s/24))
 
-	// Size the face so the ink is inkFraction of the tile wide, then centre
-	// the ink box, not the advance box: the brackets' side bearings would
-	// otherwise push it off centre.
+	// Size the face so the ink is that wide, then centre the ink box, not
+	// the advance box: the brackets' side bearings would otherwise push it
+	// off centre.
 	face := func(pt float64) (font.Face, error) {
 		return opentype.NewFace(f, &opentype.FaceOptions{Size: pt, DPI: 72, Hinting: font.HintingNone})
 	}
@@ -193,7 +174,7 @@ func render(f *opentype.Font, size int) (*image.NRGBA, error) {
 		return nil, err
 	}
 	b, _ := font.BoundString(probe, text)
-	fc, err := face(s * inkFraction(size) * s / (float64(b.Max.X-b.Min.X) / 64))
+	fc, err := face(s * (s*inkFraction(size) - 2*r) / (float64(b.Max.X-b.Min.X) / 64))
 	if err != nil {
 		return nil, err
 	}
@@ -205,12 +186,40 @@ func render(f *opentype.Font, size int) (*image.NRGBA, error) {
 	d := &font.Drawer{Dst: mask, Src: image.Opaque, Face: fc,
 		Dot: fixed.Point26_6{X: fixed.Int26_6(x * 64), Y: fixed.Int26_6(y * 64)}}
 	d.DrawString(text)
+
+	draw.DrawMask(img, img.Bounds(), &image.Uniform{outline}, image.Point{}, dilate(mask, r), image.Point{}, draw.Over)
 	draw.DrawMask(img, img.Bounds(), &image.Uniform{ink}, image.Point{}, mask, image.Point{}, draw.Over)
 	return img, nil
 }
 
-// inkFraction is how much of the tile's width the text fills: more at the
-// small sizes, where every pixel of the glyphs counts.
+// dilate grows mask by r pixels in every direction: each pixel takes the
+// strongest coverage within a disc of radius r around it, which keeps the
+// glyphs' anti-aliased edges soft on the outline's edge too.
+func dilate(mask *image.Alpha, r float64) *image.Alpha {
+	bounds := mask.Bounds()
+	out := image.NewAlpha(bounds)
+	n := int(math.Ceil(r))
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			var a uint8
+			for dy := -n; dy <= n; dy++ {
+				for dx := -n; dx <= n; dx++ {
+					if float64(dx*dx+dy*dy) > r*r {
+						continue
+					}
+					if v := mask.AlphaAt(x+dx, y+dy).A; v > a {
+						a = v
+					}
+				}
+			}
+			out.SetAlpha(x, y, color.Alpha{a})
+		}
+	}
+	return out
+}
+
+// inkFraction is how much of the square's width the text and its outline
+// fill: more at the small sizes, where every pixel of the glyphs counts.
 func inkFraction(size int) float64 {
 	switch {
 	case size <= 16:
@@ -223,11 +232,6 @@ func inkFraction(size int) float64 {
 		return 0.74
 	}
 	return 0.70
-}
-
-func lerp(a, b color.NRGBA, t float64) color.NRGBA {
-	m := func(x, y uint8) uint8 { return uint8(float64(x) + (float64(y)-float64(x))*t + 0.5) }
-	return color.NRGBA{m(a.R, b.R), m(a.G, b.G), m(a.B, b.B), 0xff}
 }
 
 // encodeICO packs PNG images into an .ico: a header, a directory entry per
