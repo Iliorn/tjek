@@ -13,6 +13,19 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+## [1.57.0] - 2026-10-12
+
+### Changed
+
+- ←/→ in the detail pane and Settings go round from the last section to the first.
+- The Tags and Projects footers show `b`, which ranks a group's tasks higher or lower.
+- Calendar: Coming up is in the day's agenda, and the month panel is narrow again.
+- The icon has no background: a white `[✓]` with a dark outline.
+
+### Fixed
+
+- Stats counts the last 7 and 30 days exactly, and its labels say so.
+
 ## [1.56.0] - 2026-10-12
 
 ### Added
