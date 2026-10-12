@@ -21,7 +21,13 @@ func (m model) handleBackgroundMsg(msg tea.Msg) (next tea.Model, cmd tea.Cmd, ok
 		next = m
 	case timerTickMsg:
 		next, cmd = m.handleTimerTick()
+	case updateProgressMsg:
+		if m.updateDL.active {
+			m.updateDL.done, m.updateDL.total = msg.done, msg.total
+		}
+		next, cmd = m, waitForUpdateProgress(msg.ch)
 	case updateDoneMsg:
+		m.updateDL = updateDownload{}
 		if msg.err != nil {
 			m.flashError(fmt.Sprintf("Update failed: %v", msg.err))
 			m.updateStatus = tr("Update failed")
@@ -128,6 +134,7 @@ func (m model) handleUpdateCheck(msg updateCheckMsg) (tea.Model, tea.Cmd) {
 	}
 	// Newer release available — ask before pulling it.
 	m.updateStatus = tr("Update available: ") + msg.latest
+	m.updateLatest = msg.latest
 	m.mode = modeConfirmUpdate
 	m.confirmMsg = msg.latest + tr(" is available. Update now? (y/n)")
 	return m, nil

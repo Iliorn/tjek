@@ -1500,6 +1500,7 @@ func (m model) helpBodyLines() []string {
 		{"↥", tr("others depend on this: finishing it unblocks them")},
 		{"1 2 3", tr("step in a project or tag: what can start now, then what waits on it")},
 		{"↻", tr("recurring task")},
+		{"◷", fmt.Sprintf(tr("under the list: waiting to start, hidden until its start date; /%s lists them"), inputWord("waiting"))},
 		{"(2/5)", tr("subtasks done / total")},
 		{"+ / -", tr("subtasks collapsed / expanded")},
 		{"↑", tr("score lifted by a subtask or by work waiting on it (detail pane)")},

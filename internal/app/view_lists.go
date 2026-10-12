@@ -263,14 +263,39 @@ func (m model) groupPaneHead(s *groupSummary, availW int) []string {
 // a bar moves in eighths of a cell rather than whole cells.
 var progressEighths = [8]string{"", "▏", "▎", "▍", "▌", "▋", "▊", "▉"}
 
+// renderUpdateProgress is the update's download as a bar in
+// updateProgressGradient, with the percentage and the megabytes so far; with
+// no size from the server, the megabytes alone.
+func (m model) renderUpdateProgress() string {
+	dl := m.updateDL
+	label := activeCountStyle.Render(fmt.Sprintf(tr("Downloading %s"), dl.version) + "  ")
+	mb := func(n int64) string { return fmt.Sprintf("%.1f", float64(n)/(1<<20)) }
+	if dl.total <= 0 {
+		return label + normalStyle.Render(mb(dl.done)+" MB")
+	}
+	pct := math.Min(float64(dl.done)/float64(dl.total), 1)
+	return label + renderGradientBar(pct, updateBarWidth, updateProgressGradient) +
+		normalStyle.Render(fmt.Sprintf(" %3d%%", int(pct*100))) +
+		helpStyle.Render(" · "+mb(dl.done)+" / "+mb(dl.total)+" MB")
+}
+
+// updateBarWidth is the download bar's width in cells.
+const updateBarWidth = 24
+
 // renderProgressBar draws pct (0–1) as a barW-cell bar in tagProgressGradient,
 // the unfilled rest as the faint track. Cells sharing a gradient step render
 // as one run.
 func renderProgressBar(pct float64, barW int) string {
+	return renderGradientBar(pct, barW, tagProgressGradient)
+}
+
+// renderGradientBar is renderProgressBar in any gradient, dark to light
+// along the filled part.
+func renderGradientBar(pct float64, barW int, gradient []lipgloss.Style) string {
 	var b strings.Builder
-	grad := len(tagProgressGradient)
+	grad := len(gradient)
 	gradAt := func(pos float64) lipgloss.Style {
-		return tagProgressGradient[min(int(pos*float64(grad-1)), grad-1)]
+		return gradient[min(int(pos*float64(grad-1)), grad-1)]
 	}
 	eighths := min(int(math.Round(pct*float64(barW)*8)), barW*8)
 	filled, partial := eighths/8, eighths%8
@@ -282,14 +307,14 @@ func renderProgressBar(pct float64, barW int) string {
 		}
 		idx := min(int(pos*float64(grad-1)), grad-1)
 		if idx != runIdx && run > 0 {
-			b.WriteString(tagProgressGradient[runIdx].Render(strings.Repeat("█", run)))
+			b.WriteString(gradient[runIdx].Render(strings.Repeat("█", run)))
 			run = 0
 		}
 		runIdx = idx
 		run++
 	}
 	if run > 0 {
-		b.WriteString(tagProgressGradient[runIdx].Render(strings.Repeat("█", run)))
+		b.WriteString(gradient[runIdx].Render(strings.Repeat("█", run)))
 	}
 	empty := barW - filled
 	if partial > 0 && filled < barW {
@@ -908,10 +933,10 @@ func (m model) waitingBlockShown(free int) bool {
 // renderWaitingBlock draws, under the active tasks, the tasks hidden until
 // their start date, soonest first, each with the day it starts; it returns
 // the rows it used. It is a read-out like the closed-today block below it:
-// the tasks are out of the list on purpose, so the rows carry no cursor, and
-// the heading names the filter that brings them into the list to be worked
-// on. A count of them on the status line, away from the list, read as
-// something stuck that could be neither seen nor cleared.
+// the tasks are out of the list on purpose, so the rows carry no cursor; ?
+// names the filter that brings them into the list to be worked on. A count
+// of them on the status line, away from the list, read as something stuck
+// that could be neither seen nor cleared.
 func (m model) renderWaitingBlock(b *strings.Builder, free int) int {
 	if !m.waitingBlockShown(free) {
 		return 0
@@ -921,7 +946,7 @@ func (m model) renderWaitingBlock(b *strings.Builder, free int) int {
 	shown := min(n, free-2)
 	avail := max(m.termWidth-12, 8)
 	b.WriteString("\n")
-	label := trCount("  Waiting to start (%d) · /%s shows them", n, n, inputWord("waiting"))
+	label := fmt.Sprintf(tr("  Waiting to start (%d)"), n)
 	b.WriteString(dimStyle.Render(label) + "\n")
 	for i := 0; i < shown; i++ {
 		when := " · " + startsLong(list[i].StartDate)
@@ -1873,7 +1898,9 @@ func (m model) renderSettingsSection(w int) (string, int) {
 		}
 	}
 
-	if m.updateStatus != "" {
+	if m.updateDL.active {
+		lines = append(lines, "", "  "+m.renderUpdateProgress())
+	} else if m.updateStatus != "" {
 		lines = append(lines, "", "  "+activeCountStyle.Render(m.updateStatus))
 	}
 	if m.syncStatus != "" {

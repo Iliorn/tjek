@@ -3,6 +3,7 @@ package app
 import (
 	"crypto/sha256"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -1141,7 +1142,7 @@ func TestDownloadReleaseAsset(t *testing.T) {
 	})
 
 	dst := filepath.Join(t.TempDir(), "tjek")
-	digest, err := downloadReleaseAsset(releaseAsset{Name: "tjek", URL: srv.URL + "/tjek"}, dst)
+	digest, err := downloadReleaseAsset(releaseAsset{Name: "tjek", URL: srv.URL + "/tjek"}, dst, nil)
 	if err != nil {
 		t.Fatalf("downloadReleaseAsset: %v", err)
 	}
@@ -1164,10 +1165,10 @@ func TestDownloadReleaseAsset(t *testing.T) {
 		t.Errorf("mode = %v, want the executable bits set", info.Mode().Perm())
 	}
 
-	if _, err := downloadReleaseAsset(releaseAsset{URL: srv.URL + "/missing"}, dst); err == nil {
+	if _, err := downloadReleaseAsset(releaseAsset{URL: srv.URL + "/missing"}, dst, nil); err == nil {
 		t.Error("a 404 should not be reported as a successful download")
 	}
-	if _, err := downloadReleaseAsset(releaseAsset{URL: srv.URL + "/empty"}, dst); err == nil {
+	if _, err := downloadReleaseAsset(releaseAsset{URL: srv.URL + "/empty"}, dst, nil); err == nil {
 		t.Error("an empty body should not be installed over the binary")
 	}
 }
@@ -1257,7 +1258,7 @@ func TestDownloadVerifiedAssetRefusesUnverifiedBinaries(t *testing.T) {
 	t.Run("matching checksum installs", func(t *testing.T) {
 		sumsBody = good + "  tjek\n"
 		dst := filepath.Join(t.TempDir(), "tjek")
-		if err := downloadVerifiedAsset(release(true), "tjek", dst); err != nil {
+		if err := downloadVerifiedAsset(release(true), "tjek", dst, nil); err != nil {
 			t.Fatalf("a matching checksum should verify: %v", err)
 		}
 		if b, err := os.ReadFile(dst); err != nil || string(b) != payload {
@@ -1268,7 +1269,7 @@ func TestDownloadVerifiedAssetRefusesUnverifiedBinaries(t *testing.T) {
 	t.Run("mismatched checksum refuses and removes the file", func(t *testing.T) {
 		sumsBody = strings.Repeat("a", 64) + "  tjek\n"
 		dst := filepath.Join(t.TempDir(), "tjek")
-		err := downloadVerifiedAsset(release(true), "tjek", dst)
+		err := downloadVerifiedAsset(release(true), "tjek", dst, nil)
 		if err == nil {
 			t.Fatal("a mismatched checksum was installed")
 		}
@@ -1282,7 +1283,7 @@ func TestDownloadVerifiedAssetRefusesUnverifiedBinaries(t *testing.T) {
 
 	t.Run("a release without SHA256SUMS is refused", func(t *testing.T) {
 		dst := filepath.Join(t.TempDir(), "tjek")
-		err := downloadVerifiedAsset(release(false), "tjek", dst)
+		err := downloadVerifiedAsset(release(false), "tjek", dst, nil)
 		if err == nil {
 			t.Fatal("an unverifiable release was installed")
 		}
@@ -1294,7 +1295,7 @@ func TestDownloadVerifiedAssetRefusesUnverifiedBinaries(t *testing.T) {
 	t.Run("SHA256SUMS without this asset is refused", func(t *testing.T) {
 		sumsBody = good + "  some-other-binary\n"
 		dst := filepath.Join(t.TempDir(), "tjek")
-		if err := downloadVerifiedAsset(release(true), "tjek", dst); err == nil {
+		if err := downloadVerifiedAsset(release(true), "tjek", dst, nil); err == nil {
 			t.Fatal("an asset with no published checksum was installed")
 		}
 	})
@@ -1583,5 +1584,31 @@ func TestRemoveLeftoverBinaries(t *testing.T) {
 	}
 	if got := strings.Join(left, " "); got != "notes.md tjek.exe tjek.exe.older" {
 		t.Errorf("left %q, want the binary and the unrelated files only", got)
+	}
+}
+
+// The download reports its progress as it goes, ending on every byte of the
+// size the server gave, so the bar in the app reaches the end.
+func TestDownloadReleaseAssetReportsProgress(t *testing.T) {
+	payload := strings.Repeat("x", 300<<10)
+	srv := releaseServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", strconv.Itoa(len(payload)))
+		fmt.Fprint(w, payload)
+	})
+	var reports [][2]int64
+	_, err := downloadReleaseAsset(releaseAsset{Name: "tjek", URL: srv.URL + "/tjek"}, filepath.Join(t.TempDir(), "tjek"),
+		func(done, total int64) { reports = append(reports, [2]int64{done, total}) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reports) == 0 {
+		t.Fatal("no progress was reported")
+	}
+	if len(reports) > 101 {
+		t.Errorf("%d reports for one download; want at most one per percent", len(reports))
+	}
+	n := int64(len(payload))
+	if last := reports[len(reports)-1]; last != [2]int64{n, n} {
+		t.Errorf("last report = %v, want %d of %d", last, n, n)
 	}
 }

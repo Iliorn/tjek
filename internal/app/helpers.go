@@ -1406,7 +1406,11 @@ func selfUpdateAsset(goos, goarch string) (string, error) {
 	}
 }
 
-func selfUpdate() error {
+func selfUpdate() error { return selfUpdateWith(nil) }
+
+// selfUpdateWith is selfUpdate reporting the binary's download to progress
+// as it goes (downloadProgress); nil reports nothing, as the CLI wants.
+func selfUpdateWith(progress downloadProgress) error {
 	execPath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("could not determine executable path: %w", err)
@@ -1437,7 +1441,7 @@ func selfUpdate() error {
 	if err != nil {
 		return err
 	}
-	if err := downloadVerifiedAsset(info, assetName, tmpFile); err != nil {
+	if err := downloadVerifiedAsset(info, assetName, tmpFile, progress); err != nil {
 		return err
 	}
 
@@ -1639,7 +1643,7 @@ func findReleaseAsset(info releaseInfo, name string) (releaseAsset, error) {
 // downloadReleaseAsset writes an asset to dst and returns the SHA-256 of the
 // bytes it actually wrote, hashed as they stream past so the check can never
 // read a different file than the one that was installed.
-func downloadReleaseAsset(asset releaseAsset, dst string) (digest string, err error) {
+func downloadReleaseAsset(asset releaseAsset, dst string, progress downloadProgress) (digest string, err error) {
 	// The download URL arrives inside the API response rather than being built
 	// here, so it is checked before it is followed — and again on every
 	// redirect, which is the hop a pre-flight check alone would miss.
@@ -1675,7 +1679,11 @@ func downloadReleaseAsset(asset releaseAsset, dst string) (digest string, err er
 		return "", err
 	}
 	sum := sha256.New()
-	written, err := io.Copy(io.MultiWriter(f, sum), io.LimitReader(resp.Body, maxReleaseAssetBytes))
+	w := io.MultiWriter(f, sum)
+	if progress != nil {
+		w = &progressWriter{w: w, total: resp.ContentLength, report: progress}
+	}
+	written, err := io.Copy(w, io.LimitReader(resp.Body, maxReleaseAssetBytes))
 	if cerr := f.Close(); err == nil {
 		err = cerr
 	}
@@ -1690,6 +1698,34 @@ func downloadReleaseAsset(asset releaseAsset, dst string) (digest string, err er
 			maxReleaseAssetBytes/(1024*1024))
 	}
 	return hex.EncodeToString(sum.Sum(nil)), nil
+}
+
+// downloadProgress is told how many bytes of a download have arrived, and
+// of how many: total is -1 when the server did not say.
+type downloadProgress func(done, total int64)
+
+// progressWriter counts what passes through it and reports it, at most once
+// per whole percent, or per 256 KB when the total is not known, so a fast
+// connection does not report (and redraw the app) for every buffer.
+type progressWriter struct {
+	w           io.Writer
+	done, total int64
+	last        int64
+	report      downloadProgress
+}
+
+func (p *progressWriter) Write(b []byte) (int, error) {
+	n, err := p.w.Write(b)
+	p.done += int64(n)
+	step := int64(256 << 10)
+	if p.total > 0 {
+		step = max(p.total/100, 1)
+	}
+	if p.done-p.last >= step || p.done == p.total {
+		p.last = p.done
+		p.report(p.done, p.total)
+	}
+	return n, err
 }
 
 // checkAssetURL refuses a release asset that does not come from GitHub over
@@ -1770,14 +1806,14 @@ func checksumFor(sums []byte, assetName string) (string, error) {
 // unless its checksum matches the release's SHA256SUMS. It fails closed: a
 // release without that asset, or without an entry for this platform's binary,
 // is not something to install blind.
-func downloadVerifiedAsset(info releaseInfo, assetName, dst string) error {
+func downloadVerifiedAsset(info releaseInfo, assetName, dst string, progress downloadProgress) error {
 	sumsAsset, err := findReleaseAsset(info, sha256SumsAsset)
 	if err != nil {
 		return fmt.Errorf("release %s publishes no %s, so the download cannot be verified; "+
 			"install it manually from https://github.com/%s/releases", info.TagName, sha256SumsAsset, releaseRepo)
 	}
 	sumsPath := dst + "." + sha256SumsAsset
-	if _, err := downloadReleaseAsset(sumsAsset, sumsPath); err != nil {
+	if _, err := downloadReleaseAsset(sumsAsset, sumsPath, nil); err != nil {
 		return fmt.Errorf("could not fetch %s: %w", sha256SumsAsset, err)
 	}
 	sums, err := os.ReadFile(sumsPath)
@@ -1793,7 +1829,7 @@ func downloadVerifiedAsset(info releaseInfo, assetName, dst string) error {
 	if err != nil {
 		return err
 	}
-	got, err := downloadReleaseAsset(asset, dst)
+	got, err := downloadReleaseAsset(asset, dst, progress)
 	if err != nil {
 		return err
 	}

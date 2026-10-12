@@ -256,6 +256,22 @@ type editorFinishedMsg struct {
 }
 type saveTickMsg struct{}
 type updateDoneMsg struct{ err error }
+
+// updateProgressMsg is how far the update's download has got (done of total
+// bytes, total -1 when unknown). It carries its channel so the handler can
+// wait for the next one (waitForUpdateProgress).
+type updateProgressMsg struct {
+	done, total int64
+	ch          chan updateProgressMsg
+}
+
+// updateDownload is the update being downloaded, shown as a bar on the
+// About page while active.
+type updateDownload struct {
+	active      bool
+	version     string
+	done, total int64
+}
 type updateCheckMsg struct {
 	latest string
 	err    error
@@ -443,8 +459,12 @@ type model struct {
 	// detailPos is which side of the list the detail pane takes (right, left,
 	// or stacked at the bottom). Read by sideBySide, so it decides the layout
 	// for every height helper at once rather than per renderer.
-	detailPos         detailPos
-	updateStatus      string
+	detailPos    detailPos
+	updateStatus string
+	// updateLatest is the newer release a check found, which the download
+	// bar names; updateDL is that download while it runs.
+	updateLatest      string
+	updateDL          updateDownload
 	autoCloseParent   bool
 	autoCloseSubtasks bool
 	// subtaskTags: a new subtask copies its parent's tags.

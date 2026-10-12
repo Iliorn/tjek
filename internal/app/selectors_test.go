@@ -743,12 +743,12 @@ func TestWaitingTaskIsHiddenUntilItsStartDate(t *testing.T) {
 		t.Errorf("waitingTop = %d, want 2", m.cache.waitingTop)
 	}
 	// They are listed under the list, soonest first with the day each
-	// starts, under a heading that names the filter showing them; the status
-	// line, away from the list, keeps quiet while they fit there.
+	// starts; the status line, away from the list, keeps quiet while they
+	// fit there.
 	w, h := m.termWidth, m.termHeight
 	m.termWidth, m.termHeight = 110, 30
 	list := ansi.Strip(m.renderTaskList())
-	head := strings.Index(list, "Waiting to start (2) · /waiting shows them")
+	head := strings.Index(list, "Waiting to start (2)")
 	dated, putOff := strings.Index(list, later.Title+" · starts "), strings.Index(list, someday.Title+" · starts someday")
 	if head < 0 || dated < head || putOff < dated {
 		t.Errorf("want the waiting block, dated task before the someday one:\n%s", list)

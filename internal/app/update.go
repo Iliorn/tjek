@@ -2025,14 +2025,41 @@ func (m model) updateConfirmUpdate(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "y", "enter":
 			m.mode = modeNormal
 			m.updateStatus = tr("Updating…")
-			return m, func() tea.Msg {
-				return updateDoneMsg{err: selfUpdate()}
+			m.updateDL = updateDownload{active: true, version: m.updateLatest, total: -1}
+			// The download reports into a one-slot channel, replacing what
+			// the app has not read yet, so it never waits on a redraw and
+			// the bar shows the latest count; closing it ends the wait.
+			ch := make(chan updateProgressMsg, 1)
+			report := func(done, total int64) {
+				select {
+				case <-ch:
+				default:
+				}
+				ch <- updateProgressMsg{done: done, total: total}
 			}
+			return m, tea.Batch(func() tea.Msg {
+				err := selfUpdateWith(report)
+				close(ch)
+				return updateDoneMsg{err: err}
+			}, waitForUpdateProgress(ch))
 		case "n", "esc":
 			m.mode = modeNormal
 		}
 	}
 	return m, nil
+}
+
+// waitForUpdateProgress waits for the download's next report, and returns
+// nothing once the download is over and the channel closed.
+func waitForUpdateProgress(ch chan updateProgressMsg) tea.Cmd {
+	return func() tea.Msg {
+		p, ok := <-ch
+		if !ok {
+			return nil
+		}
+		p.ch = ch
+		return p
+	}
 }
 
 // checkForUpdate queries the latest release tag asynchronously.

@@ -13,6 +13,14 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+### Added
+
+- Updating from Settings shows the download as an orange bar, with its percent and size.
+
+### Changed
+
+- The "Waiting to start" heading leaves `/waiting` to the `?` help, beside the ◷ rows.
+
 ## [1.59.0] - 2026-10-12
 
 ### Changed

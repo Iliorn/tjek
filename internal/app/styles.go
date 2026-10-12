@@ -408,6 +408,20 @@ var tagProgressGradient = []lipgloss.Style{
 	lipgloss.NewStyle().Foreground(lipgloss.Color("#e8a0ff")),
 }
 
+// updateProgressGradient colours the update's download bar, dark to bright
+// orange along the filled part (renderUpdateProgress).
+var updateProgressGradient = []lipgloss.Style{
+	lipgloss.NewStyle().Foreground(lipgloss.Color("#3a1800")),
+	lipgloss.NewStyle().Foreground(lipgloss.Color("#5a2600")),
+	lipgloss.NewStyle().Foreground(lipgloss.Color("#7c3500")),
+	lipgloss.NewStyle().Foreground(lipgloss.Color("#a04500")),
+	lipgloss.NewStyle().Foreground(lipgloss.Color("#c45600")),
+	lipgloss.NewStyle().Foreground(lipgloss.Color("#e56a00")),
+	lipgloss.NewStyle().Foreground(lipgloss.Color("#ff7f0f")),
+	lipgloss.NewStyle().Foreground(lipgloss.Color("#ff9a3c")),
+	lipgloss.NewStyle().Foreground(lipgloss.Color("#ffb366")),
+}
+
 var calGradient = []lipgloss.Style{
 	lipgloss.NewStyle().Foreground(lipgloss.Color("#1f4a40")),
 	lipgloss.NewStyle().Foreground(lipgloss.Color("#2a6356")),

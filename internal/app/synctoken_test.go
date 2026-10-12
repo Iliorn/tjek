@@ -100,7 +100,7 @@ func TestUpdateRefusesARedirectOffGitHub(t *testing.T) {
 		http.Redirect(w, r, "https://evil.test/tjek", http.StatusFound)
 	})
 
-	_, err := downloadReleaseAsset(releaseAsset{Name: "tjek", URL: srv.URL + "/tjek"}, t.TempDir()+"/tjek")
+	_, err := downloadReleaseAsset(releaseAsset{Name: "tjek", URL: srv.URL + "/tjek"}, t.TempDir()+"/tjek", nil)
 	if err == nil {
 		t.Fatal("a redirect to a non-GitHub host was followed")
 	}
