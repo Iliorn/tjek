@@ -5,7 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/muesli/termenv"
 
 	"github.com/Iliorn/tjek/todo"
 )
@@ -96,5 +98,42 @@ func TestRecurPickShowsTheIntervalAndTheNextDate(t *testing.T) {
 	m = script(t, m, "enter")
 	if view := ansi.Strip(m.View()); !strings.Contains(view, "↻ every 2 weeks") {
 		t.Errorf("the Recurrence field should read the rule in words:\n%s", view)
+	}
+}
+
+// In colour, the picker's line carries its colour codes intact: shortening
+// it once cleaned the escape out of each, which printed them as text. And
+// the task stays on screen, its detail pane open under the list, while its
+// rule is picked.
+func TestRecurPickDrawsInColourWithTheDetailOpen(t *testing.T) {
+	before := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(before)
+
+	task := todo.New("pay rent")
+	m := modelWithTasks(t, task)
+	m.termWidth, m.termHeight = 110, 32
+	m = sendKey(t, m, "enter")
+	m.detail.field = fieldRecurrence
+	if m.detailPos != detailBottom {
+		t.Skipf("detail position %v; this test is for the stacked pane", m.detailPos)
+	}
+	m = script(t, m, "enter")
+	if m.mode != modeRecurPick {
+		t.Fatalf("mode = %v, want the picker", m.mode)
+	}
+	view := m.View()
+	plain := ansi.Strip(view)
+	if strings.Contains(plain, "[0m") || strings.Contains(plain, ";2;") {
+		t.Errorf("colour codes printed as text:\n%s", plain)
+	}
+	if !strings.Contains(plain, "Repeat every ‹ 1 › ‹ week ›") {
+		t.Errorf("the picker is missing:\n%s", plain)
+	}
+	if !strings.Contains(plain, "Recurrence:") {
+		t.Errorf("the detail pane closed while the picker is open:\n%s", plain)
+	}
+	if got, want := strings.Count(plain, "\n")+1, m.termHeight; got > want {
+		t.Errorf("the view is %d lines in a %d-line window", got, want)
 	}
 }

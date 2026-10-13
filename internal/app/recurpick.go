@@ -8,6 +8,7 @@ import (
 	"github.com/Iliorn/tjek/todo"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // recurpick.go is the detail pane's recurrence picker: "Repeat every ‹ 2 ›
@@ -180,7 +181,10 @@ func (m model) renderRecurPick(w int) string {
 		}
 	}
 	hints := helpStyle.Render("    " + truncate(tr("↑/↓ or 0-9 change · ←/→ switch · enter save · x no repeat · r write a rule · esc cancel"), max(w-4, 8)))
-	return truncate(line, w) + "\n" + hints
+	// ansi.Truncate, not truncate: the line is already styled, and truncate
+	// cleans control characters out of text, the escape that starts each
+	// colour code included, which left the codes printed as text.
+	return ansi.Truncate(line, w, "…") + "\n" + hints
 }
 
 // recurPreviewNext is the instance r brings after t's due date, or after

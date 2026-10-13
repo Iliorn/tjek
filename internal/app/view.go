@@ -393,7 +393,7 @@ func (m model) View() string {
 func (m model) buildStackedDetail(w int) (string, int) {
 	var detailContent string
 	detailLineCount := 0
-	showDetail := m.mode == modeNormal
+	showDetail := m.modeKeepsDetail()
 	// For tabs that open the detail on enter / close on esc, the detail
 	// panel is hidden until the user explicitly opens it. In side-by-side
 	// mode the Tasks detail renders inside buildListContent's right column

@@ -314,13 +314,21 @@ func (m model) drillDetailOpen() bool {
 	return drilled && m.pane == paneDetail
 }
 
+// modeKeepsDetail reports whether the stacked detail pane stays drawn in the
+// current mode. A footer prompt takes its place, except the recurrence
+// picker: it edits a field of the task on screen, and hiding the task while
+// its rule is chosen took away what the choice was about.
+func (m model) modeKeepsDetail() bool {
+	return m.mode == modeNormal || m.mode == modeRecurPick
+}
+
 // detailVisible reports whether the detail pane will be rendered as its own
 // stacked panel for the current tab/mode/pane. Mirrors the showDetail
 // decision in view.View so the list-height math matches what the renderer
 // actually emits. In side-by-side mode the detail lives inside the list
 // region's right column, so it costs no list rows and reports false here.
 func (m model) detailVisible() bool {
-	if m.mode != modeNormal {
+	if !m.modeKeepsDetail() {
 		return false
 	}
 	if m.drillDetailOpen() {
