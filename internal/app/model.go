@@ -169,6 +169,9 @@ const (
 	// modeCaptureKey waits for the key a Settings → Keys row is to move to
 	// (keys_settings.go); captureAction is the action being rebound.
 	modeCaptureKey
+	// modeRecurPick is the detail pane's recurrence picker: every N days,
+	// weeks, months or years (recurpick.go); recurPick is its state.
+	modeRecurPick
 )
 
 // untaggedKey is a sentinel used both as the Tags-tab virtual row for tasks
@@ -384,6 +387,7 @@ type model struct {
 
 	// UI state
 	confirmMsg string
+	recurPick  recurPicker
 	// confirmOnYes is the action modeConfirm runs on y/enter; nil is a no-op.
 	// Reading pending* fields at call time keeps each action a plain method.
 	confirmOnYes         func(*model) tea.Cmd

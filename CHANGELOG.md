@@ -13,6 +13,11 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+### Changed
+
+- `enter` on Recurrence opens a picker: repeat every N days, weeks, months or years.
+- A custom interval reads in words, "every 2 weeks", rather than as `every:2w`.
+
 ## [1.60.0] - 2026-10-12
 
 ### Added

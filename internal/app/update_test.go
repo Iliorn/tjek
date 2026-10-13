@@ -947,26 +947,3 @@ func TestEditorInputReloadsDraftIntoInput(t *testing.T) {
 		t.Errorf("comment must be unchanged until Enter, got %q", c)
 	}
 }
-
-// ── Recurrence cycle order (detail pane) ─────────────────────────────────────
-
-// TestRecurrenceCycleOrder asserts the canonical Enter-on-fieldRecurrence
-// cycle: "" → daily → weekdays → weekly → monthly → yearly → (clear).
-// weekdays was previously discoverable only as the last stop before clear;
-// this test locks in the new position (after daily, before weekly).
-func TestRecurrenceCycleOrder(t *testing.T) {
-	task := todo.New("standup")
-	m := modelWithTasks(t, task)
-	m.pane = paneDetail
-	m.detail = detailState{field: fieldRecurrence}
-
-	want := []string{"daily", "weekdays", "weekly", "monthly", "yearly", ""}
-	for i, wantVal := range want {
-		updated, _ := m.startEditing()
-		m = updated.(model)
-		got := m.get(task.ID).Recurrence
-		if got != wantVal {
-			t.Errorf("press %d: recurrence = %q, want %q", i+1, got, wantVal)
-		}
-	}
-}

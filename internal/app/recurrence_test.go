@@ -52,9 +52,10 @@ func TestParseRecurInput(t *testing.T) {
 func TestTrRecurrence(t *testing.T) {
 	for rule, want := range map[string]string{
 		"weekly":                         "weekly",
-		"every:3d":                       "every:3d",
+		"every:3d":                       "every 3 days",
+		"every:4m":                       "every 4 months",
 		"weekly:mon,thu":                 "weekly mon,thu",
-		"every:2w:fri/until:2027-12-31":  "every:2w fri until 31-12-27",
+		"every:2w:fri/until:2027-12-31":  "every 2 weeks fri until 31-12-27",
 		"daily/count:10":                 "daily 10 times",
 		"something a newer tjek invents": "something a newer tjek invents",
 	} {
@@ -64,6 +65,9 @@ func TestTrRecurrence(t *testing.T) {
 	}
 	withLang(t, langDA, func() {
 		if got, want := trRecurrence("weekly:mon,thu/count:8"), "ugentligt man,tor 8 gange"; got != want {
+			t.Errorf("da: trRecurrence = %q, want %q", got, want)
+		}
+		if got, want := trRecurrence("every:2w"), "hver 2. uge"; got != want {
 			t.Errorf("da: trRecurrence = %q, want %q", got, want)
 		}
 	})

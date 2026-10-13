@@ -659,6 +659,8 @@ func (m model) extraOverheadLines() int {
 		return 3
 	case modeConfirm, modeConfirmUpdate, modeIdlePrompt, modeCaptureKey:
 		return 1
+	case modeRecurPick:
+		return 2
 	}
 	return 0
 }

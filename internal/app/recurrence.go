@@ -79,15 +79,14 @@ func canonicalDayList(s string) string {
 }
 
 // trRecurrence renders a recurrence rule for display: the interval in the
-// active language ("every:Nd|w|m|y" kept as-is, since the prefix is a
-// recognizable English keyword and the number+unit is locale-neutral), then
-// its weekdays and its end. A rule this build cannot read shows as stored.
+// active language ("every 2 weeks", recurIntervalText), then its weekdays
+// and its end. A rule this build cannot read shows as stored.
 func trRecurrence(rule string) string {
 	r, ok := todo.ParseRule(rule)
 	if !ok {
 		return rule
 	}
-	parts := []string{tr(r.Interval())}
+	parts := []string{recurIntervalText(r)}
 	if days := r.Weekdays(); len(days) > 0 {
 		names := make([]string, len(days))
 		for i, d := range days {

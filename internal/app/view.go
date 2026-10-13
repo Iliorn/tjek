@@ -740,6 +740,8 @@ func (m model) footerContentFor(w int) string {
 			return field + "\n" + helpStyle.Render("    "+tr("ctrl+e  edit in $EDITOR"))
 		}
 		return field
+	case modeRecurPick:
+		return m.renderRecurPick(w)
 	case modeIdlePrompt, modeConfirmUpdate, modeCaptureKey:
 		// Same 4-space gutter as the key hints these prompts replace, so a
 		// prompt appears where the line it stands in for was.

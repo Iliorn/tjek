@@ -236,9 +236,14 @@ then stay in the list, ranked below today's work.
 
 ## Repeating tasks
 
-`r:` in the add field, or `r` on a task's **Recurrence** field, makes it
-repeat; `enter` on that field steps through the common rules. When you finish
-one, the next appears with its due date, its subtasks reopened.
+`enter` on a task's **Recurrence** field opens a picker: "Repeat every ‹ 2 ›
+‹ weeks ›". `↑`/`↓` change the number or the period, `←`/`→` move between
+them, and digits type the number, so every second week or every fourth month
+is a few keys. It shows the date the next one would fall on; `enter` saves,
+`x` stops the task repeating. For the rules below with weekdays or an end,
+`r` on the field (or in the picker) types one, as `r:` does in the add
+field. When you finish a repeating task, the next appears with its due date,
+its subtasks reopened.
 
 | Rule | Repeats |
 |------|---------|

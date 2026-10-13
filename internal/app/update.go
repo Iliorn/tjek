@@ -101,6 +101,8 @@ func (m model) updateForMode(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateConfirm(msg)
 	case modeConfirmUpdate:
 		return m.updateConfirmUpdate(msg)
+	case modeRecurPick:
+		return m.updateRecurPick(msg)
 	case modeCaptureKey:
 		return m.updateCaptureKey(msg)
 	case modeEditTimeEntry:

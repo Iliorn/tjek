@@ -151,16 +151,12 @@ func (m model) updateDetail(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.detail.field == fieldSubtasks {
 			return m.startRenamingSelectedSubtask()
 		}
-		// Enter steps through the common rules; r writes any rule, and
-		// writing one again starts its series over from the due date.
+		// Enter picks an interval; r writes any rule, weekdays and an end
+		// included, and writing one again starts its series over from the
+		// due date.
 		if m.detail.field == fieldRecurrence {
 			if t := m.currentTodo(); t != nil {
-				m.mode = modeInput
-				m.textInput.SetValue(recurInputValue(t.Recurrence))
-				m.textInput.CursorEnd()
-				m.textInput.Placeholder = tr("Repeat (weekly, mon,thu, 2w:fri, monthly/until:31-12-27, daily/10x)...")
-				m.textInput.Focus()
-				return m, textinput.Blink
+				return m.startRecurText(t)
 			}
 		}
 		// Edit the selected time entry from the detail pane — reuses the same
@@ -754,13 +750,12 @@ func (m model) detailDepTotal(t *todo.Todo) int {
 	return len(t.Dependencies) + len(dependentsOf(m.allTodos(), t.ID))
 }
 
-// recurrenceSteps, sizeSteps and prioritySteps are the orders enter walks the
-// stepped detail fields in, backspace the other way. Size starts at Medium so
-// the first press moves toward Small, the direction most often wanted.
+// sizeSteps and prioritySteps are the orders enter walks the stepped detail
+// fields in, backspace the other way. Size starts at Medium so the first
+// press moves toward Small, the direction most often wanted.
 var (
-	recurrenceSteps = []string{"", "daily", "weekdays", "weekly", "monthly", "yearly"}
-	sizeSteps       = []todo.Size{todo.SizeMedium, todo.SizeSmall, todo.SizeLarge}
-	prioritySteps   = []todo.Priority{todo.PriorityLow, todo.PriorityMedium, todo.PriorityHigh}
+	sizeSteps     = []todo.Size{todo.SizeMedium, todo.SizeSmall, todo.SizeLarge}
+	prioritySteps = []todo.Priority{todo.PriorityLow, todo.PriorityMedium, todo.PriorityHigh}
 )
 
 // stepIn is the value dir steps away from cur in steps, wrapping at the ends;
@@ -774,9 +769,8 @@ func stepIn[T comparable](steps []T, cur T, dir int) T {
 }
 
 // detailStepValue steps the selected detail field's value by dir, for the
-// fields that pick from a short list (recurrence, priority, size, stage);
-// elsewhere it does nothing. A custom "every:Nd" rule steps to none; quick-add
-// (r:Nd) is where one is written.
+// fields that pick from a short list (priority, size, stage), and opens the
+// recurrence picker on Recurrence; elsewhere it does nothing.
 func (m model) detailStepValue(dir int) (tea.Model, tea.Cmd) {
 	t := m.currentTodo()
 	if t == nil {
@@ -784,13 +778,9 @@ func (m model) detailStepValue(dir int) (tea.Model, tea.Cmd) {
 	}
 	switch m.detail.field {
 	case fieldRecurrence:
-		m.pushUndo("cycle recurrence", t.ID)
-		if r := stepIn(recurrenceSteps, t.Recurrence, dir); r == "" {
-			t.ClearRecurrence()
-		} else {
-			t.SetRecurrence(r)
-		}
-		m.markModified(t.ID)
+		// Too many rules to step through: every N days, weeks, months or
+		// years. Both keys open the picker on the rule there is.
+		m.startRecurPick(t)
 	case fieldPriority:
 		if m.cyclePriority(t, dir) {
 			// Without this the keypress looks dead: the cycle ran, the cap put
