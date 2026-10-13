@@ -13,6 +13,8 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+## [1.61.0] - 2026-10-13
+
 ### Changed
 
 - `enter` on Recurrence opens a picker: repeat every N days, weeks, months or years.
