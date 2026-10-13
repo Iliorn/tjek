@@ -2,6 +2,7 @@ package app
 
 import (
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -27,7 +28,23 @@ func script(t *testing.T, m model, keys ...string) model {
 	for _, k := range keys {
 		m = sendKey(t, m, k)
 	}
+	noStrayCodes(t, m.View())
 	return m
+}
+
+// strayCode is what is left of a colour code that lost its escape: the
+// "[1;38;2;168;255;120m" a terminal then prints as text.
+var strayCode = regexp.MustCompile(`\[[0-9;]*m`)
+
+// noStrayCodes fails the test when view shows any colour code as text. Every
+// script checks the screen it ends on, so a styled line cut with a helper
+// for plain text (truncate cleans the escapes out) is caught wherever it is
+// drawn, not only by a test written for that line.
+func noStrayCodes(t *testing.T, view string) {
+	t.Helper()
+	if plain := ansi.Strip(view); strings.ContainsRune(plain, '\x1b') || strayCode.MatchString(plain) {
+		t.Errorf("the screen shows a colour code as text (%q):\n%s", strayCode.FindString(plain), plain)
+	}
 }
 
 // sendKeyCmd is sendKey but keeps the returned command, for asserting on
@@ -1538,7 +1555,7 @@ func TestScriptDetailSectionsInOrder(t *testing.T) {
 			t.Fatalf("after %d presses of →: in section %d, want %d (%s)", i, got, i, s.label)
 		}
 		bar := m.detailSectionBar(200)
-		if lit := headerStyle.Render(tr(s.label)); !strings.Contains(bar, lit) {
+		if lit := sectionCurrentStyle.Render(tr(s.label)); !strings.Contains(bar, lit) {
 			t.Errorf("section %s: the bar does not light it: %q", s.label, bar)
 		}
 	}

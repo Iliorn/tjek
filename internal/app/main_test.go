@@ -8,6 +8,9 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 )
 
 // testHome is the fake home directory TestMain redirects the whole binary into.
@@ -51,6 +54,12 @@ func TestMain(m *testing.M) {
 		os.Unsetenv(v)
 	}
 	os.Unsetenv("TJEK_HOME")
+	// Render as a terminal does. Without a colour profile lipgloss draws no
+	// escape codes at all, so a test could never see a code broken by
+	// cutting a styled line with a helper meant for plain text, which once
+	// printed "[0m[1;38;2;…" across the recurrence picker in every real
+	// terminal while the whole suite passed (noStrayCodes).
+	lipgloss.SetColorProfile(termenv.TrueColor)
 	code := m.Run()
 	// The last test to open the store leaves it open; on Windows that is
 	// enough to keep the temp home from being removed.

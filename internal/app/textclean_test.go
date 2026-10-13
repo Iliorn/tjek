@@ -92,8 +92,11 @@ func TestControlCharactersStayOffTheScreen(t *testing.T) {
 			m.detailPos = pos
 			m.termWidth, m.termHeight = 130, 45
 			m.calendar.selected = day
-			if len(keys) > 0 {
-				m = script(t, m, keys...)
+			// sendKey, not script: the "[31m" left of the title's escape
+			// is the text this test expects on screen, and script fails a
+			// screen that shows one (noStrayCodes).
+			for _, k := range keys {
+				m = sendKey(t, m, k)
 			}
 			for i, line := range strings.Split(m.View(), "\n") {
 				var probs []string
