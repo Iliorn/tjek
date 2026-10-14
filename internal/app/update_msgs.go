@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/Iliorn/tjek/todo"
@@ -243,6 +244,13 @@ func (m model) handleReloaded(msg reloadedMsg) (tea.Model, tea.Cmd) {
 	if msg.epoch != m.saveEpoch {
 		// A save started after this read did, which may have missed it.
 		return m, m.reloadCmd()
+	}
+	// Before the unchanged-tasks shortcut below: claiming a task changes no
+	// task. The mark it adds goes before the title, so the title column is
+	// sized again; nothing else reads claims from a cache.
+	if msg.claims != nil && !maps.Equal(m.claims, msg.claims) {
+		m.claims = msg.claims
+		m.refreshTaskColMetrics()
 	}
 	// Atomic swap: rebuild the Store from the freshly-loaded task set,
 	// invalidate caches, and follow the same task ID across the new ordering

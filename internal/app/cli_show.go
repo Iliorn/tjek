@@ -41,8 +41,10 @@ func cliShow(args []string) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}
+	now := time.Now()
+	claims := cliClaims(now)
 	if *asJSON {
-		return emitJSON(t)
+		return emitJSON(withClaim(*t, claims, now))
 	}
 	// Gather subtasks from the loaded slice (parent→child via ParentID).
 	// Sorted by CreatedAt to match TUI ordering.
@@ -53,7 +55,7 @@ func cliShow(args []string) int {
 		}
 	}
 	sort.Slice(subs, func(i, j int) bool { return subs[i].CreatedAt.Before(subs[j].CreatedAt) })
-	printTaskDetail(t, subs, todos, repo.ranker())
+	printTaskDetail(t, subs, todos, repo.ranker(), claims)
 	return 0
 }
 
@@ -139,7 +141,7 @@ func seqExplainJSONOf(e rank.Explanation) seqExplainJSON {
 	return out
 }
 
-func printTaskDetail(t *todo.Todo, subs []todo.Todo, todos []todo.Todo, rk rank.Ranker) {
+func printTaskDetail(t *todo.Todo, subs []todo.Todo, todos []todo.Todo, rk rank.Ranker, claims map[string]claim) {
 	fmt.Printf("ID:       %s\n", t.ID)
 	fmt.Printf("Title:    %s\n", t.Title)
 	status := "pending"
@@ -147,6 +149,9 @@ func printTaskDetail(t *todo.Todo, subs []todo.Todo, todos []todo.Todo, rk rank.
 		status = "done"
 	}
 	fmt.Printf("Status:   %s\n", status)
+	if c, ok := claimFor(claims, t, time.Now()); ok {
+		fmt.Printf("Claimed:  by %s until %s\n", c.Holder, claimWhen(c.Until, time.Now()))
+	}
 	if t.Status == todo.Pending && t.ParentID == "" {
 		fmt.Printf("Stage:    %s\n", storedBoard().stageDisplay(t.Stage))
 	}

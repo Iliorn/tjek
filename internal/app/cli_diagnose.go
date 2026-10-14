@@ -178,7 +178,9 @@ func diagnoseStorage() []diagnostic {
 		}
 	}
 
-	db, err := openStoreAt(path)
+	// Read-only and unmigrated: a health report describes the store as it
+	// is, and running it must not be what changes it.
+	db, err := openStoreFileAt(path, true)
 	if err != nil {
 		out = append(out, diagnostic{
 			Name: "database open", Value: "failed", Status: statusFail, Detail: err.Error(),
@@ -189,6 +191,13 @@ func diagnoseStorage() []diagnostic {
 
 	if v, err := currentSchemaVersion(db); err != nil {
 		out = append(out, diagnostic{Name: "schema version", Value: "unreadable", Status: statusFail, Detail: err.Error()})
+	} else if pending, err := pendingMigrations(db); err != nil {
+		out = append(out, diagnostic{Name: "schema version", Value: fmt.Sprintf("%03d", v), Status: statusFail, Detail: err.Error()})
+	} else if len(pending) > 0 {
+		out = append(out, diagnostic{
+			Name: "schema version", Value: fmt.Sprintf("%03d", v), Status: statusWarn,
+			Detail: fmt.Sprintf("older than this tjek; the next command or app launch migrates it to %03d", pending[len(pending)-1].version),
+		})
 	} else {
 		out = append(out, diagnostic{Name: "schema version", Value: fmt.Sprintf("%03d", v), Status: statusOK})
 	}

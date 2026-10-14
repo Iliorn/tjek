@@ -86,19 +86,30 @@ func saveStampedOnce(h *sql.DB, dirty []*todo.Todo, bases map[string]*todo.Todo,
 		return err
 	}
 	events := make(map[string]todo.Event, len(dirty))
+	// ended is the tasks this save closes or deletes, whose claims it lets go.
+	var ended []string
 	for _, t := range work {
 		signNewChildren(t, known, by.name)
 		old, ok := stored[t.ID]
 		var prev *todo.Todo
 		if ok {
 			prev = &old
+			if old.Status == todo.Pending && !old.Deleted && (t.Status != todo.Pending || t.Deleted) {
+				ended = append(ended, t.ID)
+			}
 		}
 		t.Stamps = stampEdit(prev, t, clock, now)
 		if e, ok := historyEvent(prev, t, by, now); ok {
 			events[t.ID] = e
 		}
 	}
+	for id := range tombstones {
+		ended = append(ended, id)
+	}
 	if err := saveNormalizedIn(tx, work, tombstones, score); err != nil {
+		return err
+	}
+	if err := dropClaims(tx, ended); err != nil {
 		return err
 	}
 	for id, e := range events {

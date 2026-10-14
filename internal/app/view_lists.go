@@ -1144,6 +1144,10 @@ func (m *model) taskRowLabelIn(t *todo.Todo, d *groupDeps) (prefix, text, badges
 	if t.IsTimerRunning() {
 		p.WriteString("⧗ ")
 	}
+	// Someone (an agent, mostly) is on it: worth a cell before you pick it up.
+	if _, ok := claimFor(m.claims, t, m.frameTime); ok {
+		p.WriteString(claimMark + " ")
+	}
 	// One arrow, not two: a task in the middle of a chain is both, and the
 	// half that decides whether you can start it is the one worth a cell.
 	switch {

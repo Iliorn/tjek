@@ -215,7 +215,12 @@ func (m model) renderDetailPage1(t *todo.Todo) string {
 
 	// Order within this block is derived-facts first, provenance last: Score
 	// explains the task's position in the list, the UUID and timestamps are
-	// rows nobody acts on.
+	// rows nobody acts on. A claim comes first of all: it says whether the
+	// task is free to pick up.
+	if c, ok := claimFor(m.claims, t, m.frameTime); ok {
+		left := formatDuration(c.Until.Sub(m.frameTime).Round(time.Minute))
+		roField(tr("Claimed:"), timerVal, fmt.Sprintf(tr("%s %s · %s left"), claimMark, c.Holder, left))
+	}
 	subTime := m.descendantTimeSpent(t.ID)
 	if len(t.TimeEntries) > 0 || subTime > 0 {
 		own := t.TotalTimeSpent()

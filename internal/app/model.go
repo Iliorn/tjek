@@ -516,6 +516,10 @@ type model struct {
 	// Frame
 	frameTime time.Time
 
+	// claims are the reservations agents hold on tasks (claims.go), read
+	// with the tasks on load and on every reload. The app only shows them.
+	claims map[string]claim
+
 	// Gantt reusable buffers
 	ganttBarBuf   []rune
 	ganttColorBuf []int
@@ -643,6 +647,7 @@ func initialModel(repo Repository) model {
 	m := model{
 		Store:             store,
 		repo:              repo,
+		claims:            repoClaims(repo, time.Now()),
 		rank:              rank.Ranker{Biases: biasesFromSettings(settings)},
 		boardCfg:          boardConfigFromSettings(settings),
 		textInput:         ti,
@@ -938,7 +943,8 @@ func (m *model) reload(ifChanged bool) tea.Cmd {
 		}
 		todos, err := repo.Load()
 		fp, versions := loadedFingerprint(todos)
-		return reloadedMsg{todos: todos, err: err, epoch: epoch, fingerprint: fp, versions: versions}
+		return reloadedMsg{todos: todos, err: err, epoch: epoch, fingerprint: fp, versions: versions,
+			claims: repoClaims(repo, time.Now())}
 	}
 }
 

@@ -89,6 +89,10 @@ type reloadedMsg struct {
 	// the loop; zero and nil when the sender left them to handleReloaded.
 	fingerprint uint64
 	versions    []uint64
+	// claims are the store's claims as of the read (loadClaims). A claim
+	// taken or released changes no task, so they are adopted even when the
+	// tasks are unchanged.
+	claims map[string]claim
 }
 
 // watcherState lives on the model. The mutex protects pendingExternalReload

@@ -36,11 +36,17 @@ func cliList(args []string) int {
 	wide := fs.Bool("wide", false, "add AGE and IDLE columns (days since creation / last change)")
 	waiting := fs.Bool("waiting", false, "only tasks hidden until their start date (left out otherwise)")
 	where := fs.String("where", "", "only tasks matching a filter in the app's / grammar ('#work -@home or p:high'); edit and done --where change these")
+	claimed := fs.Bool("claimed", false, "only tasks someone holds a claim on (tjek claim)")
+	unclaimed := fs.Bool("unclaimed", false, "only tasks nobody holds a claim on")
 	flagArgs, positionals := splitFlagsAndPositionals(fs, args)
 	if err := fs.Parse(flagArgs); err != nil {
 		return 2
 	}
 	if !noPositionals("list", positionals, `to filter by a word, use tjek search "word"`) {
+		return 2
+	}
+	if *claimed && *unclaimed {
+		fmt.Fprintln(os.Stderr, "tjek list: --claimed and --unclaimed leave nothing between them; pass one")
 		return 2
 	}
 	opts, code := listOptsFromFlags(*all, *focus, *tag, *project, *search, *searchWord, *searchRe, *stale, *unblocked)
@@ -59,6 +65,14 @@ func cliList(args []string) int {
 	}
 	blockedSet := buildBlockedSet(todos)
 	rows := filterTopLevel(todos, opts)
+	now := time.Now()
+	claims := cliClaims(now)
+	if *claimed || *unclaimed {
+		rows = slices.DeleteFunc(rows, func(t todo.Todo) bool {
+			_, held := claimFor(claims, &t, now)
+			return held != *claimed
+		})
+	}
 	if err := sortTodosByCLIMode(rows, *sortBy, blockedSet, repo.ranker()); err != nil {
 		fmt.Fprintf(os.Stderr, "tjek list: %v\n", err)
 		return 2
@@ -67,7 +81,7 @@ func cliList(args []string) int {
 		rows = rows[:*limit]
 	}
 	if *asJSON {
-		return emitJSON(rows)
+		return emitJSON(tasksJSON(rows, claims, now))
 	}
 	// A bare "(no tasks)" after finishing a project is indistinguishable from
 	// a typo'd filter. When completed tasks match the same filters, say so —
@@ -80,7 +94,7 @@ func cliList(args []string) int {
 			return 0
 		}
 	}
-	printTaskTableWide(rows, blockedSet, *wide)
+	printTaskTableWide(rows, blockedSet, *wide, claims)
 	return 0
 }
 
@@ -185,10 +199,12 @@ func cliSearch(args []string) int {
 	if *limit > 0 && len(rows) > *limit {
 		rows = rows[:*limit]
 	}
+	now := time.Now()
+	claims := cliClaims(now)
 	if *asJSON {
-		return emitJSON(rows)
+		return emitJSON(tasksJSON(rows, claims, now))
 	}
-	printTaskTable(rows, blockedSet)
+	printTaskTableWide(rows, blockedSet, false, claims)
 	return 0
 }
 
@@ -306,6 +322,7 @@ func cliTop(args []string) int {
 	n := fs.Int("n", 10, "rows to show")
 	asJSON := fs.Bool("json", false, "emit JSON instead of a table")
 	wide := fs.Bool("wide", false, "include priority, due date, and tags columns")
+	unclaimed := fs.Bool("unclaimed", false, "leave out the tasks someone holds a claim on (tjek claim)")
 	flagArgs, positionals := splitFlagsAndPositionals(fs, args)
 	if err := fs.Parse(flagArgs); err != nil {
 		return 2
@@ -328,6 +345,13 @@ func cliTop(args []string) int {
 	if storedHideWaiting() {
 		rows = slices.DeleteFunc(rows, func(t todo.Todo) bool { return rank.StartsLater(&t, now) })
 	}
+	claims := cliClaims(now)
+	if *unclaimed {
+		rows = slices.DeleteFunc(rows, func(t todo.Todo) bool {
+			_, held := claimFor(claims, &t, now)
+			return held
+		})
+	}
 	if *n > 0 && len(rows) > *n {
 		rows = rows[:*n]
 	}
@@ -337,13 +361,14 @@ func cliTop(args []string) int {
 		// scale the table and the TUI show, so a status-bar widget can render
 		// the same number the app does without knowing the field maximum.
 		type scoredOut struct {
-			ID       string   `json:"id"`
-			Title    string   `json:"title"`
-			Score    float64  `json:"score"`
-			Percent  int      `json:"percent"`
-			Priority string   `json:"priority"`
-			Due      string   `json:"due,omitempty"`
-			Tags     []string `json:"tags,omitempty"`
+			ID       string     `json:"id"`
+			Title    string     `json:"title"`
+			Score    float64    `json:"score"`
+			Percent  int        `json:"percent"`
+			Priority string     `json:"priority"`
+			Due      string     `json:"due,omitempty"`
+			Tags     []string   `json:"tags,omitempty"`
+			Claim    *claimJSON `json:"claim,omitempty"`
 		}
 		out := make([]scoredOut, len(rows))
 		for i := range rows {
@@ -352,8 +377,9 @@ func cliTop(args []string) int {
 				due = rows[i].DueDate.Format("2006-01-02")
 			}
 			score := rk.Score(&rows[i])
-			out[i] = scoredOut{rows[i].ID, rows[i].Title, score, rk.Percent(score),
-				priorityLetter(rows[i].Priority), due, rows[i].Tags}
+			out[i] = scoredOut{ID: rows[i].ID, Title: rows[i].Title, Score: score, Percent: rk.Percent(score),
+				Priority: priorityLetter(rows[i].Priority), Due: due, Tags: rows[i].Tags,
+				Claim: withClaim(rows[i], claims, now).Claim}
 		}
 		return emitJSON(out)
 	}
@@ -382,13 +408,13 @@ func cliTop(args []string) int {
 			fmt.Printf("%-8s  %5s  %-3s  %-10s  %-*s  %s\n",
 				rows[i].ID[:8], cliScoreCell(rk, &rows[i], now),
 				priorityLetter(rows[i].Priority), due, tagW, tags,
-				truncate(rows[i].Title, 60))
+				truncate(claimedTitle(rows[i].Title, claims, &rows[i], now), 60))
 		}
 		return 0
 	}
 	for i := range rows {
 		fmt.Printf("%-8s %5s  %s\n", rows[i].ID[:8],
-			cliScoreCell(rk, &rows[i], now), truncate(rows[i].Title, 60))
+			cliScoreCell(rk, &rows[i], now), truncate(claimedTitle(rows[i].Title, claims, &rows[i], now), 60))
 	}
 	return 0
 }

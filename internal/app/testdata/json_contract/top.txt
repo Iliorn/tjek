@@ -1,3 +1,6 @@
+[].claim.by
+[].claim.since
+[].claim.until
 [].due
 [].id
 [].percent

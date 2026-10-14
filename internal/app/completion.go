@@ -32,10 +32,12 @@ var cliCommandSpecs = []cliCommandSpec{
 		"chain", "comment", "depends", "due", "json", "like", "note", "p", "priority",
 		"project", "quiet-id", "recur", "size", "stage", "start", "tag"}},
 	{name: "list", summary: "list pending top-level tasks", flags: []string{
-		"all", "blocked", "focus", "json", "limit", "project", "ready", "search",
-		"search-re", "search-word", "sort", "stale", "tag", "unblocked-since", "waiting", "where", "wide"}},
+		"all", "blocked", "claimed", "focus", "json", "limit", "project", "ready", "search",
+		"search-re", "search-word", "sort", "stale", "tag", "unblocked-since", "unclaimed", "waiting", "where", "wide"}},
 	{name: "search", summary: "title/notes search", flags: []string{"json", "limit", "pending", "re", "sort", "word"}},
-	{name: "top", summary: "show the top tasks by sequence score", flags: []string{"json", "n", "wide"}},
+	{name: "top", summary: "show the top tasks by sequence score", flags: []string{"json", "n", "unclaimed", "wide"}},
+	{name: "claim", summary: "reserve a task so other agents leave it alone", flags: []string{"as", "json", "next", "ttl", "where"}, refArg: true},
+	{name: "release", summary: "give a claimed task back", flags: []string{"as", "f", "json"}, refArg: true},
 	{name: "show", summary: "show one task in full", flags: []string{"json"}, refArg: true},
 	{name: "why", summary: "explain one task's sequence rank", flags: []string{"json"}, refArg: true},
 	{name: "edit", summary: "change fields on one task", refArg: true, flags: []string{

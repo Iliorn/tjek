@@ -29,25 +29,36 @@ func Main(version string) {
 	restoreConsole := prepareConsole()
 	defer restoreConsole()
 
-	// Remove the binaries earlier Windows self-updates moved aside, if any.
-	if execPath, err := os.Executable(); err == nil {
-		removeLeftoverBinaries(execPath)
-	}
+	// A read-only run (--read-only or TJEK_READ_ONLY) touches no file, so the
+	// housekeeping below waits for one that may.
+	args, readOnly := takeReadOnly(os.Args[1:])
+	if !readOnly {
+		// Remove the binaries earlier Windows self-updates moved aside, if any.
+		if execPath, err := os.Executable(); err == nil {
+			removeLeftoverBinaries(execPath)
+		}
 
-	// An install from before the rename: move its files and its binary to
-	// tjek's names before anything looks for them.
-	adoptFormerName()
+		// An install from before the rename: move its files and its binary to
+		// tjek's names before anything looks for them.
+		adoptFormerName()
+	}
 
 	// CLI mode: when the first arg names a subcommand, run the non-TUI
 	// dispatcher and exit. Only bare `tjek` launches the Bubble Tea program
 	// below; it takes no arguments, so any other word is a mistake to report.
-	if len(os.Args) > 1 {
+	if len(args) > 0 || readOnly {
 		code := 0
-		if isCLICommand(os.Args[1]) {
-			code = runCLI(os.Args[1:])
-			checkpointStore()
-		} else {
-			code = unknownCommand(os.Args[1])
+		switch {
+		case len(args) == 0:
+			fmt.Fprintln(os.Stderr, "tjek: the app does not run read-only; name a command (tjek help)")
+			code = 2
+		case isCLICommand(args[0]):
+			code = runCLI(args, readOnly)
+			if !readOnly {
+				checkpointStore()
+			}
+		default:
+			code = unknownCommand(args[0])
 		}
 		restoreConsole() // os.Exit runs no deferred calls
 		os.Exit(code)

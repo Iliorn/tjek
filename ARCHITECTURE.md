@@ -532,6 +532,26 @@ Rules:
   `errSchemaTooNew` when `schema_version` is newer than this build knows, and
   `main` exits rather than show an empty list over a full database and write
   older columns back.
+- **A read writes nothing** (`storeMode`, cli_access.go). `openStore` creates,
+  migrates and tidies (tombstone pruning) only for `accessWrite`, the app and
+  the commands that change tasks. `runCLI` sets `accessRead` for the commands
+  `cliReads` lists: the store must exist (`errNoStore`, so an agent with the
+  wrong `HOME` gets an error, not an empty list) and only a migration this
+  build needs is written; no stale-timer recovery runs. `--read-only` /
+  `TJEK_READ_ONLY` (`takeReadOnly`, in `Main`) is `accessReadOnly`: SQLite
+  opens the file `mode=ro`, a pending migration is refused
+  (`errStoreNeedsMigration`), and every command not in `cliReads` is refused.
+  `doctor` always opens read-only and unmigrated (`openStoreFileAt`).
+- **Claims are beside the task, not on it** (claims.go, migration 017). A
+  claim (`tjek claim`) is a row in `claims`: holder and expiry in Unix ms. It
+  is not a `todo.Todo` field, so it never syncs, exports or enters history,
+  and `todo.Fields` does not know it. `takeClaim` is one upsert whose `WHERE`
+  is the whole "is it free" test, so racing processes cannot both win.
+  `saveStamped` drops the claims of the tasks a save closes or deletes, so
+  closing a task in the app releases it as `tjek done` does. The app reads claims with each
+  load and reload (`reloadedMsg.claims`, adopted before the unchanged-tasks
+  shortcut, since a claim changes no task) and only shows them
+  (`claimFor`, ⚑ in `taskRowLabelIn`, the detail pane's Claimed row).
 - **History is written by the save.** `saveStamped` compares each task with
   the stored version (as it does for the stamps) and records one `todo.Event`
   (`historyEvent`): created, closed, reopened, deleted, restored, or edited

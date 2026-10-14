@@ -2,8 +2,12 @@ package app
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+	"net/url"
 	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,12 +36,48 @@ var (
 	dbErr  error
 )
 
+// storeAccess is what this process may do to the store when it opens it. The
+// CLI sets it (storeMode) before anything opens the store; the app keeps the
+// default.
+type storeAccess int
+
+const (
+	// accessWrite creates the store if it is missing, migrates it and tidies
+	// it (tombstone pruning): the app and the commands that change tasks.
+	accessWrite storeAccess = iota
+	// accessRead is a command that only reads: the store must exist, and
+	// nothing is written to it but the migration this build needs to read
+	// it at all.
+	accessRead
+	// accessReadOnly is --read-only (TJEK_READ_ONLY): SQLite opens the file
+	// read-only, so nothing can write to it, and a store this build would
+	// have to migrate is refused rather than read.
+	accessReadOnly
+)
+
+var storeMode = accessWrite
+
+var (
+	// errNoStore is a store a read went looking for and did not find. A read
+	// never creates one: an empty store at the wrong path answers "no tasks",
+	// which is a wrong answer given with confidence.
+	errNoStore = errors.New("no task store")
+	// errStoreNeedsMigration is a read-only open of a store this build has
+	// not migrated yet.
+	errStoreNeedsMigration = errors.New("the task store needs migrating to this tjek's schema, which a read-only run cannot do; run any command without --read-only (or TJEK_READ_ONLY) once")
+)
+
 // openStore opens (once) the SQLite database, creates the schema, and — only if
 // the todos table did not previously exist — imports any legacy JSON file.
 // Gating import on a freshly-created table avoids "zombie" tasks: deleting every
-// task in the app must not re-import the old JSON on the next launch.
+// task in the app must not re-import the old JSON on the next launch. A read
+// (storeMode) opens an existing store and nothing more.
 func openStore() error {
 	dbOnce.Do(func() {
+		if storeMode != accessWrite {
+			db, dbErr = openExistingStoreAt(dbPath(), storeMode == accessReadOnly)
+			return
+		}
 		if err := ensureStorageDir(); err != nil {
 			dbErr = err
 			return
@@ -45,6 +85,73 @@ func openStore() error {
 		db, dbErr = openStoreAt(dbPath())
 	})
 	return dbErr
+}
+
+// storePragmas tune every connection to the store; see openStoreAt.
+const storePragmas = `
+	PRAGMA journal_mode=WAL;
+	PRAGMA synchronous=NORMAL;
+	PRAGMA busy_timeout=5000;
+	PRAGMA foreign_keys=ON;
+	PRAGMA temp_store=MEMORY;
+	PRAGMA mmap_size=67108864;
+	PRAGMA wal_autocheckpoint=1000;
+`
+
+// openExistingStoreAt opens the store at path for a read: an error when there
+// is none, the migrations this build needs (or, readOnly, an error saying it
+// needs them), and no tidying. readOnly opens the file read-only, so SQLite
+// itself refuses any write.
+func openExistingStoreAt(path string, readOnly bool) (*sql.DB, error) {
+	handle, err := openStoreFileAt(path, readOnly)
+	if err != nil {
+		return nil, err
+	}
+	pending, err := pendingMigrations(handle)
+	if err == nil && len(pending) > 0 {
+		if readOnly {
+			err = errStoreNeedsMigration
+		} else {
+			err = runMigrations(handle)
+		}
+	}
+	if err != nil {
+		handle.Close()
+		return nil, err
+	}
+	return handle, nil
+}
+
+// openStoreFileAt opens the store file at path as it is, schema and all: an
+// error when there is none, and with readOnly, a connection SQLite refuses
+// any write on.
+func openStoreFileAt(path string, readOnly bool) (*sql.DB, error) {
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("%w at %s (a command that adds a task, or the app, creates one)", errNoStore, path)
+	} else if err != nil {
+		return nil, err
+	}
+	dsn := path
+	if readOnly {
+		// An absolute path as a file: URI, so mode=ro is read as a parameter
+		// rather than as part of the name; ToSlash and the leading slash make
+		// a Windows drive path a valid one (file:///C:/...).
+		p := filepath.ToSlash(path)
+		if !strings.HasPrefix(p, "/") {
+			p = "/" + p
+		}
+		dsn = (&url.URL{Scheme: "file", Path: p, RawQuery: "mode=ro"}).String()
+	}
+	handle, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return nil, err
+	}
+	handle.SetMaxOpenConns(1)
+	if _, err := handle.Exec(storePragmas); err != nil {
+		handle.Close()
+		return nil, err
+	}
+	return handle, nil
 }
 
 // checkpointStore folds the WAL back into tasks.db and truncates it, so the
@@ -80,15 +187,7 @@ func openStoreAt(path string) (*sql.DB, error) {
 	// while skipping the per-commit fsync of FULL. mmap_size enables zero-copy
 	// reads for typical working sets. foreign_keys is enabled now so future
 	// migrations can rely on ON DELETE CASCADE.
-	if _, err := handle.Exec(`
-		PRAGMA journal_mode=WAL;
-		PRAGMA synchronous=NORMAL;
-		PRAGMA busy_timeout=5000;
-		PRAGMA foreign_keys=ON;
-		PRAGMA temp_store=MEMORY;
-		PRAGMA mmap_size=67108864;
-		PRAGMA wal_autocheckpoint=1000;
-	`); err != nil {
+	if _, err := handle.Exec(storePragmas); err != nil {
 		handle.Close()
 		return nil, err
 	}

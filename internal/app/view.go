@@ -1491,6 +1491,7 @@ func (m model) helpBodyLines() []string {
 		{"[✓]", tr("done (ST column)")},
 		{"[B]", tr("its board column's icon, once columns have icons (ST column)")},
 		{"⧗", tr("timer running")},
+		{claimMark, tr("claimed: an agent is on it (tjek claim)")},
 		{"↧", tr("blocked: waiting on an unfinished dependency; sorts last")},
 		{"↥", tr("others depend on this: finishing it unblocks them")},
 		{"1 2 3", tr("step in a project or tag: what can start now, then what waits on it")},

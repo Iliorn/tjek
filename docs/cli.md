@@ -50,6 +50,7 @@ tjek import backup.json         # merge an export file into the local store
 tjek import - < backup.json     # same, reading from stdin
 task export | tjek import -     # bring a Taskwarrior list over (see below)
 tjek doctor                     # this installation's health, for bug reports
+tjek claim --next --as codex-1  # an agent reserves the top free task (see below)
 tjek help
 ```
 
@@ -91,11 +92,58 @@ A change made from the command line shows in the task's history marked
 `cli`, under the name from Settings. Set `TJEK_AUTHOR` to sign a script's
 changes with a name of its own; `tjek show` prints the history at the end.
 
+## Agents working from one list
+
+Several agents (Codex, Claude, a script) can take work from the same list
+without two of them doing the same task. Each one claims a task before
+starting on it:
+
+```sh
+export TJEK_AUTHOR=codex-1          # who the agent is: signs its edits and its claims
+tjek claim --next --json            # take the top ready task nobody holds, and print it
+tjek claim 3f2a                     # claim again within 30 minutes to keep it (--ttl=2h for longer)
+tjek done 3f2a                      # closing (or deleting) it gives the claim back
+tjek release 3f2a                   # or give it back unfinished
+```
+
+- **One agent wins.** `claim` checks the task is free and takes it in one
+  step, so two agents claiming at once cannot both get it. `--next` passes
+  over tasks that are claimed, blocked, waiting for a later start date or
+  have a timer running, and `--where` narrows it (`--where '#work'`).
+- **Exit code 3** means nothing was claimed: the task is someone else's, or
+  `--next` found no free task. It is not an error; pick another or wait.
+- **A claim runs out** after `--ttl` (30 minutes by default), so an agent
+  that stops without releasing frees its task by itself. `release -f` frees
+  one now, whoever holds it.
+- **You see who is on what.** `list`, `top` and `show` name the holder, and
+  their `--json` adds a `claim` object; `--unclaimed` (and `list --claimed`)
+  filter on it. The app marks the row with ⚑ and says who holds it, and for
+  how long, in the detail pane.
+- Claims live in this computer's database only: they don't sync, export or
+  appear in the history. Give each agent its own name, since a claim made
+  under a name can be renewed or released by anyone using it.
+
+### Reading without changing anything
+
+`list`, `top`, `show`, `why`, `search`, `tags`, `projects`, `stats`,
+`export` and `doctor` only read. They never create a database (no database
+is an error, not an empty list), stop a forgotten timer or tidy old
+deletions; the next command that changes something does that.
+
+For an agent that should only look, `--read-only` (or `TJEK_READ_ONLY=1`)
+refuses every other command and opens the database read-only, so nothing can
+write to it. A database an older tjek left, which this one would have to
+upgrade, is refused rather than upgraded.
+
+With `--json`, a command that fails prints `{"error": "...", "exit_code": N}`
+on stdout as well as its message on stderr, so a script reading stdout finds
+out what went wrong.
+
 ## The `--json` output is a contract
 
-`list`, `search`, `top`, `show`, `why`, `add`, `tags`, `projects`, `doctor`,
-`stats --format=json|waybar` and `export` all emit JSON, and that shape is
-treated as an interface:
+`list`, `search`, `top`, `show`, `why`, `add`, `claim`, `release`, `tags`,
+`projects`, `doctor`, `stats --format=json|waybar`, `export` and the error
+object above all emit JSON, and that shape is treated as an interface:
 
 - **Fields are not renamed or removed in a patch or minor release.** New
   fields may be added at any time, so read the keys you need and ignore the

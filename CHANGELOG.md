@@ -13,6 +13,16 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+### Added
+
+- `tjek claim` and `release` let agents reserve tasks so no two take the same one.
+- `--read-only` (or `TJEK_READ_ONLY=1`) refuses commands that could change anything.
+- A command run with `--json` that fails prints its error as JSON on stdout.
+
+### Changed
+
+- `list`, `show` and other lookups no longer write to the database.
+
 ## [1.61.0] - 2026-10-13
 
 ### Changed

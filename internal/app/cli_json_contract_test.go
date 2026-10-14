@@ -180,6 +180,10 @@ func jsonContractFixture(t *testing.T) {
 	if code := cliLog([]string{"contract fixture root", "30m"}); code != 0 {
 		t.Fatalf("fixture log: exit %d", code)
 	}
+	// A claim, so the tasks that show one carry its shape.
+	if code := cliClaim([]string{"contract fixture root", "--as", "contract-agent"}); code != 0 {
+		t.Fatalf("fixture claim: exit %d", code)
+	}
 }
 
 func TestJSONContractList(t *testing.T) {
@@ -239,6 +243,42 @@ func TestJSONContractDoctor(t *testing.T) {
 	checkContract(t, "doctor", contractOf(t, "doctor", "--json"))
 }
 
+// claim --json is the task as show --json gives it, with the claim just made.
+func TestJSONContractClaim(t *testing.T) {
+	jsonContractFixture(t)
+	checkContract(t, "claim", contractOf(t, "claim", "--next", "--as", "another-agent", "--json"))
+}
+
+func TestJSONContractRelease(t *testing.T) {
+	jsonContractFixture(t)
+	checkContract(t, "release", contractOf(t, "release", "contract fixture root", "--as", "contract-agent", "--json"))
+}
+
+// A failed --json command answers in JSON too. Every command shares the one
+// shape (withJSONErrors), so one failure pins it.
+func TestJSONContractError(t *testing.T) {
+	jsonContractFixture(t)
+	var code int
+	out := captureStdout(t, func() {
+		captureStderr(t, func() { code = runCLI([]string{"show", "no-such-task-anywhere", "--json"}, false) })
+	})
+	if code != 2 {
+		t.Fatalf("exit %d, want 2 (an unknown ref)\noutput: %s", code, out)
+	}
+	var doc any
+	if err := json.Unmarshal([]byte(out), &doc); err != nil {
+		t.Fatalf("a failed --json command printed no JSON: %v\noutput: %s", err, out)
+	}
+	paths := map[string]bool{}
+	jsonKeyPaths(doc, "", paths)
+	keys := make([]string, 0, len(paths))
+	for k := range paths {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	checkContract(t, "error", strings.Join(keys, "\n")+"\n")
+}
+
 // Every command the completion table says takes --json must be covered above.
 // Adding a JSON surface without pinning its shape is the gap this closes, so
 // the list of covered commands is derived from the table rather than kept by
@@ -247,6 +287,7 @@ func TestJSONContractCoversEveryJSONCommand(t *testing.T) {
 	covered := map[string]bool{
 		"list": true, "show": true, "search": true, "top": true, "why": true,
 		"tags": true, "projects": true, "stats": true, "export": true, "doctor": true,
+		"claim": true, "release": true,
 		// `add --json` emits the created task; its shape is the same struct
 		// `show --json` pins, and adding a task is not something this suite
 		// should do to assert a shape it already covers.

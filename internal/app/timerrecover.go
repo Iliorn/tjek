@@ -133,17 +133,8 @@ func reconcileStaleTimers(h *sql.DB, now time.Time, threshold time.Duration, sc 
 }
 
 // reconcileStaleTimersCLI runs the recoverer for a CLI invocation and warns on
-// stderr. Skipped for commands that don't touch the store.
-func reconcileStaleTimersCLI(cmd string) {
-	switch cmd {
-	// Commands that say nothing about tasks have no business opening the
-	// store — and opening it is not free: a store older than this binary is
-	// migrated on open, which is a one-way change for anyone still running an
-	// older tjek elsewhere. `tjek update --check` asking GitHub for a tag
-	// must not be what upgrades a database schema.
-	case "help", "-h", "--help", "--version", "update", "completion", "man":
-		return
-	}
+// stderr. runCLI calls it only for commands that write to the store.
+func reconcileStaleTimersCLI() {
 	if err := openStore(); err != nil {
 		return
 	}

@@ -1,3 +1,6 @@
+[].claim.by
+[].claim.since
+[].claim.until
 [].comments[].author
 [].comments[].created_at
 [].comments[].deleted_at

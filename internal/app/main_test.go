@@ -121,12 +121,13 @@ func releaseStoreSingleton(t *testing.T) {
 
 // closeStoreSingleton closes the process-wide database and puts openStore back
 // to "not opened yet", so the next caller opens one wherever the paths point
-// then.
+// then, for writing as the app does until a test's runCLI says otherwise.
 func closeStoreSingleton() {
 	if db != nil {
 		_ = db.Close()
 	}
 	db, dbErr, dbOnce = nil, nil, sync.Once{}
+	storeMode = accessWrite
 }
 
 // testStore is how a test gets at the process-wide database: it opens it if

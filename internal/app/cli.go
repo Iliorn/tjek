@@ -16,8 +16,9 @@ import (
 
 // cli.go is the non-TUI surface: a small set of subcommands sharing the same
 // SQLite store as the Bubble Tea app. Designed to be scriptable (--json on
-// every list-shaped command, exit codes 0=ok, 1=runtime, 2=usage) without
-// pulling in a CLI framework — the standard `flag` package is enough.
+// every list-shaped command, exit codes 0=ok, 1=runtime, 2=usage, 3=not
+// claimed) without pulling in a CLI framework — the standard `flag` package
+// is enough.
 //
 // Stream contract: stdout carries only a command's primary result (the thing
 // a pipe or $(...) capture wants); side-effect notices — another timer being
@@ -30,6 +31,7 @@ var cliCommands = []string{
 	"show", "why", "edit", "delete", "rm", "undelete", "comment",
 	"stats", "start", "stop", "log", "export", "import", "subtask",
 	"search", "tags", "projects", "serve", "sync", "undo", "share",
+	"claim", "release",
 	"doctor", "update", "suggest", "completion", "man", "help", "-h", "--help", "--version",
 	// Retired, but still routed so muscle memory gets an explanation
 	// instead of the TUI opening on top of the typed command.
@@ -90,10 +92,32 @@ func editDistance(a, b string) int {
 	return prev[len(rb)]
 }
 
-func runCLI(args []string) int {
-	// Recover any timer a prior (possibly crashed) session left running, before
-	// running the command, so the warning rides along with this invocation.
-	reconcileStaleTimersCLI(args[0])
+// runCLI runs one command. readOnly is --read-only or TJEK_READ_ONLY
+// (takeReadOnly), already taken out of args.
+func runCLI(args []string, readOnly bool) int {
+	if wantsJSON(args) {
+		return withJSONErrors(func() int { return runCLICommand(args, readOnly) })
+	}
+	return runCLICommand(args, readOnly)
+}
+
+func runCLICommand(args []string, readOnly bool) int {
+	cmd := args[0]
+	switch {
+	case readOnly && !cliReads(cmd) && (!cliStoreFree(cmd) || cmd == "update"):
+		// update leaves the store alone and replaces the binary instead.
+		return refuseInReadOnly(cmd)
+	case readOnly:
+		storeMode = accessReadOnly
+	case cliReads(cmd):
+		storeMode = accessRead
+	case !cliStoreFree(cmd):
+		// Recover any timer a prior (possibly crashed) session left running,
+		// before running the command, so the warning rides along with this
+		// invocation. A command that only reads leaves that to the next one
+		// that writes.
+		reconcileStaleTimersCLI()
+	}
 	rc := dispatchCLI(args)
 	// After a successful mutating command, push the change to the sync server so
 	// a shell edit propagates even when the TUI isn't open. Fail-soft and gated
@@ -168,6 +192,10 @@ func dispatchCLI(args []string) int {
 		return cliSync(rest)
 	case "share":
 		return cliShare(rest)
+	case "claim":
+		return cliClaim(rest)
+	case "release":
+		return cliRelease(rest)
 	case "learnings":
 		fmt.Fprintln(os.Stderr, "tjek learnings: removed; learnings were folded into each task's notes.")
 		fmt.Fprintln(os.Stderr, "Search them with: tjek search \"Learnings\"  (notes are searched too), or open the task and press n.")
@@ -303,6 +331,13 @@ var cliHelpBlocks = []helpBlock{
 		{"tjek undelete <ref> | --list", "restore a specific deleted task by ref (browse with --list)"},
 		{`tjek subtask <parent> "title"`, "create a subtask (--each for multiple titles)"},
 	}},
+	{"Agents (several working from one list):", []helpRow{
+		{"tjek claim <ref> [--as=NAME]", "reserve a task so other agents leave it alone, for --ttl (default 30m); claim it again to renew. NAME defaults to TJEK_AUTHOR. Exit 3: someone else holds it"},
+		{"tjek claim --next [--where=F]", "claim the highest-ranked ready task nobody holds, in one step, so two agents never both take it (exit 3: none free); --json prints it as show --json does"},
+		{"tjek release <ref>... [-f]", "give a claim back (-f: whoever holds it). Closing or deleting a task releases it too, and an unrenewed claim runs out"},
+		{"tjek --read-only <command>", "refuse anything but list, top, show, why, search, tags, projects, stats, export and doctor, and open the store read-only (also TJEK_READ_ONLY=1). Those commands never write to the store anyway"},
+		{"", `A command run with --json that fails prints {"error": ..., "exit_code": N} on stdout as well as its message on stderr.`},
+	}},
 	{"Shell integration:", []helpRow{
 		{"tjek completion bash|zsh|fish", "print a completion script (install paths in the man page)"},
 		{"tjek man", "print the man page in roff (e.g. > ~/.local/share/man/man1/tjek.1)"},
@@ -379,6 +414,7 @@ var cliHelpBlocks = []helpBlock{
 		{"--ready", "only actionable tasks, ST [ ] (no unfinished dependencies; list only)"},
 		{"--blocked", "only tasks waiting on an unfinished dependency (these sort last; list only)"},
 		{"--waiting", "only tasks hidden until their start date (list only; list and top leave them out)"},
+		{"--claimed / --unclaimed", "only tasks someone holds a claim on / nobody does (list only; top takes --unclaimed)"},
 		{"--where=FILTER", "only tasks matching a filter in the app's / grammar: '#work -@home or p:high' (list only)"},
 		{"--tag=NAME", "only tasks carrying this tag"},
 		{"--project=NAME", "only tasks in this project"},
@@ -387,8 +423,9 @@ var cliHelpBlocks = []helpBlock{
 	}},
 	{"Flags (top):", []helpRow{
 		{"--n=N", "rows to show (default 10)"},
-		{"--json", "emit JSON (includes tags, priority, due)"},
+		{"--json", "emit JSON (includes tags, priority, due, and the claim of a claimed task)"},
 		{"--wide", "table with priority, due, tags columns"},
+		{"--unclaimed", "leave out the tasks someone holds a claim on"},
 	}},
 	{"Flags (edit):", []helpRow{
 		{"--title=...", "new title"},
@@ -608,15 +645,16 @@ func priorityLetter(p todo.Priority) string {
 // waiting on an unfinished dependency: they sort last, and carry a ↧ before the
 // title saying why they are down there.
 func printTaskTable(rows []todo.Todo, blocked map[string]bool) {
-	printTaskTableWide(rows, blocked, false)
+	printTaskTableWide(rows, blocked, false, nil)
 }
 
 // printTaskTableWide is printTaskTable with the two time columns --wide adds:
 // AGE (days since the task was created) and IDLE (days since it last changed).
 // They are opt-in rather than always shown because they are review columns, not
 // working ones — a daily `tjek list` doesn't need them, and every column costs
-// width the title would otherwise have.
-func printTaskTableWide(rows []todo.Todo, blocked map[string]bool, wide bool) {
+// width the title would otherwise have. A task in claims carries its holder
+// before the title (claimedTitle).
+func printTaskTableWide(rows []todo.Todo, blocked map[string]bool, wide bool, claims map[string]claim) {
 	if len(rows) == 0 {
 		fmt.Println("(no tasks)")
 		return
@@ -680,7 +718,7 @@ func printTaskTableWide(rows []todo.Todo, blocked map[string]bool, wide bool) {
 		sz := strings.ToLower(t.Size.Letter())
 		// Before the title, as in the TUI: it answers "can I pick this up?",
 		// which is asked before the title has been read.
-		title := t.Title
+		title := claimedTitle(t.Title, claims, &t, now)
 		if blocked[t.ID] {
 			title = "↧ " + title
 		}
@@ -696,6 +734,15 @@ func printTaskTableWide(rows []todo.Todo, blocked map[string]bool, wide bool) {
 				t.ID[:8], st, sz, priorityLetter(t.Priority), due, times, title)
 		}
 	}
+}
+
+// claimedTitle is title with the holder of t's claim before it ("⚑ codex-1 ·
+// "), as the tables print it: who is on a task is read before what it is.
+func claimedTitle(title string, claims map[string]claim, t *todo.Todo, now time.Time) string {
+	if c, ok := claimFor(claims, t, now); ok {
+		return claimMark + " " + c.Holder + " · " + title
+	}
+	return title
 }
 
 // noteFlagText resolves a --note/--append-note flag value: the "-" sentinel

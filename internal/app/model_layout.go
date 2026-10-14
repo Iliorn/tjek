@@ -556,6 +556,9 @@ func (m model) detailMainHeight(t *todo.Todo) int {
 	if len(t.TimeEntries) > 0 || m.descendantTimeSpent(t.ID) > 0 {
 		h++
 	}
+	if _, ok := claimFor(m.claims, t, m.frameTime); ok {
+		h++
+	}
 	if completedFieldVisible(t) {
 		h++
 	}
