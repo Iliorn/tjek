@@ -372,8 +372,9 @@ and another tool can read it.
   [From Taskwarrior](cli.md#from-taskwarrior)). Its tasks are
   merged in: new ones are added, ones you already have take the newer
   version, and nothing is deleted, so importing the same file twice changes
-  nothing. `u` takes the whole import back. After a Taskwarrior import, the
-  message names what tjek had no place for.
+  nothing. `u` takes the whole import back. A task from the file that you
+  have deleted comes back, so the file can be imported again after `u`.
+  After a Taskwarrior import, the message names what tjek had no place for.
 
 ### Picking a file or folder
 

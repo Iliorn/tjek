@@ -35,7 +35,8 @@ func cliImport(args []string) int {
 Merges the tasks in the export file into the local store. The versioned
 envelope produced by 'tjek export', the legacy bare JSON array, and
 Taskwarrior's 'task export' are accepted (task export | tjek import -).
-Import is idempotent: running it a second time with the same file changes nothing.`)
+Import is idempotent: running it a second time with the same file changes nothing.
+A task in the file that was deleted here is restored.`)
 	}
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -73,7 +74,8 @@ Import is idempotent: running it a second time with the same file changes nothin
 		fmt.Fprintf(os.Stderr, "tjek import: open store: %v\n", err)
 		return 1
 	}
-	res, err := importTasks(db, tasks, storedBiases())
+	settings, _ := loadSettings() // a broken file already warned at load; the name is optional
+	res, err := importTasks(db, tasks, storedBiases(), newCLIRepo(settings).editor())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "tjek import: %v\n", err)
 		return 1
@@ -117,7 +119,13 @@ type importResult struct{ added, updated int }
 // never replaces anything wholesale and a second import of the same file
 // changes nothing. The CLI's `tjek import` and the Settings import share it,
 // so the two cannot disagree about what a file does.
-func importTasks(h *sql.DB, tasks []todo.Todo, b rank.Biases) (importResult, error) {
+//
+// A task the file holds that is deleted here comes back first (reviveDeleted),
+// as `tjek undelete` would bring it: an import is asked for the file's tasks,
+// and the merge alone lets the deletion win, being newer than the file. That
+// is what made importing a file again after u took the import back say every
+// task was already here. by signs the restores in the history.
+func importTasks(h *sql.DB, tasks []todo.Todo, b rank.Biases, by editor) (importResult, error) {
 	// Snapshot the pre-merge set so the result reports what the merge actually
 	// changed (new or edited), not a live-count delta: an import that only
 	// edits existing tasks leaves the count unchanged but still did work.
@@ -125,17 +133,25 @@ func importTasks(h *sql.DB, tasks []todo.Todo, b rank.Biases) (importResult, err
 	if err != nil {
 		return importResult{}, fmt.Errorf("load current: %w", err)
 	}
+	revived, err := reviveDeleted(h, before, tasks, b, by)
+	if err != nil {
+		return importResult{}, fmt.Errorf("restore deleted: %w", err)
+	}
 	merged, changed, err := mergeIntoStore(h, tasks, b)
 	if err != nil {
 		return importResult{}, fmt.Errorf("merge: %w", err)
 	}
 	var res importResult
-	if !changed {
+	if !changed && revived == 0 {
 		return res, nil
 	}
+	// A task that was here only as a deletion counts as added: to the person
+	// importing it, it was not here.
 	known := make(map[string]bool, len(before))
 	for i := range before {
-		known[before[i].ID] = true
+		if !before[i].Deleted {
+			known[before[i].ID] = true
+		}
 	}
 	for _, t := range changedTasks(before, merged) {
 		if known[t.ID] {
@@ -145,6 +161,45 @@ func importTasks(h *sql.DB, tasks []todo.Todo, b rank.Biases) (importResult, err
 		}
 	}
 	return res, nil
+}
+
+// reviveDeleted restores the tasks that incoming holds live and stored holds
+// deleted, so the merge after it finds them here, and reports how many. Each
+// is saved undeleted, which stamps its restore later than its deletion, and a
+// parent that stays deleted is let go, as `tjek undelete` does, rather than
+// leave the task under a parent nobody can see.
+func reviveDeleted(h *sql.DB, stored, incoming []todo.Todo, b rank.Biases, by editor) (int, error) {
+	byID := make(map[string]*todo.Todo, len(stored))
+	for i := range stored {
+		byID[stored[i].ID] = &stored[i]
+	}
+	coming := make(map[string]bool, len(incoming))
+	for i := range incoming {
+		if !incoming[i].Deleted {
+			coming[incoming[i].ID] = true
+		}
+	}
+	var revive []*todo.Todo
+	for id := range coming {
+		x := byID[id]
+		if x == nil || !x.Deleted {
+			continue
+		}
+		c := copyTodo(*x)
+		c.Deleted, c.DeletedAt = false, time.Time{}
+		c.ModifiedAt = todo.StampModified(x.DeletedAt)
+		if p := byID[c.ParentID]; c.ParentID != "" && p != nil && p.Deleted && !coming[c.ParentID] {
+			c.ParentID = ""
+		}
+		revive = append(revive, &c)
+	}
+	if len(revive) == 0 {
+		return 0, nil
+	}
+	if err := saveStamped(h, revive, nil, rank.Ranker{Biases: b}.ScoreNow(), time.Now(), by); err != nil {
+		return 0, err
+	}
+	return len(revive), nil
 }
 
 // exportFileName is the file the Settings auto-export keeps current in the

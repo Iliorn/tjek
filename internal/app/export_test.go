@@ -375,6 +375,45 @@ func TestCliImportEditOnlyReportsChanged(t *testing.T) {
 	}
 }
 
+// A task deleted since it was imported comes back with the next import of its
+// file, and the history says it was restored.
+func TestCliImportRestoresADeletedTask(t *testing.T) {
+	setTestHome(t, t.TempDir())
+	task := todo.New("Deleted since the import")
+	path := filepath.Join(t.TempDir(), "backup.json")
+	if err := writeExport(path, []todo.Todo{task}); err != nil {
+		t.Fatal(err)
+	}
+	captureStdout(t, func() {
+		if code := cliImport([]string{path}); code != 0 {
+			t.Fatalf("first import: exit %d", code)
+		}
+		if code := cliDelete([]string{task.ID}); code != 0 {
+			t.Fatalf("delete: exit %d", code)
+		}
+	})
+	out := captureStdout(t, func() {
+		if code := cliImport([]string{path}); code != 0 {
+			t.Fatalf("second import: exit %d", code)
+		}
+	})
+	if !strings.Contains(out, "1 changed") {
+		t.Errorf("second import reported %q, want the task restored", out)
+	}
+	_, todos, err := loadForCLI()
+	if err != nil || len(todos) != 1 || todos[0].Deleted {
+		t.Fatalf("after the second import: %+v, err %v", todos, err)
+	}
+	if h := todos[0].History; len(h) == 0 || h[len(h)-1].Action != todo.ActionRestored {
+		t.Errorf("history %+v; want the restore recorded last", h)
+	}
+	// Idempotent still: a third import changes nothing.
+	out = captureStdout(t, func() { cliImport([]string{path}) })
+	if !strings.Contains(out, "0 changed") {
+		t.Errorf("third import reported %q", out)
+	}
+}
+
 // TestCliImportVersionTooHighExitsWithError confirms that an envelope with
 // version > 1 causes exit code 1 (runtime error), not 0 or 2.
 func TestCliImportVersionTooHighExitsWithError(t *testing.T) {

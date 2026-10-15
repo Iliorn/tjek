@@ -206,6 +206,71 @@ func TestScriptImportFromFile(t *testing.T) {
 	}
 }
 
+// Importing a file again after u took the import back brings its tasks back:
+// u deleted them, and an import is asked for the file's tasks, deleted here or
+// not. The deletion used to win, being newer than the file, and the second
+// import said every task was already here.
+func TestScriptImportAgainAfterUndo(t *testing.T) {
+	setTestHome(t, t.TempDir())
+	testStore(t)
+	m := initialModel(newSQLiteRepo())
+	m.termWidth, m.termHeight = 120, 40
+	parent := todo.New("Imported parent")
+	child := todo.New("Imported child")
+	child.ParentID = parent.ID
+	file := filepath.Join(t.TempDir(), "backup.json")
+	if err := writeExport(file, []todo.Todo{parent, child}); err != nil {
+		t.Fatal(err)
+	}
+	importFile := func(m model) (model, importDoneMsg) {
+		t.Helper()
+		m.tab = tabSettings
+		m.settingsCursor = settingImportFile
+		m = typePath(t, sendKey(t, m, "enter"))
+		m.textInput.SetValue(file)
+		next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		m = next.(model)
+		done := cmd().(importDoneMsg)
+		next, _ = m.Update(done)
+		m = next.(model)
+		next, _ = m.Update(reloadedMsg{todos: done.todos, epoch: m.saveEpoch})
+		return next.(model), done
+	}
+
+	m, done := importFile(m)
+	if done.err != nil || done.res.added != 2 {
+		t.Fatalf("first import: %+v, err %v", done.res, done.err)
+	}
+	m.tab = tabTasks
+	m = sendKey(t, m, "u")
+	m.flushPendingWrites()
+	if n := len(m.allTodos()); n != 0 {
+		t.Fatalf("u left %d tasks", n)
+	}
+
+	m, done = importFile(m)
+	if done.err != nil || done.res.added != 2 || done.res.updated != 0 {
+		t.Fatalf("second import: %+v, err %v; want both tasks back as new", done.res, done.err)
+	}
+	if !strings.Contains(m.err, "2 new") {
+		t.Errorf("toast = %q", m.err)
+	}
+	got := map[string]*todo.Todo{}
+	for _, t := range m.allTodos() {
+		got[t.Title] = t
+	}
+	if got["Imported parent"] == nil || got["Imported child"] == nil || got["Imported child"].ParentID != parent.ID {
+		t.Fatalf("after importing again the store holds %v", got)
+	}
+
+	// And u takes the second import back too.
+	m.tab = tabTasks
+	m = sendKey(t, m, "u")
+	if n := len(m.allTodos()); n != 0 {
+		t.Errorf("u after the second import left %d tasks", n)
+	}
+}
+
 func TestScriptImportRejectsANonExport(t *testing.T) {
 	m := modelWithTasks(t)
 	m.tab = tabSettings

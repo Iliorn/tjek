@@ -27,6 +27,7 @@ belongs in the commit message, where it is kept next to the code it explains.
 ### Fixed
 
 - With stdin from `/dev/null`, as agents run commands, tjek no longer asks y/N questions.
+- Importing a file again after `u` undid its import brings the tasks back.
 
 ## [1.61.0] - 2026-10-13
 

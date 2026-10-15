@@ -204,13 +204,17 @@ func (m *model) startImport(file importFile) tea.Cmd {
 	m.savePending = false
 	m.beginSave()
 	repo, biases := m.repo, m.rank.Biases
+	var by editor
+	if r, ok := repo.(*sqliteRepo); ok {
+		by = r.editor()
+	}
 	return func() tea.Msg {
 		if !c.empty() {
 			if err := repo.SaveOnto(c.dirty, c.bases, c.tombstones); err != nil {
 				return importDoneMsg{err: err}
 			}
 		}
-		res, err := importTasks(db, tasks, biases)
+		res, err := importTasks(db, tasks, biases, by)
 		if err != nil {
 			return importDoneMsg{err: err}
 		}
