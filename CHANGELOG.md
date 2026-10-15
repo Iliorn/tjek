@@ -13,6 +13,8 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+## [1.62.0] - 2026-10-15
+
 ### Added
 
 - `tjek claim` and `release` let agents reserve tasks so no two take the same one.
