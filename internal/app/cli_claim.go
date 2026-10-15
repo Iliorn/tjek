@@ -1,6 +1,9 @@
 package app
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
@@ -59,19 +62,84 @@ func cliClaims(now time.Time) map[string]claim {
 	return claims
 }
 
-// claimHolder is who a claim is made for: --as, or the name this device's
-// edits carry (TJEK_AUTHOR first), so an agent that signs its edits as
-// itself claims as itself too.
-func claimHolder(as string) (string, bool) {
+// claimHolder is who a claim is made for, so that nobody has to set anything
+// up: --as when given; else the agent running tjek, named by its kind and its
+// session (claude-2b91), which stays the same for the whole chat; else
+// TJEK_AUTHOR; else, at a terminal, the person's own name. Anything else is
+// an agent tjek cannot place, given a name of its own (agent-7f3a). fresh
+// reports a name made up for this one call, which the caller has to hand back
+// with --as to renew or release the claim.
+func claimHolder(as string) (name string, fresh bool) {
 	if as = strings.TrimSpace(as); as != "" {
-		return as, true
+		return as, false
 	}
-	settings, _ := loadSettings()
-	if n := strings.TrimSpace(authorName(settings)); n != "" {
-		return n, true
+	if kind, session := detectAgent(os.Getenv); kind != "" {
+		if session != "" {
+			return kind + "-" + shortHash(session), false
+		}
+		return kind + "-" + randomHex(), true
 	}
-	fmt.Fprintln(os.Stderr, "tjek: no name to claim as; pass --as NAME or set TJEK_AUTHOR")
-	return "", false
+	if n := strings.TrimSpace(os.Getenv("TJEK_AUTHOR")); n != "" {
+		return n, false
+	}
+	if stdinIsTTY() {
+		settings, _ := loadSettings()
+		if n := strings.TrimSpace(authorName(settings)); n != "" {
+			return n, false
+		}
+	}
+	return "agent-" + randomHex(), true
+}
+
+// detectAgent names the coding agent whose shell runs tjek, from what it puts
+// in its commands' environment, and its session when it says which: kind is
+// "" for none. AI_AGENT is the convention an agent with no variable known here
+// may follow ("claude-code_2-1-285_agent" names "claude-code").
+func detectAgent(getenv func(string) string) (kind, session string) {
+	switch {
+	case getenv("CLAUDECODE") != "":
+		return "claude", getenv("CLAUDE_CODE_SESSION_ID")
+	case getenv("CODEX_THREAD_ID") != "":
+		return "codex", getenv("CODEX_THREAD_ID")
+	case getenv("CODEX_SANDBOX") != "", getenv("CODEX_SANDBOX_NETWORK_DISABLED") != "", getenv("CODEX_CI") != "":
+		return "codex", ""
+	case getenv("AI_AGENT") != "":
+		return agentKind(getenv("AI_AGENT")), ""
+	}
+	return "", ""
+}
+
+// agentKind is AI_AGENT's leading name, cut at its first "_" and kept to
+// letters, digits and dashes, so it reads well inside a claim's name.
+func agentKind(v string) string {
+	v, _, _ = strings.Cut(strings.ToLower(strings.TrimSpace(v)), "_")
+	v = strings.Map(func(r rune) rune {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' {
+			return r
+		}
+		return -1
+	}, v)
+	v = strings.Trim(v, "-")
+	if len(v) > 16 {
+		v = strings.TrimRight(v[:16], "-")
+	}
+	if v == "" {
+		return "agent"
+	}
+	return v
+}
+
+// shortHash is four hex digits standing for s: enough to tell one session's
+// claims from another's, and none of the session's own ID on show.
+func shortHash(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:2])
+}
+
+func randomHex() string {
+	var b [2]byte
+	_, _ = rand.Read(b[:])
+	return hex.EncodeToString(b[:])
 }
 
 // claimWhen is a claim's end as text: the time today, the date too beyond it.
@@ -86,7 +154,7 @@ func claimWhen(t, now time.Time) string {
 func cliClaim(args []string) int {
 	fs := flag.NewFlagSet("claim", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
-	as := fs.String("as", "", "who the claim is for (default: TJEK_AUTHOR, else your name)")
+	as := fs.String("as", "", "who the claim is for (default: the agent running tjek and its session, e.g. claude-2b91)")
 	ttl := fs.Duration("ttl", defaultClaimTTL, "how long the claim lasts; claim again to renew it")
 	next := fs.Bool("next", false, "claim the highest-ranked task that is ready and unclaimed, in place of a ref")
 	where := fs.String("where", "", "with --next: only tasks matching a filter in the app's / grammar ('#work p:high')")
@@ -113,10 +181,7 @@ func cliClaim(args []string) int {
 		fmt.Fprintln(os.Stderr, "tjek claim: --ttl must be positive (30m, 2h)")
 		return 2
 	}
-	holder, ok := claimHolder(*as)
-	if !ok {
-		return 2
-	}
+	holder, fresh := claimHolder(*as)
 	repo, todos, err := loadForCLI()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "load: %v\n", err)
@@ -153,10 +218,14 @@ func cliClaim(args []string) int {
 			return 1
 		}
 		if !took {
-			fmt.Fprintf(os.Stderr, "tjek claim: %s %q is claimed by %s until %s\n",
-				shortID(t.ID), t.Title, c.Holder, claimWhen(c.Until, now))
+			fmt.Fprintf(os.Stderr, "tjek claim: %s %q is claimed by %s until %s%s\n",
+				shortID(t.ID), t.Title, c.Holder, claimWhen(c.Until, now), ifThatIsYou(c.Holder, *as))
 			return exitClaimed
 		}
+	}
+	if fresh {
+		// The name was made up for this call; the next one will not know it.
+		fmt.Fprintf(os.Stderr, "tjek claim: claimed as %s; pass --as %s to renew or release it\n", holder, holder)
 	}
 	if *asJSON {
 		return emitJSON(withClaim(*t, map[string]claim{t.ID: c}, now))
@@ -201,6 +270,16 @@ func claimNext(todos []todo.Todo, where, holder string, ttl time.Duration, now t
 	return nil, claim{}, nil
 }
 
+// ifThatIsYou is the hint after a refusal for a caller that gave no --as: an
+// agent whose name was made up for the call that claimed the task gets it
+// back this way.
+func ifThatIsYou(holder, as string) string {
+	if strings.TrimSpace(as) != "" {
+		return ""
+	}
+	return fmt.Sprintf("; if that is you, pass --as %s", holder)
+}
+
 // releaseJSON is one task's line in `tjek release --json`.
 type releaseJSON struct {
 	ID       string     `json:"id"`
@@ -212,7 +291,7 @@ type releaseJSON struct {
 func cliRelease(args []string) int {
 	fs := flag.NewFlagSet("release", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
-	as := fs.String("as", "", "whose claim to release (default: TJEK_AUTHOR, else your name)")
+	as := fs.String("as", "", "whose claim to release (default: as for claim)")
 	force := fs.Bool("f", false, "release the claim whoever holds it")
 	asJSON := fs.Bool("json", false, "emit what was released as JSON")
 	fs.Usage = func() {
@@ -227,10 +306,7 @@ func cliRelease(args []string) int {
 		fs.Usage()
 		return 2
 	}
-	holder, ok := claimHolder(*as)
-	if !ok {
-		return 2
-	}
+	holder, _ := claimHolder(*as)
 	_, todos, err := loadForCLI()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "load: %v\n", err)
@@ -260,8 +336,8 @@ func cliRelease(args []string) int {
 			}
 		case held.Holder != "":
 			row.HeldBy = held.json()
-			fmt.Fprintf(os.Stderr, "tjek release: %s %q is claimed by %s until %s; -f releases it anyway\n",
-				shortID(t.ID), t.Title, held.Holder, claimWhen(held.Until, now))
+			fmt.Fprintf(os.Stderr, "tjek release: %s %q is claimed by %s until %s%s; -f releases it whoever holds it\n",
+				shortID(t.ID), t.Title, held.Holder, claimWhen(held.Until, now), ifThatIsYou(held.Holder, *as))
 			rc = max(rc, exitClaimed)
 		default:
 			fmt.Fprintf(os.Stderr, "tjek release: %s %q is not claimed\n", shortID(t.ID), t.Title)

@@ -332,7 +332,7 @@ var cliHelpBlocks = []helpBlock{
 		{`tjek subtask <parent> "title"`, "create a subtask (--each for multiple titles)"},
 	}},
 	{"Agents (several working from one list):", []helpRow{
-		{"tjek claim <ref> [--as=NAME]", "reserve a task so other agents leave it alone, for --ttl (default 30m); claim it again to renew. NAME defaults to TJEK_AUTHOR. Exit 3: someone else holds it"},
+		{"tjek claim <ref> [--as=NAME]", "reserve a task so other agents leave it alone, for --ttl (default 30m); claim it again to renew. NAME defaults to the agent running tjek and its chat (claude-2b91, codex-7f3a). Exit 3: someone else holds it"},
 		{"tjek claim --next [--where=F]", "claim the highest-ranked ready task nobody holds, in one step, so two agents never both take it (exit 3: none free); --json prints it as show --json does"},
 		{"tjek release <ref>... [-f]", "give a claim back (-f: whoever holds it). Closing or deleting a task releases it too, and an unrenewed claim runs out"},
 		{"tjek --read-only <command>", "refuse anything but list, top, show, why, search, tags, projects, stats, export and doctor, and open the store read-only (also TJEK_READ_ONLY=1). Those commands never write to the store anyway"},

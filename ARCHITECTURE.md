@@ -548,7 +548,13 @@ Rules:
   and `todo.Fields` does not know it. `takeClaim` is one upsert whose `WHERE`
   is the whole "is it free" test, so racing processes cannot both win.
   `saveStamped` drops the claims of the tasks a save closes or deletes, so
-  closing a task in the app releases it as `tjek done` does. The app reads claims with each
+  closing a task in the app releases it as `tjek done` does. The holder
+  needs no setup (`claimHolder`): `--as`, else the agent running tjek and
+  its chat (`detectAgent`: `CLAUDECODE` + `CLAUDE_CODE_SESSION_ID`,
+  `CODEX_THREAD_ID`, `AI_AGENT`) hashed to `claude-2b91`, stable across the
+  chat's calls; else `TJEK_AUTHOR`; else, at a terminal, the person; else a
+  name for the call, which the output tells the agent to pass back.
+  `TestMain` clears these variables so the suite runs alike inside an agent. The app reads claims with each
   load and reload (`reloadedMsg.claims`, adopted before the unchanged-tasks
   shortcut, since a claim changes no task) and only shows them
   (`claimFor`, ⚑ in `taskRowLabelIn`, the detail pane's Claimed row).

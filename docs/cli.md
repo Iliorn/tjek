@@ -50,7 +50,7 @@ tjek import backup.json         # merge an export file into the local store
 tjek import - < backup.json     # same, reading from stdin
 task export | tjek import -     # bring a Taskwarrior list over (see below)
 tjek doctor                     # this installation's health, for bug reports
-tjek claim --next --as codex-1  # an agent reserves the top free task (see below)
+tjek claim --next               # an agent reserves the top free task (see below)
 tjek help
 ```
 
@@ -99,12 +99,19 @@ without two of them doing the same task. Each one claims a task before
 starting on it:
 
 ```sh
-export TJEK_AUTHOR=codex-1          # who the agent is: signs its edits and its claims
 tjek claim --next --json            # take the top ready task nobody holds, and print it
 tjek claim 3f2a                     # claim again within 30 minutes to keep it (--ttl=2h for longer)
 tjek done 3f2a                      # closing (or deleting) it gives the claim back
 tjek release 3f2a                   # or give it back unfinished
 ```
+
+Nothing needs setting up. tjek names the agent itself, from the variables
+the agent puts in its commands' environment: `claude-2b91` from Claude Code,
+`codex-7f3a` from Codex, the number standing for the chat. The same chat
+keeps its name, so it renews and releases without saying who it is. An agent
+tjek cannot place (or one with no chat ID to go by) is given a name for the
+call, `agent-7f3a`, and told to pass it back with `--as`; a person at a
+terminal claims under their own name. `--as NAME` picks a name outright.
 
 - **One agent wins.** `claim` checks the task is free and takes it in one
   step, so two agents claiming at once cannot both get it. `--next` passes
@@ -120,8 +127,7 @@ tjek release 3f2a                   # or give it back unfinished
   filter on it. The app marks the row with ⚑ and says who holds it, and for
   how long, in the detail pane.
 - Claims live in this computer's database only: they don't sync, export or
-  appear in the history. Give each agent its own name, since a claim made
-  under a name can be renewed or released by anyone using it.
+  appear in the history.
 
 ### Reading without changing anything
 

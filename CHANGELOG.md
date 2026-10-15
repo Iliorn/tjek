@@ -16,12 +16,17 @@ belongs in the commit message, where it is kept next to the code it explains.
 ### Added
 
 - `tjek claim` and `release` let agents reserve tasks so no two take the same one.
+- A claim is named after the agent and chat that made it (`claude-2b91`), with no setup.
 - `--read-only` (or `TJEK_READ_ONLY=1`) refuses commands that could change anything.
 - A command run with `--json` that fails prints its error as JSON on stdout.
 
 ### Changed
 
 - `list`, `show` and other lookups no longer write to the database.
+
+### Fixed
+
+- With stdin from `/dev/null`, as agents run commands, tjek no longer asks y/N questions.
 
 ## [1.61.0] - 2026-10-13
 

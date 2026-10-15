@@ -11,6 +11,7 @@ import (
 
 	"github.com/Iliorn/tjek/rank"
 	"github.com/Iliorn/tjek/todo"
+	"github.com/charmbracelet/x/term"
 )
 
 // ── done ─────────────────────────────────────────────────────────────────────
@@ -595,10 +596,11 @@ func cliUndo(args []string) int {
 
 // stdinIsTTY reports whether stdin is an interactive terminal — the gate for
 // asking a y/N question at all. A variable so a test can drive the prompting
-// paths (suggest's link loop) with scripted answers on a pipe.
+// paths (suggest's link loop) with scripted answers on a pipe. It asks the
+// terminal itself: /dev/null is a character device too, and it is the stdin
+// coding agents give the commands they run.
 var stdinIsTTY = func() bool {
-	fi, err := os.Stdin.Stat()
-	return err == nil && fi.Mode()&os.ModeCharDevice != 0
+	return term.IsTerminal(os.Stdin.Fd())
 }
 
 // confirmStdin prompts on stderr (stdout stays machine-clean) and accepts

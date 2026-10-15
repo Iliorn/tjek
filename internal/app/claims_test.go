@@ -173,6 +173,81 @@ func TestCLIClaimAndRelease(t *testing.T) {
 	}
 }
 
+func TestDetectAgent(t *testing.T) {
+	for _, c := range []struct {
+		env           map[string]string
+		kind, session string
+	}{
+		{map[string]string{}, "", ""},
+		{map[string]string{"CLAUDECODE": "1", "CLAUDE_CODE_SESSION_ID": "s1"}, "claude", "s1"},
+		{map[string]string{"CODEX_THREAD_ID": "t1", "CODEX_SANDBOX": "seatbelt"}, "codex", "t1"},
+		{map[string]string{"CODEX_SANDBOX_NETWORK_DISABLED": "1"}, "codex", ""},
+		{map[string]string{"AI_AGENT": "claude-code_2-1-285_agent"}, "claude-code", ""},
+		{map[string]string{"AI_AGENT": "  Some Tool!_x"}, "sometool", ""},
+		{map[string]string{"AI_AGENT": "___"}, "agent", ""},
+	} {
+		kind, session := detectAgent(func(k string) string { return c.env[k] })
+		if kind != c.kind || session != c.session {
+			t.Errorf("detectAgent(%v) = %q, %q; want %q, %q", c.env, kind, session, c.kind, c.session)
+		}
+	}
+}
+
+// Nobody sets anything up: an agent with a session keeps one name for the
+// whole chat, so it renews and releases without --as; one without is told the
+// name it was given.
+func TestClaimNamesTheAgent(t *testing.T) {
+	claimFixture(t, "Agent work", "Other work")
+	t.Setenv("CLAUDECODE", "1")
+	t.Setenv("CLAUDE_CODE_SESSION_ID", "session-one")
+	want := "claude-" + shortHash("session-one")
+
+	freshProcess()
+	code, out, errOut := cli(t, false, "claim", "agent work")
+	if code != 0 || !strings.Contains(out, "for "+want) || strings.Contains(errOut, "--as") {
+		t.Fatalf("claim in a Claude session: exit %d, %q, %q; want it held by %s with no hint", code, out, errOut, want)
+	}
+	freshProcess()
+	if code, _, errOut := cli(t, false, "claim", "agent work"); code != 0 {
+		t.Fatalf("the same session renewing: exit %d, %q", code, errOut)
+	}
+	// Another chat is another agent, and is told how the holder gets it back.
+	t.Setenv("CLAUDE_CODE_SESSION_ID", "session-two")
+	freshProcess()
+	code, _, errOut = cli(t, false, "release", "agent work")
+	if code != exitClaimed || !strings.Contains(errOut, "if that is you, pass --as "+want) {
+		t.Fatalf("another session releasing: exit %d, %q", code, errOut)
+	}
+	t.Setenv("CLAUDE_CODE_SESSION_ID", "session-one")
+	freshProcess()
+	if code, out, _ := cli(t, false, "release", "agent work"); code != 0 || !strings.Contains(out, "released") {
+		t.Fatalf("the holder's session releasing: exit %d, %q", code, out)
+	}
+
+	// No session to go by: a name for this call, and how to use it again.
+	t.Setenv("CLAUDECODE", "")
+	t.Setenv("CODEX_SANDBOX_NETWORK_DISABLED", "1")
+	freshProcess()
+	code, out, errOut = cli(t, false, "claim", "other work")
+	if code != 0 || !strings.Contains(out, "for codex-") || !strings.Contains(errOut, "pass --as codex-") {
+		t.Fatalf("claim from Codex without a thread id: exit %d, %q, %q", code, out, errOut)
+	}
+
+	// Nothing to go by and no terminal: an agent tjek cannot place.
+	t.Setenv("CODEX_SANDBOX_NETWORK_DISABLED", "")
+	orig := stdinIsTTY
+	t.Cleanup(func() { stdinIsTTY = orig })
+	stdinIsTTY = func() bool { return false }
+	if name, fresh := claimHolder(""); !strings.HasPrefix(name, "agent-") || !fresh {
+		t.Errorf("claimHolder with nothing to go by = %q, %v", name, fresh)
+	}
+	// A person at a terminal claims under their own name.
+	stdinIsTTY = func() bool { return true }
+	if name, fresh := claimHolder(""); strings.HasPrefix(name, "agent-") || fresh {
+		t.Errorf("claimHolder at a terminal = %q, %v; want the person's name", name, fresh)
+	}
+}
+
 func TestCLIClaimNext(t *testing.T) {
 	ids := claimFixture(t, "Ready one", "Ready two", "Blocked", "Waiting", "Timed", "Taken")
 	freshProcess()

@@ -54,6 +54,13 @@ func TestMain(m *testing.M) {
 		os.Unsetenv(v)
 	}
 	os.Unsetenv("TJEK_HOME")
+	// The suite is often run by a coding agent, whose variables name the
+	// holder of a claim (detectAgent). Cleared, so the suite runs as it does
+	// in CI; the tests that want an agent set one.
+	for _, v := range []string{"CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SANDBOX",
+		"CODEX_SANDBOX_NETWORK_DISABLED", "CODEX_CI", "AI_AGENT", "TJEK_AUTHOR", "TJEK_READ_ONLY"} {
+		os.Unsetenv(v)
+	}
 	// Render as a terminal does. Without a colour profile lipgloss draws no
 	// escape codes at all, so a test could never see a code broken by
 	// cutting a styled line with a helper meant for plain text, which once
