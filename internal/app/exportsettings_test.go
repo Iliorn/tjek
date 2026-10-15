@@ -271,6 +271,69 @@ func TestScriptImportAgainAfterUndo(t *testing.T) {
 	}
 }
 
+// The wrong file imported first, then the right one, both taken back with u,
+// then the right one imported again: the right file's version of a task the
+// two share comes back, not the wrong one's that u last restored.
+func TestScriptReimportTakesTheFilesVersion(t *testing.T) {
+	setTestHome(t, t.TempDir())
+	testStore(t)
+	m := initialModel(newSQLiteRepo())
+	m.termWidth, m.termHeight = 120, 40
+	// Both exported earlier today, the right one the later: files hold the
+	// past, and u happens now.
+	shared := todo.New("Wrong title")
+	shared.CreatedAt = time.Now().Add(-3 * time.Hour)
+	shared.ModifiedAt = time.Now().Add(-2 * time.Hour)
+	right := copyTodo(shared)
+	right.Title = "Right title"
+	right.Notes = "the right notes"
+	right.ModifiedAt = time.Now().Add(-time.Hour)
+	wrongFile := filepath.Join(t.TempDir(), "wrong.json")
+	rightFile := filepath.Join(t.TempDir(), "right.json")
+	if err := writeExport(wrongFile, []todo.Todo{shared}); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeExport(rightFile, []todo.Todo{right}); err != nil {
+		t.Fatal(err)
+	}
+	importFile := func(m model, file string) model {
+		t.Helper()
+		m.tab = tabSettings
+		m.settingsCursor = settingImportFile
+		m = typePath(t, sendKey(t, m, "enter"))
+		m.textInput.SetValue(file)
+		next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		m = next.(model)
+		done := cmd().(importDoneMsg)
+		if done.err != nil {
+			t.Fatalf("import %s: %v", file, done.err)
+		}
+		next, _ = m.Update(done)
+		m = next.(model)
+		next, _ = m.Update(reloadedMsg{todos: done.todos, epoch: m.saveEpoch})
+		return next.(model)
+	}
+
+	m = importFile(m, wrongFile)
+	m = importFile(m, rightFile)
+	// Each u saved before the next, as a person pressing them is slower than
+	// the save's debounce.
+	m.tab = tabTasks
+	m = sendKey(t, m, "u")
+	m.flushPendingWrites()
+	m = sendKey(t, m, "u")
+	m.flushPendingWrites()
+	if n := len(m.allTodos()); n != 0 {
+		t.Fatalf("u twice left %d tasks", n)
+	}
+
+	m = importFile(m, rightFile)
+	all := m.allTodos()
+	if len(all) != 1 || all[0].Title != "Right title" || all[0].Notes != "the right notes" {
+		t.Fatalf("after importing the right file again: %d tasks, the first %q / %q", len(all), all[0].Title, all[0].Notes)
+	}
+}
+
 func TestScriptImportRejectsANonExport(t *testing.T) {
 	m := modelWithTasks(t)
 	m.tab = tabSettings

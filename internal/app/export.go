@@ -164,8 +164,14 @@ func importTasks(h *sql.DB, tasks []todo.Todo, b rank.Biases, by editor) (import
 }
 
 // reviveDeleted restores the tasks that incoming holds live and stored holds
-// deleted, so the merge after it finds them here, and reports how many. Each
-// is saved undeleted, which stamps its restore later than its deletion, and a
+// deleted, so the merge after it finds them here, and reports how many.
+//
+// Each comes back as the file has it, not as it was when deleted: what it
+// was then can be what an undo restored just before deleting it, stamped
+// later than the file, which then won the merge. That was the wrong file's
+// version coming back after the wrong import and the right one were both
+// undone and the right one imported again. Comments and time entries only
+// the store has are kept. It is saved stamped later than its deletion, and a
 // parent that stays deleted is let go, as `tjek undelete` does, rather than
 // leave the task under a parent nobody can see.
 func reviveDeleted(h *sql.DB, stored, incoming []todo.Todo, b rank.Biases, by editor) (int, error) {
@@ -173,22 +179,25 @@ func reviveDeleted(h *sql.DB, stored, incoming []todo.Todo, b rank.Biases, by ed
 	for i := range stored {
 		byID[stored[i].ID] = &stored[i]
 	}
-	coming := make(map[string]bool, len(incoming))
+	coming := make(map[string]*todo.Todo, len(incoming))
 	for i := range incoming {
 		if !incoming[i].Deleted {
-			coming[incoming[i].ID] = true
+			coming[incoming[i].ID] = &incoming[i]
 		}
 	}
 	var revive []*todo.Todo
-	for id := range coming {
+	for id, in := range coming {
 		x := byID[id]
 		if x == nil || !x.Deleted {
 			continue
 		}
-		c := copyTodo(*x)
+		c := copyTodo(*in)
 		c.Deleted, c.DeletedAt = false, time.Time{}
 		c.ModifiedAt = todo.StampModified(x.DeletedAt)
-		if p := byID[c.ParentID]; c.ParentID != "" && p != nil && p.Deleted && !coming[c.ParentID] {
+		c.Stamps, c.History = nil, nil
+		c.Comments = keepStoredRecords(c.Comments, x.Comments, func(r todo.Comment) string { return r.ID })
+		c.TimeEntries = keepStoredRecords(c.TimeEntries, x.TimeEntries, func(r todo.TimeEntry) string { return r.ID })
+		if p := byID[c.ParentID]; c.ParentID != "" && p != nil && p.Deleted && coming[c.ParentID] == nil {
 			c.ParentID = ""
 		}
 		revive = append(revive, &c)
@@ -200,6 +209,21 @@ func reviveDeleted(h *sql.DB, stored, incoming []todo.Todo, b rank.Biases, by ed
 		return 0, err
 	}
 	return len(revive), nil
+}
+
+// keepStoredRecords is the file's records with the stored ones it lacks added,
+// so a revive written whole does not delete them.
+func keepStoredRecords[R any](file, stored []R, id func(R) string) []R {
+	have := make(map[string]bool, len(file))
+	for _, r := range file {
+		have[id(r)] = true
+	}
+	for _, r := range stored {
+		if !have[id(r)] {
+			file = append(file, r)
+		}
+	}
+	return file
 }
 
 // exportFileName is the file the Settings auto-export keeps current in the

@@ -388,6 +388,9 @@ func TestCliImportRestoresADeletedTask(t *testing.T) {
 		if code := cliImport([]string{path}); code != 0 {
 			t.Fatalf("first import: exit %d", code)
 		}
+		if code := cliComment([]string{task.ID, "written after the import"}); code != 0 {
+			t.Fatalf("comment: exit %d", code)
+		}
 		if code := cliDelete([]string{task.ID}); code != 0 {
 			t.Fatalf("delete: exit %d", code)
 		}
@@ -406,6 +409,10 @@ func TestCliImportRestoresADeletedTask(t *testing.T) {
 	}
 	if h := todos[0].History; len(h) == 0 || h[len(h)-1].Action != todo.ActionRestored {
 		t.Errorf("history %+v; want the restore recorded last", h)
+	}
+	// The file knows nothing of a comment made since; it is kept anyway.
+	if c := todos[0].Comments; len(c) != 1 || c[0].Text != "written after the import" || !c[0].DeletedAt.IsZero() {
+		t.Errorf("comments after the restore: %+v", c)
 	}
 	// Idempotent still: a third import changes nothing.
 	out = captureStdout(t, func() { cliImport([]string{path}) })

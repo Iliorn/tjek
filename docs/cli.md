@@ -229,7 +229,7 @@ The main fields of each task:
 your tasks with the same merge that powers sync. It **never replaces**
 anything wholesale, so `export | import` is always safe and importing the same
 file twice changes nothing. A task in the file that has been deleted here
-comes back. A bare JSON array of tasks is accepted too.
+comes back as the file has it. A bare JSON array of tasks is accepted too.
 
 ### From Taskwarrior
 

@@ -373,7 +373,8 @@ and another tool can read it.
   merged in: new ones are added, ones you already have take the newer
   version, and nothing is deleted, so importing the same file twice changes
   nothing. `u` takes the whole import back. A task from the file that you
-  have deleted comes back, so the file can be imported again after `u`.
+  have deleted comes back as the file has it, so after `u` the file (or
+  the right one, if you picked the wrong one first) can be imported again.
   After a Taskwarrior import, the message names what tjek had no place for.
 
 ### Picking a file or folder
