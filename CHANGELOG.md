@@ -13,6 +13,11 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+### Added
+
+- An agent's edits are signed with its name in the history (`claude-2b91 · cli`).
+- `tjek add --request-id=ID` run again answers with the task it made, adding no duplicate.
+
 ## [1.62.0] - 2026-10-15
 
 ### Added

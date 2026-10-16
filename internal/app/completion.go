@@ -30,7 +30,7 @@ type cliCommandSpec struct {
 var cliCommandSpecs = []cliCommandSpec{
 	{name: "add", summary: "add a new task", flags: []string{
 		"chain", "comment", "depends", "due", "json", "like", "note", "p", "priority",
-		"project", "quiet-id", "recur", "size", "stage", "start", "tag"}},
+		"project", "quiet-id", "recur", "request-id", "size", "stage", "start", "tag"}},
 	{name: "list", summary: "list pending top-level tasks", flags: []string{
 		"all", "blocked", "claimed", "focus", "json", "limit", "project", "ready", "search",
 		"search-re", "search-word", "sort", "stale", "tag", "unblocked-since", "unclaimed", "waiting", "where", "wide"}},

@@ -89,7 +89,8 @@ from the command line (or synced from another device) and reloads, waiting
 until you finish any edit you are in the middle of.
 
 A change made from the command line shows in the task's history marked
-`cli`, under the name from Settings. Set `TJEK_AUTHOR` to sign a script's
+`cli`, under the name from Settings, or a coding agent's own name
+(`claude-2b91`) when one runs it. Set `TJEK_AUTHOR` to sign a script's
 changes with a name of its own; `tjek show` prints the history at the end.
 
 ## Agents working from one list
@@ -108,11 +109,16 @@ tjek release 3f2a                   # or give it back unfinished
 Nothing needs setting up. tjek names the agent itself, from the variables
 the agent puts in its commands' environment: `claude-2b91` from Claude Code,
 `codex-7f3a` from Codex, the number standing for the chat. The same chat
-keeps its name, so it renews and releases without saying who it is. An agent
-tjek cannot place (or one with no chat ID to go by) is given a name for the
-call, `agent-7f3a`, and told to pass it back with `--as`; a person at a
-terminal claims under their own name. `--as NAME` picks a name outright.
+keeps its name, so it renews and releases without saying who it is, and its
+edits carry the name in the task's history. An agent tjek cannot place (or
+one with no chat ID to go by) is given a name for the call, `agent-7f3a`,
+and told to pass it back with `--as`; a person at a terminal claims under
+their own name. `--as NAME`, or `TJEK_AUTHOR`, picks a name outright.
 
+- **An add can be run again.** `tjek add "title" --request-id=ID` with an
+  ID the agent makes up per task answers a second run with the task the
+  first made, so a retry after a timeout adds no duplicate. IDs are
+  remembered for a week.
 - **One agent wins.** `claim` checks the task is free and takes it in one
   step, so two agents claiming at once cannot both get it. `--next` passes
   over tasks that are claimed, blocked, waiting for a later start date or

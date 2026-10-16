@@ -925,7 +925,7 @@ func newSQLiteRepo() *sqliteRepo { return &sqliteRepo{rank: rank.Default()} }
 // events carry the settings' name and say they came from the command line.
 func newCLIRepo(s appSettings) *sqliteRepo {
 	r := newSQLiteRepo()
-	r.by = editor{name: authorName(s), source: todo.SourceCLI}
+	r.by = editor{name: cliAuthorName(s), source: todo.SourceCLI}
 	return r
 }
 

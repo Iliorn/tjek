@@ -119,8 +119,10 @@ Historik:
   minutes read as one row, and edits right after a task was created are part
   of its creation.
 - **The name** is Settings → "Your name", or your account's name until you
-  set one. A script or an agent can sign as itself with `TJEK_AUTHOR`:
-  `TJEK_AUTHOR=Claude tjek done 3f2a`.
+  set one. A coding agent working through the command line signs as itself,
+  `claude-2b91`, the name its [claims](cli.md#agents-working-from-one-list)
+  carry; a script can pick a name with `TJEK_AUTHOR`:
+  `TJEK_AUTHOR=nightly-import tjek done 3f2a`.
 
 History syncs with the task, so every device shows the same rows. Tasks from
 before history existed start with none.

@@ -37,6 +37,7 @@ func cliAdd(args []string) int {
 	startNow := fs.Bool("start", false, "start the time tracker on the new task (stops any other running timer first)")
 	asJSON := fs.Bool("json", false, "emit the created task as JSON (includes its id) instead of the human line")
 	quietID := fs.Bool("quiet-id", false, "print only the new task's full id (for scripting / shell capture)")
+	requestID := fs.String("request-id", "", "an ID for this add: run again with the same ID, it answers with the task the first run made instead of adding another")
 	fs.Usage = func() {
 		fmt.Fprintln(os.Stderr, "usage: tjek add \"title\" [flags]   (or `tjek add -` to read one title per line from stdin)")
 		fmt.Fprintln(os.Stderr, "  the title accepts the same quick-add tokens as the TUI: #tag @project due:friday p:high s:l r:weekly dep:^  (flags override tokens)")
@@ -51,6 +52,7 @@ func cliAdd(args []string) int {
 		fmt.Fprintln(os.Stderr, "tjek add: title required")
 		return 2
 	}
+	*requestID = strings.TrimSpace(*requestID)
 	settings, sErr := loadSettings()
 	if sErr != nil {
 		fmt.Fprintf(os.Stderr, "warning: %v (using defaults)\n", sErr)
@@ -98,6 +100,10 @@ func cliAdd(args []string) int {
 	if batch {
 		if *startNow {
 			fmt.Fprintln(os.Stderr, "tjek add: --start can't be combined with batch stdin add (-)")
+			return 2
+		}
+		if *requestID != "" {
+			fmt.Fprintln(os.Stderr, "tjek add: --request-id names one task; add the lines one at a time, each with its own ID")
 			return 2
 		}
 		lines, err := readTitlesFromStdin(os.Stdin)
@@ -267,6 +273,36 @@ func cliAdd(args []string) int {
 	if *chain {
 		for i := 1; i < len(created); i++ {
 			created[i].AddDependency(created[i-1].ID)
+		}
+	}
+	// A request ID seen before answers with the task it made, and adds nothing.
+	// One reserved by an add that stopped before saving still names the task:
+	// it is made now, under the ID that add chose.
+	if *requestID != "" {
+		if err := openStore(); err != nil {
+			fmt.Fprintf(os.Stderr, "tjek add: open store: %v\n", err)
+			return 1
+		}
+		id, reused, err := reserveRequest(db, *requestID, created[0].ID, time.Now())
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "tjek add: --request-id: %v\n", err)
+			return 1
+		}
+		if reused {
+			if earlier, err := findStoredTask(id); err != nil {
+				fmt.Fprintf(os.Stderr, "load: %v\n", err)
+				return 1
+			} else if earlier != nil {
+				gone := ""
+				if earlier.Deleted {
+					gone = ", and has since been deleted"
+				}
+				fmt.Fprintf(os.Stderr, "tjek add: request %q already added %s %q%s; nothing new was added\n",
+					*requestID, shortID(earlier.ID), earlier.Title, gone)
+				saveLastAddedID(earlier.ID)
+				return emitAddResult(earlier, false, nil, *asJSON, *quietID)
+			}
+			created[0].ID = id
 		}
 	}
 	dirty := make([]*todo.Todo, 0, len(created)+1)

@@ -549,11 +549,12 @@ Rules:
   is the whole "is it free" test, so racing processes cannot both win.
   `saveStamped` drops the claims of the tasks a save closes or deletes, so
   closing a task in the app releases it as `tjek done` does. The holder
-  needs no setup (`claimHolder`): `--as`, else the agent running tjek and
-  its chat (`detectAgent`: `CLAUDECODE` + `CLAUDE_CODE_SESSION_ID`,
-  `CODEX_THREAD_ID`, `AI_AGENT`) hashed to `claude-2b91`, stable across the
-  chat's calls; else `TJEK_AUTHOR`; else, at a terminal, the person; else a
-  name for the call, which the output tells the agent to pass back.
+  needs no setup (`claimHolder`): `--as` or `TJEK_AUTHOR`, else the agent
+  running tjek and its chat (agents.go, `agentName`: `CLAUDECODE` +
+  `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`, `AI_AGENT`) hashed to
+  `claude-2b91`, stable across the chat's calls and the name its edits are
+  signed with; else, at a terminal, the person; else a name for the call,
+  which the output tells the agent to pass back.
   `TestMain` clears these variables so the suite runs alike inside an agent. The app reads claims with each
   load and reload (`reloadedMsg.claims`, adopted before the unchanged-tasks
   shortcut, since a claim changes no task) and only shows them
@@ -564,7 +565,7 @@ Rules:
   with the changed units. So the TUI, the CLI and an import leave the same
   trail and no mutation site knows about history. The author is the repo's
   `editor` (`SetAuthor` from Settings or `TJEK_AUTHOR`; `newCLIRepo` marks the
-  CLI's); a change tjek makes itself is flagged `todo.Todo.Auto` where it
+  CLI's, and signs as the agent running it, `cliAuthorName`); a change tjek makes itself is flagged `todo.Todo.Auto` where it
   happens (taskops.go, recurrence, auto-close), never stored, cleared by
   `drainDirty`. Events are insert-only (`task_events`, `INSERT OR IGNORE`), a
   sync merge unions them by ID and records none of its own, and the save hands

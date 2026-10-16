@@ -248,6 +248,46 @@ func TestClaimNamesTheAgent(t *testing.T) {
 	}
 }
 
+// What an agent changes is signed with the name its claims carry, so the
+// history says which chat did it; a name given still wins.
+func TestCLIEditsAreSignedByTheAgent(t *testing.T) {
+	setTestHome(t, t.TempDir())
+	t.Setenv("CLAUDECODE", "1")
+	t.Setenv("CLAUDE_CODE_SESSION_ID", "session-one")
+	want := "claude-" + shortHash("session-one")
+	captureStdout(t, func() {
+		cliAdd([]string{"Agent's task", "--comment", "started on it"})
+	})
+	freshProcess()
+	_, todos, _ := loadForCLI()
+	if len(todos) != 1 {
+		t.Fatalf("%d tasks", len(todos))
+	}
+	h := todos[0].History
+	if len(h) == 0 || h[0].Author != want || h[0].Source != todo.SourceCLI {
+		t.Errorf("history %+v; want it signed %s from the cli", h, want)
+	}
+	if c := todos[0].Comments; len(c) != 1 || c[0].Author != want {
+		t.Errorf("comments %+v; want them signed %s", c, want)
+	}
+	if name, _ := claimHolder(""); name != want {
+		t.Errorf("claims are made as %q, edits signed %q", name, want)
+	}
+
+	t.Setenv("TJEK_AUTHOR", "named-agent")
+	if got := cliAuthorName(appSettings{}); got != "named-agent" {
+		t.Errorf("with TJEK_AUTHOR the CLI signs as %q", got)
+	}
+	if got, _ := claimHolder(""); got != "named-agent" {
+		t.Errorf("with TJEK_AUTHOR claims are made as %q", got)
+	}
+	t.Setenv("TJEK_AUTHOR", "")
+	t.Setenv("CLAUDECODE", "")
+	if got := cliAuthorName(appSettings{Name: "Mark"}); got != "Mark" {
+		t.Errorf("with no agent the CLI signs as %q, want the Settings name", got)
+	}
+}
+
 func TestCLIClaimNext(t *testing.T) {
 	ids := claimFixture(t, "Ready one", "Ready two", "Blocked", "Waiting", "Timed", "Taken")
 	freshProcess()
@@ -364,7 +404,13 @@ func TestReadOnlyRun(t *testing.T) {
 func TestReadOnlyRefusesAStoreThatNeedsMigrating(t *testing.T) {
 	claimFixture(t, "Old store task")
 	h := testStore(t)
-	if _, err := h.Exec(`DROP TABLE claims; DELETE FROM schema_version WHERE version = 17`); err != nil {
+	newest, err := currentSchemaVersion(h)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Undo the newest migration (018), as a store from the build before it
+	// would be. A new migration has to be undone here instead.
+	if _, err := h.Exec(`DROP TABLE add_requests; DELETE FROM schema_version WHERE version = ?`, newest); err != nil {
 		t.Fatal(err)
 	}
 	freshProcess()
@@ -373,14 +419,14 @@ func TestReadOnlyRefusesAStoreThatNeedsMigrating(t *testing.T) {
 		t.Fatalf("read-only list of an unmigrated store: exit %d, %q", code, errOut)
 	}
 	freshProcess()
-	if v, _ := currentSchemaVersion(rawStore(t)); v != 16 {
+	if v, _ := currentSchemaVersion(rawStore(t)); v != newest-1 {
 		t.Fatalf("the refused read migrated the store to %d", v)
 	}
 	if code, out, _ := cli(t, false, "list"); code != 0 || !strings.Contains(out, "Old store task") {
 		t.Fatalf("plain list of an unmigrated store: exit %d, %q", code, out)
 	}
 	freshProcess()
-	if v, _ := currentSchemaVersion(rawStore(t)); v != 17 {
+	if v, _ := currentSchemaVersion(rawStore(t)); v != newest {
 		t.Errorf("a plain read left the store at %d", v)
 	}
 }

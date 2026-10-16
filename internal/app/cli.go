@@ -405,6 +405,7 @@ var cliHelpBlocks = []helpBlock{
 		{"--start", "start the time tracker on the new task (stops any other running timer first)"},
 		{"--json", "emit the created task as JSON (includes its id)"},
 		{"--quiet-id", "print only the new task's full id (for scripting)"},
+		{"--request-id=ID", "run again with the same ID, answer with the task the first run made instead of adding another (for a retry after a timeout)"},
 	}},
 	{"Flags (list / search):", []helpRow{
 		{"--json", "emit JSON"},

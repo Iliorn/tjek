@@ -158,13 +158,14 @@ func historyWhen(at, now time.Time) string {
 }
 
 // historyWhoWidth is the "who" column's width for rows: the widest name,
-// capped so one long name cannot push "what" off a narrow pane.
+// capped so one long name cannot push "what" off a narrow pane. The cap holds
+// an agent's whole name and mark, "claude-2b91 · cli".
 func historyWhoWidth(rows []historyRow) int {
 	w := 0
 	for _, r := range rows {
 		w = max(w, ansi.StringWidth(historyWho(r)))
 	}
-	return min(w, 16)
+	return min(w, 18)
 }
 
 // historyLines is rows as text, each clipped to width: the detail pane's
