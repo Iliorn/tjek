@@ -13,6 +13,8 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+## [1.63.0] - 2026-10-16
+
 ### Added
 
 - An agent's edits are signed with its name in the history (`claude-2b91 · cli`).
