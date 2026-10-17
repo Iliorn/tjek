@@ -214,6 +214,9 @@ func dispatchCLI(args []string) int {
 		fmt.Println(appVersion)
 		return 0
 	default: // help, -h, --help
+		if len(rest) > 0 {
+			return cliHelpTopic(rest[0])
+		}
 		return cliHelp()
 	}
 }
@@ -331,7 +334,7 @@ var cliHelpBlocks = []helpBlock{
 		{"tjek undelete <ref> | --list", "restore a specific deleted task by ref (browse with --list)"},
 		{`tjek subtask <parent> "title"`, "create a subtask (--each for multiple titles)"},
 	}},
-	{"Agents (several working from one list):", []helpRow{
+	{"Agents (several working from one list; tjek help agents for a primer):", []helpRow{
 		{"tjek claim <ref> [--as=NAME]", "reserve a task so other agents leave it alone, for --ttl (default 30m); claim it again to renew. NAME defaults to the agent running tjek and its chat (claude-2b91, codex-7f3a). Exit 3: someone else holds it"},
 		{"tjek claim --next [--where=F]", "claim the highest-ranked ready task nobody holds, in one step, so two agents never both take it (exit 3: none free); --json prints it as show --json does"},
 		{"tjek release <ref>... [-f]", "give a claim back (-f: whoever holds it). Closing or deleting a task releases it too, and an unrenewed claim runs out"},
@@ -387,9 +390,11 @@ var cliHelpBlocks = []helpBlock{
 	{"Meta:", []helpRow{
 		{"tjek --version", "print build version"},
 		{"tjek help", "this message"},
+		{"tjek help <command>", "one command's usage and flags"},
+		{"tjek help agents", "how a coding agent works from the list, in a dozen lines"},
 	}},
 	{"", []helpRow{
-		{"", "Task references can be a UUID prefix (`347e`) OR a case-insensitive substring of the title (`milk`). ID-prefix wins on hex-shaped queries so scripts stay deterministic. Ambiguous refs fail with exit code 2 and list each match with its short ID."},
+		{"", refHelp},
 	}},
 	{"Flags (add):", []helpRow{
 		{"--due=DATE", "today|tomorrow|+3d|-2d|dd-mm-yy|monday|..."},
@@ -514,6 +519,100 @@ func cliHelp() int {
 	return 0
 }
 
+// cliHelpTopic is `tjek help <topic>`: the agents primer, or one command's
+// rows and flags out of the full reference. An agent asking how one command
+// works reads that, not all of the help at a few thousand tokens.
+func cliHelpTopic(topic string) int {
+	var b strings.Builder
+	if topic == "agents" {
+		writeHelp(&b, agentHelpBlocks())
+		fmt.Print(b.String())
+		return 0
+	}
+	blocks := commandHelpBlocks(topic)
+	if blocks == nil {
+		fmt.Fprintf(os.Stderr, "tjek help: no command %q\n", topic)
+		if near := nearestCommand(topic); near != "" {
+			fmt.Fprintf(os.Stderr, "Did you mean: tjek help %s\n", near)
+		}
+		fmt.Fprintln(os.Stderr, "Run 'tjek help' for every command, or 'tjek help agents' for working from an agent.")
+		return 2
+	}
+	writeHelp(&b, blocks)
+	fmt.Print(b.String())
+	return 0
+}
+
+// commandHelpBlocks is the part of cliHelpBlocks about cmd: the rows whose
+// usage is the command, the flag blocks naming it, and the note on refs when
+// one of its rows takes a ref. It is nil when no row is about cmd.
+func commandHelpBlocks(cmd string) []helpBlock {
+	switch cmd {
+	case "ls":
+		cmd = "list"
+	case "rm":
+		cmd = "delete"
+	}
+	var out []helpBlock
+	takesRef := false
+	for _, blk := range cliHelpBlocks {
+		var rows []helpRow
+		if inner, ok := strings.CutPrefix(blk.title, "Flags ("); ok {
+			if slices.Contains(strings.Split(strings.TrimSuffix(inner, "):"), " / "), cmd) {
+				rows = blk.rows
+			}
+		} else {
+			for _, r := range blk.rows {
+				if r.use == "tjek "+cmd || strings.HasPrefix(r.use, "tjek "+cmd+" ") {
+					rows = append(rows, r)
+					takesRef = takesRef || strings.Contains(r.use, "<ref>")
+				}
+			}
+		}
+		if len(rows) > 0 {
+			out = append(out, helpBlock{blk.title, rows})
+		}
+	}
+	if out == nil {
+		return nil
+	}
+	if takesRef {
+		out = append(out, helpBlock{"", []helpRow{{"", refHelp}}})
+	}
+	return out
+}
+
+// refHelp is how a command finds the task a ref names.
+const refHelp = "Task references can be a UUID prefix (`347e`) OR a case-insensitive substring of the title (`milk`). ID-prefix wins on hex-shaped queries so scripts stay deterministic. Ambiguous refs fail with exit code 2 and list each match with its short ID."
+
+// agentHelpBlocks is `tjek help agents`: what a coding agent needs to work
+// from the list, short enough to read on every start, or to paste into an
+// AGENTS.md or CLAUDE.md. It names the agent reading it when tjek knows it.
+func agentHelpBlocks() []helpBlock {
+	name := "claude-2b91"
+	if n, chat := agentName(); chat {
+		name = n
+	}
+	return []helpBlock{
+		{"tjek for coding agents: take a task, work on it, close it", []helpRow{
+			{"tjek claim --next --json", "take the highest-ranked ready task nobody holds (exit 3: none free; --where '#work' narrows it)"},
+			{"tjek show <id> --json", "read it: notes, comments, dependencies, subtasks"},
+			{`tjek comment <id> "text"`, "say what you found or did (- reads it from stdin)"},
+			{`tjek done <id> -m "why"`, "close it, which gives the claim back"},
+			{"tjek release <id>", "or give it back unfinished"},
+			{`tjek add "title" --json`, "add a task; with --request-id=ID a rerun after a timeout adds no second one"},
+		}},
+		{"", []helpRow{
+			{"", "- Your claims and edits carry the name " + name + ", from your chat; nothing to set up. A claim lasts 30m (--ttl=2h for longer). Any change you make to the task renews it, as does claiming it again."},
+			{"", "- Name tasks by ID or its first 8 characters: any other word is matched against the titles."},
+			{"", "- Exit codes: 0 ok, 1 error, 2 usage or an ambiguous ref, 3 not claimed (someone else holds it, or none is free)."},
+			{"", `- With --json a failure prints {"error": ..., "exit_code": N} on stdout. JSON comes on one line when an agent runs tjek.`},
+			{"", "- --read-only (or TJEK_READ_ONLY=1) refuses every command that would change anything."},
+			{"", "- tjek help <command> shows one command; tjek help shows them all."},
+		}},
+	}
+}
+
 // ── shared helpers ───────────────────────────────────────────────────────────
 
 // splitFlagsAndPositionals separates a CLI subcommand's argv into a flag-only
@@ -621,9 +720,14 @@ func noPositionals(verb string, words []string, hint string) bool {
 	return false
 }
 
+// emitJSON prints v as a command's --json result: indented for a person to
+// read, and on one line for a coding agent (agentName), which reads every
+// byte of it and pays for the indentation in tokens, a fifth of a task list.
 func emitJSON(v any) int {
 	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
+	if n, _ := agentName(); n == "" {
+		enc.SetIndent("", "  ")
+	}
 	if err := enc.Encode(v); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1

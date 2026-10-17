@@ -135,6 +135,46 @@ func TestCliHelpListsEveryRoutableCommand(t *testing.T) {
 	}
 }
 
+// `tjek help <command>` answers for every command help lists, with only that
+// command's rows, and fits 80 columns as the whole reference does. The agents
+// primer stays short enough to read on every start.
+func TestCliHelpTopics(t *testing.T) {
+	full := captureStdout(t, func() { cliHelp() })
+	for _, spec := range cliCommandSpecs {
+		if spec.name == "help" {
+			continue
+		}
+		var code int
+		out := captureStdout(t, func() { code = cliHelpTopic(spec.name) })
+		if code != 0 || !strings.Contains(out, "tjek "+spec.name) {
+			t.Errorf("tjek help %s: exit %d\n%s", spec.name, code, out)
+		}
+		if len(out) >= len(full)/2 {
+			t.Errorf("tjek help %s prints %d of the reference's %d bytes", spec.name, len(out), len(full))
+		}
+	}
+	if out := captureStdout(t, func() { cliHelpTopic("add") }); !strings.Contains(out, "--request-id") || strings.Contains(out, "tjek list") {
+		t.Errorf("tjek help add has the wrong rows:\n%s", out)
+	}
+	primer := captureStdout(t, func() { cliHelpTopic("agents") })
+	if len(primer) > 2048 || !strings.Contains(primer, "claim --next") {
+		t.Errorf("tjek help agents is %d bytes:\n%s", len(primer), primer)
+	}
+	for _, topic := range []string{"agents", "list", "sync", "claim"} {
+		out := captureStdout(t, func() { cliHelpTopic(topic) })
+		for i, line := range strings.Split(out, "\n") {
+			if n := utf8.RuneCountInString(line); n > helpWidth {
+				t.Errorf("help %s line %d is %d columns: %q", topic, i+1, n, line)
+			}
+		}
+	}
+	var code int
+	captureStderr(t, func() { code = cliHelpTopic("nope") })
+	if code != 2 {
+		t.Errorf("tjek help nope: exit %d, want 2", code)
+	}
+}
+
 // `tjek help` is read in a terminal, most of which open 80 columns wide; a
 // longer line wraps mid-word into the next command's column.
 func TestCliHelpFitsEightyColumns(t *testing.T) {

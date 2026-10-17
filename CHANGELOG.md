@@ -13,6 +13,15 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+### Added
+
+- `tjek help agents` is a primer for coding agents; `tjek help <command>` shows one.
+
+### Changed
+
+- A change an agent makes to the task it has claimed renews the claim.
+- `--json` prints on one line when a coding agent runs tjek, so it costs fewer tokens.
+
 ## [1.63.0] - 2026-10-16
 
 ### Added

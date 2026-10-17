@@ -2,9 +2,11 @@ package app
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"maps"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -288,6 +290,30 @@ func TestCLIEditsAreSignedByTheAgent(t *testing.T) {
 	}
 }
 
+// An agent gets the same JSON on one line, without the indentation it would
+// pay for in tokens.
+func TestAgentsGetCompactJSON(t *testing.T) {
+	claimFixture(t, "One", "Two")
+	freshProcess()
+	_, indented, _ := cli(t, false, "list", "--json")
+	t.Setenv("CLAUDECODE", "1")
+	freshProcess()
+	_, compact, _ := cli(t, false, "list", "--json")
+	if strings.Count(compact, "\n") != 1 || len(compact) >= len(indented) {
+		t.Fatalf("an agent's list --json is not one line:\n%s", compact)
+	}
+	var a, b []map[string]any
+	if err := json.Unmarshal([]byte(indented), &a); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(compact), &b); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(a, b) {
+		t.Errorf("an agent's JSON says something else:\n%s\n%s", indented, compact)
+	}
+}
+
 func TestCLIClaimNext(t *testing.T) {
 	ids := claimFixture(t, "Ready one", "Ready two", "Blocked", "Waiting", "Timed", "Taken")
 	freshProcess()
@@ -345,6 +371,47 @@ func TestClosingOrDeletingReleasesTheClaim(t *testing.T) {
 	captureStdout(t, func() { cliReopen([]string{ids["Finish me"]}) })
 	if claims, _ := loadClaims(testStore(t), time.Now()); len(claims) != 0 {
 		t.Errorf("a reopened task is claimed again: %v", claims)
+	}
+}
+
+// An agent working on its task keeps it: a change it makes renews its claim,
+// one anyone else makes leaves the claim as it was, and a longer --ttl is not
+// cut short.
+func TestHoldersChangeRenewsTheClaim(t *testing.T) {
+	ids := claimFixture(t, "Long job", "Longer job")
+	until := func(id string) time.Duration {
+		t.Helper()
+		c, err := claimOn(testStore(t), id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return time.Until(c.Until)
+	}
+	t.Setenv("TJEK_AUTHOR", "agent-a")
+	freshProcess()
+	captureStdout(t, func() {
+		cliClaim([]string{ids["Long job"], "--ttl", "1m"})
+		cliClaim([]string{ids["Longer job"], "--ttl", "2h"})
+	})
+
+	t.Setenv("TJEK_AUTHOR", "agent-b")
+	freshProcess()
+	captureStdout(t, func() { cliComment([]string{ids["Long job"], "not mine"}) })
+	if d := until(ids["Long job"]); d > time.Minute {
+		t.Fatalf("another agent's comment renewed the claim to %v", d)
+	}
+
+	t.Setenv("TJEK_AUTHOR", "agent-a")
+	freshProcess()
+	captureStdout(t, func() {
+		cliComment([]string{ids["Long job"], "halfway"})
+		cliEdit([]string{ids["Longer job"], "--p", "h"})
+	})
+	if d := until(ids["Long job"]); d < defaultClaimTTL-time.Minute {
+		t.Errorf("the holder's comment left the claim %v from running out; want about %v", d, defaultClaimTTL)
+	}
+	if d := until(ids["Longer job"]); d < time.Hour {
+		t.Errorf("the holder's edit cut a 2h claim to %v", d)
 	}
 }
 

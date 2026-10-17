@@ -112,6 +112,17 @@ func saveStampedOnce(h *sql.DB, dirty []*todo.Todo, bases map[string]*todo.Todo,
 	if err := dropClaims(tx, ended); err != nil {
 		return err
 	}
+	if by.source == todo.SourceCLI {
+		var worked []string
+		for _, t := range work {
+			if !slices.Contains(ended, t.ID) {
+				worked = append(worked, t.ID)
+			}
+		}
+		if err := renewClaims(tx, worked, by.name, now); err != nil {
+			return err
+		}
+	}
 	for id, e := range events {
 		if err := insertEvent(tx, id, e); err != nil {
 			return err

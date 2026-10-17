@@ -106,6 +106,10 @@ tjek done 3f2a                      # closing (or deleting) it gives the claim b
 tjek release 3f2a                   # or give it back unfinished
 ```
 
+`tjek help agents` prints this in a dozen lines, for an agent to read when
+it starts or to paste into an `AGENTS.md` or `CLAUDE.md`; `tjek help
+<command>` shows one command's usage and flags.
+
 Nothing needs setting up. tjek names the agent itself, from the variables
 the agent puts in its commands' environment: `claude-2b91` from Claude Code,
 `codex-7f3a` from Codex, the number standing for the chat. The same chat
@@ -126,8 +130,9 @@ their own name. `--as NAME`, or `TJEK_AUTHOR`, picks a name outright.
 - **Exit code 3** means nothing was claimed: the task is someone else's, or
   `--next` found no free task. It is not an error; pick another or wait.
 - **A claim runs out** after `--ttl` (30 minutes by default), so an agent
-  that stops without releasing frees its task by itself. `release -f` frees
-  one now, whoever holds it.
+  that stops without releasing frees its task by itself. Anything the holder
+  changes on the task (a comment, an edit, a time entry) renews it, as
+  claiming it again does. `release -f` frees one now, whoever holds it.
 - **You see who is on what.** `list`, `top` and `show` name the holder, and
   their `--json` adds a `claim` object; `--unclaimed` (and `list --claimed`)
   filter on it. The app marks the row with ⚑ and says who holds it, and for
@@ -150,6 +155,9 @@ upgrade, is refused rather than upgraded.
 With `--json`, a command that fails prints `{"error": "...", "exit_code": N}`
 on stdout as well as its message on stderr, so a script reading stdout finds
 out what went wrong.
+
+Run by a coding agent, `--json` prints each result on one line rather than
+indented: the same JSON, in about a fifth fewer tokens.
 
 ## The `--json` output is a contract
 

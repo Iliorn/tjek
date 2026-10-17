@@ -148,6 +148,23 @@ func dropClaims(tx *sql.Tx, ids []string) error {
 	return err
 }
 
+// renewClaims runs holder's live claims on ids on for defaultClaimTTL from
+// now, inside a save's transaction: an agent changing its task (a comment, an
+// edit, a time entry) is still on it, so it does not lose the task for not
+// claiming it again. A claim taken for longer keeps its later end.
+func renewClaims(tx *sql.Tx, ids []string, holder string, now time.Time) error {
+	if len(ids) == 0 || holder == "" {
+		return nil
+	}
+	args := []any{now.Add(defaultClaimTTL).UnixMilli(), holder, now.UnixMilli()}
+	for _, id := range ids {
+		args = append(args, id)
+	}
+	_, err := tx.Exec(`UPDATE claims SET expires_at = MAX(expires_at, ?) WHERE holder = ? AND expires_at > ?
+		AND task_id IN (?`+strings.Repeat(",?", len(ids)-1)+`)`, args...)
+	return err
+}
+
 // claimReader is the part of a Repository that can read claims. It is not on
 // the Repository port: a claim is a CLI-side reservation the app only shows,
 // and the test fakes have none.

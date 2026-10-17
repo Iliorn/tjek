@@ -548,7 +548,10 @@ Rules:
   and `todo.Fields` does not know it. `takeClaim` is one upsert whose `WHERE`
   is the whole "is it free" test, so racing processes cannot both win.
   `saveStamped` drops the claims of the tasks a save closes or deletes, so
-  closing a task in the app releases it as `tjek done` does. The holder
+  closing a task in the app releases it as `tjek done` does. A CLI save
+  renews the claims its signer holds on the tasks it changes (`renewClaims`,
+  to at least `defaultClaimTTL` from now), so an agent at work on its task
+  does not lose it for not claiming again. The holder
   needs no setup (`claimHolder`): `--as` or `TJEK_AUTHOR`, else the agent
   running tjek and its chat (agents.go, `agentName`: `CLAUDECODE` +
   `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`, `AI_AGENT`) hashed to
