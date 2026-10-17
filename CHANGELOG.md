@@ -13,6 +13,8 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+## [1.64.0] - 2026-10-17
+
 ### Added
 
 - `tjek help agents` is a primer for coding agents; `tjek help <command>` shows one.
