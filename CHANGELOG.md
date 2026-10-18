@@ -13,6 +13,11 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+### Fixed
+
+- On a sync server, the CLI and TUI use the fleet's column names, not stale local ones.
+- `--stage` naming the done column now says to use `tjek done`, not "unknown stage".
+
 ## [1.64.0] - 2026-10-17
 
 ### Added
