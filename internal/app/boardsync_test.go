@@ -192,3 +192,43 @@ func TestBoardSyncCarriesIcons(t *testing.T) {
 		t.Errorf("settings.json kept icons %v", s.StageIcons)
 	}
 }
+
+// A sync server never syncs as a client, so its settings.json keeps the
+// columns it joined with. Its CLI must work against the fleet list it stores,
+// or an agent on the hub files tasks under names the fleet renamed away.
+func TestServerWorksAgainstTheFleetList(t *testing.T) {
+	setTestHome(t, t.TempDir())
+	joined := time.Date(2026, 9, 13, 18, 0, 0, 0, time.UTC)
+	local := appSettings{Stages: []string{"Analysis", "Implementation", "Completed"}, StagesModifiedAt: joined}
+
+	if got := boardInEffect(local).stages; strings.Join(got, ",") != "Analysis,Implementation,Completed" {
+		t.Errorf("with no stored list the device's own columns apply, got %v", got)
+	}
+
+	var store boardStore
+	fleet := tasksync.Board{Stages: []string{"Backlog", "Active", "Completed"}, ModifiedAt: joined.Add(16 * 24 * time.Hour)}
+	if err := store.SaveBoard(fleet); err != nil {
+		t.Fatal(err)
+	}
+	c := boardInEffect(local)
+	if _, ok := c.canonicalStage("Active"); !ok {
+		t.Errorf("the fleet's newer columns should apply on the server, got %v", c.stages)
+	}
+	if _, ok := c.canonicalStage("Implementation"); ok {
+		t.Error("a column the fleet renamed away should no longer resolve")
+	}
+
+	// Newer wins, as in the merge: a list edited here since beats the stored one.
+	edited := local
+	edited.StagesModifiedAt = fleet.ModifiedAt.Add(time.Hour)
+	if got := boardInEffect(edited).stages; got[0] != "Analysis" {
+		t.Errorf("a list edited after the stored one should win, got %v", got)
+	}
+
+	// With sharing off the device keeps its own columns.
+	private := local
+	private.SyncBoardDisabled = true
+	if got := boardInEffect(private).stages; got[0] != "Analysis" {
+		t.Errorf("a device that does not share its board should keep its own, got %v", got)
+	}
+}

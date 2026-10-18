@@ -73,6 +73,23 @@ func TestStageIndexAndCanonical(t *testing.T) {
 	}
 }
 
+// Refusing the Done column is right, but "unknown stage" is not: the name is
+// configured, so the refusal names it as the finish line and points at done.
+func TestStageFlagErrorNamesTheDoneColumn(t *testing.T) {
+	c := testBoard([]string{"Todo", "Doing", "Shipped"})
+	for cmd, want := range map[string]string{
+		"add":  "tjek add: Shipped is the done column, not a stage — add the task, then `tjek done <ref>`",
+		"edit": "tjek edit: Shipped is the done column, not a stage — close the task with `tjek done <ref>`",
+	} {
+		if got := c.stageFlagError(cmd, " shipped "); got != want {
+			t.Errorf("%s: got %q, want %q", cmd, got, want)
+		}
+	}
+	if got, want := c.stageFlagError("add", "Review"), `tjek add: unknown stage "Review" (configured: Todo, Doing)`; got != want {
+		t.Errorf("unknown name: got %q, want %q", got, want)
+	}
+}
+
 // The last configured column *is* Done: renaming it renames the heading the
 // completed cards sit under, and does not add a fifth column or turn the
 // renamed name into a stage a pending task can hold.

@@ -57,7 +57,7 @@ func cliAdd(args []string) int {
 	if sErr != nil {
 		fmt.Fprintf(os.Stderr, "warning: %v (using defaults)\n", sErr)
 	}
-	board := boardConfigFromSettings(settings)
+	board := boardInEffect(settings)
 	repo := newCLIRepo(settings)
 	repo.SetRanker(rank.Ranker{Biases: biasesFromSettings(settings)})
 
@@ -122,7 +122,7 @@ func cliAdd(args []string) int {
 	if *stage != "" {
 		name, ok := board.canonicalStage(*stage)
 		if !ok {
-			fmt.Fprintf(os.Stderr, "tjek add: unknown stage %q (configured: %s)\n", *stage, strings.Join(board.pending(), ", "))
+			fmt.Fprintln(os.Stderr, board.stageFlagError("add", *stage))
 			return 2
 		}
 		stageName = name

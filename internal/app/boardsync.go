@@ -58,6 +58,28 @@ func (b *boardStore) SaveBoard(board tasksync.Board) error {
 	return writeFileAtomic(boardStatePath(), data, 0600)
 }
 
+// boardInEffect is the board this device works against: settings.json's,
+// unless this device's own sync server holds a newer fleet list. A server
+// never syncs as a client, so adoptFromSync never runs there and its
+// settings.json keeps whatever columns it had when it joined; without this,
+// `tjek add` on the hub files new tasks under names the rest of the fleet has
+// renamed away. Newer-wins is the merge rule, so a list edited here since
+// still beats the stored one. In memory only: settings.json is left as it is.
+// A device that is not a server has no board.json, and pays one failed stat.
+func boardInEffect(s appSettings) boardConfig {
+	c := boardConfigFromSettings(s)
+	if !c.sync {
+		return c
+	}
+	b, err := (&boardStore{}).LoadBoard()
+	if err != nil || len(b.Stages) == 0 || !b.ModifiedAt.After(c.modifiedAt) {
+		return c
+	}
+	c.setColumns(b.Stages, b.Icons)
+	c.modifiedAt = b.ModifiedAt
+	return c
+}
+
 // ── The client's half ────────────────────────────────────────────────────────
 
 // wire is what this device offers the fleet: nil when the preference is off,

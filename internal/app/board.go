@@ -93,7 +93,7 @@ func boardConfigFromSettings(s appSettings) boardConfig {
 // which has no model to hold them. An unreadable file reads as the defaults.
 func storedBoard() boardConfig {
 	s, _ := loadSettings()
-	return boardConfigFromSettings(s)
+	return boardInEffect(s)
 }
 
 // setStages installs a stage list, normalizing it first so the board's one
@@ -284,6 +284,21 @@ func (c boardConfig) stageDisplay(stage string) string {
 // second way to complete a task, bypassing everything closePendingTask does.
 func (c boardConfig) canonicalStage(input string) (string, bool) {
 	return canonicalStageIn(c.pending(), input)
+}
+
+// stageFlagError is cmd's refusal of a --stage value canonicalStage would not
+// resolve. The Done column gets its own answer: its name *is* configured, so
+// "unknown stage" sends the reader hunting for a typo when the way in is
+// `tjek done`.
+func (c boardConfig) stageFlagError(cmd, input string) string {
+	if done := c.stages[c.doneColumn()]; strings.EqualFold(strings.TrimSpace(input), done) {
+		how := "close the task with `tjek done <ref>`"
+		if cmd == "add" {
+			how = "add the task, then `tjek done <ref>`"
+		}
+		return fmt.Sprintf("tjek %s: %s is the done column, not a stage — %s", cmd, done, how)
+	}
+	return fmt.Sprintf("tjek %s: unknown stage %q (configured: %s)", cmd, input, strings.Join(c.pending(), ", "))
 }
 
 // canonicalStageIn is canonicalStage against an arbitrary list — used while

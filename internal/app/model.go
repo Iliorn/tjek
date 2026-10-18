@@ -649,7 +649,7 @@ func initialModel(repo Repository) model {
 		repo:              repo,
 		claims:            repoClaims(repo, time.Now()),
 		rank:              rank.Ranker{Biases: biasesFromSettings(settings)},
-		boardCfg:          boardConfigFromSettings(settings),
+		boardCfg:          boardInEffect(settings),
 		textInput:         ti,
 		searchInput:       si,
 		depSearchInput:    di,
