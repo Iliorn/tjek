@@ -13,6 +13,12 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+### Changed
+
+- The Calendar's month grid lights the days you closed tasks, not only the days you logged time.
+- The Calendar shows each entry on one row, its project beside the title, the times in one column.
+- Under the month grid, the day and month count tasks completed; time shows only when logged.
+
 ## [1.66.1] - 2026-10-19
 
 ### Fixed

@@ -11,74 +11,137 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// TestRenderTimelineSubSkipsBareEntries asserts the sub-line is skipped when
-// the entry has neither project nor tags (so bare entries stay 1-line), and
-// that the project + tags appear in that order otherwise.
-func TestRenderTimelineSubSkipsBareEntries(t *testing.T) {
-	m := newTestModel()
-
-	bare := dayActivity{title: "bare"}
-	if got := m.renderTimelineSub(bare, 80, false); got != "" {
-		t.Errorf("bare entry: want empty sub line, got %q", got)
+// An entry's context follows its title on the same row: nothing for a bare
+// entry, otherwise the project before the tags.
+func TestTimelineMetaOrder(t *testing.T) {
+	if got, w := timelineMeta(dayActivity{title: "bare"}, 80); got != "" || w != 0 {
+		t.Errorf("bare entry: want no context, got %q (%d)", got, w)
 	}
-
-	withProj := dayActivity{title: "x", project: "alpha"}
-	if got := m.renderTimelineSub(withProj, 80, false); !strings.Contains(got, "[alpha]") {
+	if got, _ := timelineMeta(dayActivity{project: "alpha"}, 80); !strings.Contains(got, "[alpha]") {
 		t.Errorf("project-only: missing [alpha] in %q", got)
 	}
-
-	withTags := dayActivity{title: "x", tags: []string{"a", "b"}}
-	if got := m.renderTimelineSub(withTags, 80, false); !strings.Contains(got, "#a") || !strings.Contains(got, "#b") {
+	if got, _ := timelineMeta(dayActivity{tags: []string{"a", "b"}}, 80); !strings.Contains(got, "#a") || !strings.Contains(got, "#b") {
 		t.Errorf("tag-only: missing tags in %q", got)
 	}
-
-	both := dayActivity{title: "x", project: "alpha", tags: []string{"a"}}
-	got := m.renderTimelineSub(both, 80, false)
-	pIdx := strings.Index(got, "[alpha]")
-	tIdx := strings.Index(got, "#a")
-	if pIdx < 0 || tIdx < 0 || pIdx > tIdx {
-		t.Errorf("project must precede tags: pIdx=%d tIdx=%d in %q", pIdx, tIdx, got)
+	got, _ := timelineMeta(dayActivity{project: "alpha", tags: []string{"a"}}, 80)
+	if p, tg := strings.Index(got, "[alpha]"), strings.Index(got, "#a"); p < 0 || tg < 0 || p > tg {
+		t.Errorf("project must precede tags in %q", got)
 	}
 }
 
-// TestRenderTimelineSubDropsTagsOnNarrow asserts the sub-line drops tags
-// before project when the combined width would overflow innerW. This keeps
-// the no-wrap contract from the renderTimelineLines panel honest.
-func TestRenderTimelineSubDropsTagsOnNarrow(t *testing.T) {
-	m := newTestModel()
-	long := dayActivity{
-		title:   "x",
-		project: "shorty",
-		tags:    []string{"a-very-long-tag-name-that-eats-the-width"},
+// Short of room, the context drops its tags before its project, clips a
+// parent rather than overflow, and reports the width it drew.
+func TestTimelineMetaFitsItsWidth(t *testing.T) {
+	got, w := timelineMeta(dayActivity{project: "shorty", tags: []string{"a-very-long-tag-name-that-eats-the-width"}}, 12)
+	if !strings.Contains(got, "[shorty]") || strings.Contains(got, "a-very-long-tag-name") {
+		t.Errorf("want the project kept and the tag dropped at 12 cells: %q", got)
 	}
-	got := m.renderTimelineSub(long, 16, false) // 16 - 4 indent = 12 avail
-	if !strings.Contains(got, "[shorty]") {
-		t.Errorf("project should survive narrow width: %q", got)
+	if sw := ansi.StringWidth(got); sw != w || w > 12 {
+		t.Errorf("context is %d cells, reported %d, allowed 12: %q", sw, w, got)
 	}
-	if strings.Contains(got, "a-very-long-tag-name") {
-		t.Errorf("tag should be dropped when it doesn't fit: %q", got)
+	got, w = timelineMeta(dayActivity{parentTitle: "A parent title that is far too long to fit"}, 12)
+	if !strings.HasPrefix(ansi.Strip(got), "↳ A parent") || ansi.StringWidth(got) != w || w > 12 {
+		t.Errorf("parent ref should clip to 12 cells: %q (%d)", got, w)
 	}
 }
 
-// TestRenderTimelineSubShowsParent asserts a subtask activity renders a
-// "↳ parent" reference even when it has no project or tags (so a done subtask's
-// short title gets parent context in the day timeline), and that the parent ref
-// is truncated rather than overflowing a narrow panel.
-func TestRenderTimelineSubShowsParent(t *testing.T) {
+// A day's entries take a row each, with the project on the title's row, and
+// the time column starts in the same place on every row whatever its kind.
+func TestTimelineIsOneRowAnEntry(t *testing.T) {
 	m := newTestModel()
+	day := localMidnight(-1)
+	m.calendar.selected = day
+	closed := mkTodo("c", "closed without a timer", todo.Done)
+	closed.Project = "home"
+	closed.CompletedAt = day.Add(17 * time.Hour)
+	timed := mkTodo("t", "timed work", todo.Pending)
+	timed.Project = "work"
+	timed.Tags = []string{"deep"}
+	timed.TimeEntries = []todo.TimeEntry{{ID: "e", StartedAt: day.Add(9 * time.Hour), StoppedAt: day.Add(10 * time.Hour)}}
+	m.add(closed)
+	m.add(timed)
+	m.refreshCaches()
 
-	sub := dayActivity{title: "fix", completed: true, parentTitle: "Big parent task"}
-	got := m.renderTimelineSub(sub, 80, false)
-	if !strings.Contains(got, "↳ Big parent task") {
-		t.Errorf("want parent reference in sub line, got %q", got)
+	lines := m.renderTimelineLines(100, 20)
+	if len(lines) != 2 {
+		t.Fatalf("want one row per entry, got %d:\n%s", len(lines), ansi.Strip(strings.Join(lines, "\n")))
 	}
+	col := -1
+	for _, l := range lines {
+		plain := ansi.Strip(l)
+		if w := ansi.StringWidth(l); w > 100 {
+			t.Errorf("row is %d cells, wider than the pane's 100: %q", w, plain)
+		}
+		at := strings.Index(plain, "09:00")
+		if at < 0 {
+			at = strings.Index(plain, "✓ done at")
+		}
+		at = ansi.StringWidth(plain[:at])
+		if col >= 0 && at != col {
+			t.Errorf("time column starts at %d and at %d:\n%s", col, at, ansi.Strip(strings.Join(lines, "\n")))
+		}
+		col = at
+	}
+	if !strings.Contains(ansi.Strip(lines[0]), "Timed work [work]") || !strings.Contains(ansi.Strip(lines[1]), "Closed without a timer [home]") {
+		t.Errorf("want each project on its title's row:\n%s", ansi.Strip(strings.Join(lines, "\n")))
+	}
+}
 
-	// Parent reference must not overflow the inner width once styled
-	// (indent + truncated content stays within innerW).
-	narrow := dayActivity{title: "fix", parentTitle: "A parent title that is far too long to fit"}
-	got = m.renderTimelineSub(narrow, 16, false)
-	if w := ansi.StringWidth(got); w > 16 {
-		t.Errorf("parent ref overflowed innerW=16: width=%d %q", w, got)
+// A day of closed tasks and no timer: the title says how many, without a
+// "0s" of time, and the timeline has no empty duration column.
+func TestTimelineWithoutTimeHasNoDuration(t *testing.T) {
+	m := newTestModel()
+	day := localMidnight(-1)
+	m.calendar.selected = day
+	for _, id := range []string{"a", "b"} {
+		td := mkTodo(id, "closed "+id, todo.Done)
+		td.CompletedAt = day.Add(12 * time.Hour)
+		m.add(td)
+	}
+	m.refreshCaches()
+	if got := m.timelineSummary(); got != "2 entries" {
+		t.Errorf("summary = %q, want %q", got, "2 entries")
+	}
+	for _, l := range m.renderTimelineLines(80, 10) {
+		if plain := ansi.Strip(l); strings.HasSuffix(plain, " ") {
+			t.Errorf("row ends in an empty duration column: %q", plain)
+		}
+	}
+}
+
+// The month grid lights a day where tasks were closed with no time logged,
+// and the panel under it counts them for the day and the month.
+func TestMonthPanelCountsClosedTasks(t *testing.T) {
+	m := newTestModel()
+	sel := localMidnight(0)
+	other := sel.AddDate(0, 0, -1)
+	if other.Month() != sel.Month() {
+		other = sel.AddDate(0, 0, 1)
+	}
+	m.calendar.selected = sel
+	m.frameTime = sel.Add(23 * time.Hour)
+	for i, at := range []time.Time{sel, sel, other} {
+		td := mkTodo(fmt.Sprint(i), "closed", todo.Done)
+		td.Project = "home"
+		td.CompletedAt = at.Add(12 * time.Hour)
+		m.add(td)
+	}
+	m.refreshCaches()
+
+	lines := m.renderMonthCalendarLines(calPanelWidth - 2)
+	plain := ansi.Strip(strings.Join(lines, "\n"))
+	words := strings.Join(strings.Fields(plain), " ")
+	for _, want := range []string{"Day Completed 2 home 2", "Month Completed 3"} {
+		if !strings.Contains(words, want) {
+			t.Errorf("month panel lacks %q:\n%s", want, plain)
+		}
+	}
+	if strings.Contains(plain, "Tracked") || strings.Contains(plain, "0s") {
+		t.Errorf("a month with no time logged shows a time total:\n%s", plain)
+	}
+	cell := fmt.Sprintf("%2d", other.Day())
+	if unlit := normalStyle.Render(cell); strings.Contains(strings.Join(lines, "\n"), unlit) {
+		t.Errorf("day %d closed a task and is drawn unlit", other.Day())
 	}
 }
 
@@ -113,7 +176,7 @@ func TestActivitiesForDaySurfacesDueTasks(t *testing.T) {
 		t.Fatalf("got %+v, want due event for task p", a)
 	}
 
-	line := ansi.Strip(m.renderTimelineEntry(acts[0], 0, 80))
+	line := ansi.Strip(m.renderTimelineEntry(acts[0], 0, 80, timelineColumns(acts, m.frameTime)))
 	if !strings.Contains(line, "⧗ due") || !strings.Contains(line, "Ship release") {
 		t.Fatalf("timeline entry = %q, want due marker + title", line)
 	}
@@ -126,7 +189,7 @@ func TestRenderTimelineEntryOverdue(t *testing.T) {
 	past := localMidnight(-3)
 	a := dayActivity{title: "file taxes", start: past, stop: past, due: true}
 
-	line := ansi.Strip(m.renderTimelineEntry(a, 0, 80))
+	line := ansi.Strip(m.renderTimelineEntry(a, 0, 80, timelineColumns([]dayActivity{a}, m.frameTime)))
 	if !strings.Contains(line, "⧗ overdue") {
 		t.Fatalf("timeline entry = %q, want overdue marker", line)
 	}
@@ -150,7 +213,7 @@ func TestTimelineTicksTrackedTaskCompletedThatDay(t *testing.T) {
 	if len(acts) != 1 || !acts[0].doneThatDay {
 		t.Fatalf("activitiesForDay = %+v, want one entry marked doneThatDay", acts)
 	}
-	line := ansi.Strip(m.renderTimelineEntry(acts[0], 0, 80))
+	line := ansi.Strip(m.renderTimelineEntry(acts[0], 0, 80, timelineColumns(acts, m.frameTime)))
 	if !strings.Contains(line, "✓") || strings.Contains(line, "●") {
 		t.Fatalf("timeline entry = %q, want ✓ instead of the timer dot", line)
 	}
@@ -264,7 +327,7 @@ func TestComingUpIsInTheAgenda(t *testing.T) {
 func TestAgendaKeepsComingUpOnALongDay(t *testing.T) {
 	day := localMidnight(0)
 	var tasks []todo.Todo
-	for i := range 12 {
+	for i := range 20 {
 		x := todo.New(fmt.Sprintf("Tracked %d", i))
 		x.Project = "work"
 		x.TimeEntries = []todo.TimeEntry{{ID: fmt.Sprintf("e%d", i), StartedAt: day.Add(time.Duration(i) * time.Hour), StoppedAt: day.Add(time.Duration(i)*time.Hour + 30*time.Minute)}}

@@ -96,6 +96,7 @@ var countOne = map[language]map[string]string{
 		"due in %d days; the ramp adds points daily": "due in %d day; the ramp adds points daily",
 		"%s (%d entries)":                            "%s (%d entry)",
 		"%d entries · %s":                            "%d entry · %s",
+		"%d entries":                                 "%d entry",
 	},
 	langDA: {
 		"%d done":                     "%d færdig",
@@ -107,6 +108,7 @@ var countOne = map[language]map[string]string{
 		"due in %d days; the ramp adds points daily": "forfalder om %d dag; rampen giver point hver dag",
 		"%s (%d entries)": "%s (%d post)",
 		"%d entries · %s": "%d post · %s",
+		"%d entries":      "%d post",
 	},
 	langDE: {
 		"%d days overdue":                            "%d Tag überfällig",
@@ -114,6 +116,7 @@ var countOne = map[language]map[string]string{
 		"due in %d days; the ramp adds points daily": "fällig in %d Tag; die Rampe gibt täglich Punkte",
 		"%s (%d entries)":                            "%s (%d Eintrag)",
 		"%d entries · %s":                            "%d Eintrag · %s",
+		"%d entries":                                 "%d Eintrag",
 	},
 }
 
@@ -664,9 +667,11 @@ var daTranslations = map[string]string{
 	"You have %d task(s) in '%s'. Share them with everyone sharing it? (y/n)":           "Du har %d opgave(r) i '%s'. Del dem med alle, der deler det? (y/n)",
 
 	// Calendar
-	"Month ":                     "Måned ",
-	"Day ":                       "Dag ",
+	"Month":                      "Måned",
+	"Day":                        "Dag",
+	"Tracked":                    "Registreret",
 	"%d entries · %s":            "%d poster · %s",
+	"%d entries":                 "%d poster",
 	"1 entry · ":                 "1 post · ",
 	"  No activity on this day.": "  Ingen aktivitet på denne dag.",
 	"  Press t on a task (tab 1) to start tracking.": "  Tryk t på en opgave (fane 1) for at starte registrering.",
@@ -1536,9 +1541,11 @@ var deTranslations = map[string]string{
 	"You have %d task(s) in '%s'. Share them with everyone sharing it? (y/n)":           "Du hast %d Aufgabe(n) in '%s'. Mit allen teilen, die es teilen? (y/n)",
 
 	// Calendar
-	"Month ":                     "Monat ",
-	"Day ":                       "Tag ",
+	"Month":                      "Monat",
+	"Day":                        "Tag",
+	"Tracked":                    "Erfasst",
 	"%d entries · %s":            "%d Einträge · %s",
+	"%d entries":                 "%d Einträge",
 	"1 entry · ":                 "1 Eintrag · ",
 	"  No activity on this day.": "  Keine Aktivität an diesem Tag.",
 	"  Press t on a task (tab 1) to start tracking.": "  t auf einer Aufgabe (Reiter 1) startet die Erfassung.",

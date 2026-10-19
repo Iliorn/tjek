@@ -212,6 +212,22 @@ func (m model) dueDaysInRange(from, to time.Time) map[calDay]bool {
 	return days
 }
 
+// closedPerDay counts the tasks closed on each day in [from, to].
+func (m model) closedPerDay(from, to time.Time) map[calDay]int {
+	end := to.AddDate(0, 0, 1)
+	counts := make(map[calDay]int)
+	for _, t := range m.tasks {
+		if t.Deleted || t.Status != todo.Done || t.CompletedAt.IsZero() {
+			continue
+		}
+		if t.CompletedAt.Before(from) || !t.CompletedAt.Before(end) {
+			continue
+		}
+		counts[dayKey(t.CompletedAt)]++
+	}
+	return counts
+}
+
 // ── Calendar tab layout ───────────────────────────────────────────────────────
 
 func (m model) buildCalendarContent(w, outerH int) string {
@@ -295,6 +311,7 @@ func (m model) renderMonthCalendarLines(innerW int) []string {
 	monthStart := time.Date(sel.Year(), sel.Month(), 1, 0, 0, 0, 0, sel.Location())
 	monthEnd := monthStart.AddDate(0, 1, -1)
 	totals := m.trackedPerDay(monthStart, monthEnd)
+	closed := m.closedPerDay(monthStart, monthEnd)
 	dueDays := m.dueDaysInRange(monthStart, monthEnd)
 
 	var maxDay, monthTotal time.Duration
@@ -303,6 +320,25 @@ func (m model) renderMonthCalendarLines(innerW int) []string {
 		if d > maxDay {
 			maxDay = d
 		}
+	}
+	var maxClosed, monthClosed int
+	for _, n := range closed {
+		monthClosed += n
+		maxClosed = max(maxClosed, n)
+	}
+	// A day's heat is its share of the month's busiest day by whichever
+	// measure says more: time logged or tasks closed. Most work is closed
+	// without a timer running, and a grid lit by time alone would leave
+	// those days blank.
+	heat := func(k calDay) float64 {
+		h := 0.0
+		if maxDay > 0 {
+			h = float64(totals[k]) / float64(maxDay)
+		}
+		if maxClosed > 0 {
+			h = max(h, float64(closed[k])/float64(maxClosed))
+		}
+		return h
 	}
 
 	today := startOfDay(m.frameTime)
@@ -326,18 +362,12 @@ func (m model) renderMonthCalendarLines(innerW int) []string {
 				cells = append(cells, "  ")
 			} else {
 				cell := fmt.Sprintf("%2d", day.Day())
-				tracked := totals[dayKey(day)]
+				h := heat(dayKey(day))
 				switch {
 				case day.Equal(sel):
 					cell = calSelectedDayStyle.Render(cell)
-				case tracked > 0:
-					idx := len(calGradient) - 1
-					if maxDay > 0 {
-						idx = int(float64(tracked) / float64(maxDay) * float64(len(calGradient)-1))
-						if idx >= len(calGradient) {
-							idx = len(calGradient) - 1
-						}
-					}
+				case h > 0:
+					idx := min(int(h*float64(len(calGradient)-1)), len(calGradient)-1)
 					cell = calGradient[idx].Bold(true).Render(cell)
 				case day.Equal(today):
 					cell = calTodayStyle.Render(cell)
@@ -357,9 +387,19 @@ func (m model) renderMonthCalendarLines(innerW int) []string {
 
 	lines = append(lines, m.renderDayRollupLines(innerW)...)
 
-	lines = append(lines, "")
-	lines = append(lines, dimStyle.Render(tr("Month "))+timerStyle.Render(formatDuration(monthTotal)))
+	lines = append(lines, "", dimStyle.Render(tr("Month")))
+	lines = append(lines, calTallyLine(tr("Completed"), checkDoneStyle.Render(fmt.Sprint(monthClosed)), innerW))
+	if monthTotal > 0 {
+		lines = append(lines, calTallyLine(tr("Tracked"), timerStyle.Render(formatDuration(monthTotal)), innerW))
+	}
 	return lines
+}
+
+// calTallyLine is one row of the month panel's totals: the label indented
+// under its heading and the styled value right-aligned to the panel's edge.
+func calTallyLine(label, value string, innerW int) string {
+	labelW := max(innerW-1-ansi.StringWidth(value)-1, 0)
+	return " " + dimStyle.Render(padRight(truncate(label, labelW), labelW)) + " " + value
 }
 
 // comingUpDays is how far ahead of the selected day the agenda lists
@@ -429,13 +469,12 @@ func (m model) renderComingUpLines(w, maxRows int) []string {
 	return lines
 }
 
-// renderDayRollupLines builds the per-project / per-tag breakdown for the
-// selected day, shown under the month grid.
+// renderDayRollupLines builds the selected day's totals, shown under the
+// month grid: the tasks closed and the time logged, each only when there is
+// some, then the projects the closed tasks belong to and the projects and
+// tags the time went to. A day with neither shows nothing.
 func (m model) renderDayRollupLines(innerW int) []string {
 	acts := m.activitiesForDay(m.calendar.selected)
-	if len(acts) == 0 {
-		return nil
-	}
 
 	projTotals := make(map[string]time.Duration)
 	tagTotals := make(map[string]time.Duration)
@@ -449,6 +488,21 @@ func (m model) renderDayRollupLines(innerW int) []string {
 		for _, tag := range a.tags {
 			tagTotals["#"+tag] += d
 		}
+	}
+	key := dayKey(m.calendar.selected)
+	closedIn := make(map[string]int)
+	var closed int
+	for _, t := range m.tasks {
+		if t.Deleted || t.Status != todo.Done || t.CompletedAt.IsZero() || dayKey(t.CompletedAt) != key {
+			continue
+		}
+		closed++
+		if t.Project != "" {
+			closedIn[t.Project]++
+		}
+	}
+	if closed == 0 && dayTotal == 0 {
+		return nil
 	}
 
 	type rollup struct {
@@ -476,8 +530,29 @@ func (m model) renderDayRollupLines(innerW int) []string {
 		return rs
 	}
 
-	nameW := innerW - 8 // 1 indent + 7 for the right-aligned duration
-	lines := []string{"", dimStyle.Render(tr("Day ")) + timerStyle.Render(formatDuration(dayTotal))}
+	lines := []string{"", dimStyle.Render(tr("Day"))}
+	if closed > 0 {
+		lines = append(lines, calTallyLine(tr("Completed"), checkDoneStyle.Render(fmt.Sprint(closed)), innerW))
+	}
+	if dayTotal > 0 {
+		lines = append(lines, calTallyLine(tr("Tracked"), timerStyle.Render(formatDuration(dayTotal)), innerW))
+	}
+
+	byClosed := make([]string, 0, len(closedIn))
+	for name := range closedIn {
+		byClosed = append(byClosed, name)
+	}
+	sort.Slice(byClosed, func(i, j int) bool {
+		if closedIn[byClosed[i]] != closedIn[byClosed[j]] {
+			return closedIn[byClosed[i]] > closedIn[byClosed[j]]
+		}
+		return byClosed[i] < byClosed[j]
+	})
+	nameW := innerW - 8 // 1 indent + 7 for the right-aligned count or duration
+	for _, name := range byClosed[:min(len(byClosed), 3)] {
+		lines = append(lines, " "+projLabelStyle.Render(padRight(truncate(name, nameW), nameW))+
+			checkDoneStyle.Render(fmt.Sprintf("%7d", closedIn[name])))
+	}
 	for _, r := range top(projTotals, 3) {
 		lines = append(lines, " "+projLabelStyle.Render(padRight(truncate(r.name, nameW), nameW))+
 			timerStyle.Render(fmt.Sprintf("%7s", formatDurationCompact(r.d))))
@@ -500,6 +575,11 @@ func (m model) timelineSummary() string {
 	var total time.Duration
 	for _, a := range acts {
 		total += a.duration()
+	}
+	if total == 0 {
+		// A day of closed tasks and deadlines has no time to sum; "0s"
+		// would read as a timer that ran for nothing.
+		return trCount("%d entries", len(acts), len(acts))
 	}
 	if len(acts) == 1 {
 		return tr("1 entry · ") + formatDuration(total)
@@ -545,7 +625,7 @@ func (m model) renderAgendaLines(innerW, innerH int) []string {
 }
 
 // agendaMinTimeline is the fewest rows the timeline keeps when Coming up
-// shares the pane with it: an entry, its project line and the ⋮ below.
+// shares the pane with it: an entry and a ⋮ either side.
 const agendaMinTimeline = 3
 
 func (m model) renderTimelineLines(innerW, innerH int) []string {
@@ -558,254 +638,216 @@ func (m model) renderTimelineLines(innerW, innerH int) []string {
 		return lines
 	}
 
-	// Per-entry height is 1 line for bare entries and 2 lines for entries
-	// with project/tags. Precompute heights so pagination is honest.
-	heights := make([]int, len(acts))
-	for i := range acts {
-		heights[i] = 1
-		if acts[i].project != "" || len(acts[i].tags) > 0 || acts[i].parentTitle != "" {
-			heights[i] = 2
+	// One row an entry, so the window is the cursor's row with as many
+	// either side as fit, less a row for each "⋮" marking entries cut off.
+	cur := min(max(m.calendar.entryCursor, 0), len(acts)-1)
+	fit := func(rows int) (int, int) {
+		rows = max(rows, 1)
+		start := max(min(cur-rows/2, len(acts)-rows), 0)
+		return start, min(start+rows, len(acts))
+	}
+	start, end := fit(innerH)
+	if start > 0 || end < len(acts) {
+		markers := 0
+		if start > 0 {
+			markers++
 		}
+		if end < len(acts) {
+			markers++
+		}
+		start, end = fit(innerH - markers)
 	}
 
-	bodyH := innerH
-	if bodyH < 1 {
-		bodyH = 1
-	}
-
-	// Pick a [start, end) window centered on the cursor that fits in bodyH,
-	// counting each entry's height + 1 connector between entries. Reserves
-	// one line for a leading/trailing "⋮" marker when entries are clipped.
-	fit := func(reserveTop, reserveBot int) (int, int) {
-		budget := bodyH - reserveTop - reserveBot
-		if budget < 1 {
-			budget = 1
-		}
-		cur := m.calendar.entryCursor
-		if cur < 0 {
-			cur = 0
-		} else if cur >= len(acts) {
-			cur = len(acts) - 1
-		}
-		used := heights[cur]
-		start, end := cur, cur+1
-		for {
-			grew := false
-			if end < len(acts) {
-				extra := heights[end] + 1 // entry + connector above it
-				if used+extra <= budget {
-					used += extra
-					end++
-					grew = true
-				}
-			}
-			if start > 0 {
-				extra := heights[start-1] + 1
-				if used+extra <= budget {
-					used += extra
-					start--
-					grew = true
-				}
-			}
-			if !grew {
-				break
-			}
-		}
-		return start, end
-	}
-
-	start, end := fit(0, 0)
-	clippedTop := start > 0
-	clippedBot := end < len(acts)
-	if clippedTop || clippedBot {
-		// Re-fit reserving room for the ⋮ markers we're about to emit.
-		top, bot := 0, 0
-		if clippedTop {
-			top = 1
-		}
-		if clippedBot {
-			bot = 1
-		}
-		start, end = fit(top, bot)
-		clippedTop = start > 0
-		clippedBot = end < len(acts)
-	}
-
-	if clippedTop {
+	cols := timelineColumns(acts, m.frameTime)
+	if start > 0 {
 		lines = append(lines, ruleStyle.Render("  ⋮"))
 	}
 	for i := start; i < end; i++ {
-		lines = append(lines, m.renderTimelineEntry(acts[i], i, innerW))
-		hasNext := i < end-1 || clippedBot
-		if sub := m.renderTimelineSub(acts[i], innerW, hasNext); sub != "" {
-			lines = append(lines, sub)
-		}
-		if i < end-1 {
-			lines = append(lines, ruleStyle.Render("  │"))
-		}
+		lines = append(lines, m.renderTimelineEntry(acts[i], i, innerW, cols))
 	}
-	if clippedBot {
+	if end < len(acts) {
 		lines = append(lines, ruleStyle.Render("  ⋮"))
 	}
 	return lines
 }
 
-func (m model) renderTimelineEntry(a dayActivity, index, innerW int) string {
+// timelineCols is the width of the timeline's right-hand columns, the same on
+// every row of the day so the times and durations line up whatever kind of
+// entry each row is. A day with no time logged has no duration column, and its
+// width goes to the titles.
+type timelineCols struct {
+	rangeW, durW int
+}
+
+func timelineColumns(acts []dayActivity, now time.Time) timelineCols {
+	var c timelineCols
+	for _, a := range acts {
+		c.rangeW = max(c.rangeW, len([]rune(timelineRange(a, now))))
+		if !a.completed && !a.due {
+			c.durW = 8
+		}
+	}
+	return c
+}
+
+// timelineRange is an entry's time column: the span of a time entry, when a
+// task was closed, or that it is due.
+func timelineRange(a dayActivity, now time.Time) string {
+	switch {
+	case a.due && a.start.Before(startOfDay(now)):
+		return tr("⧗ overdue")
+	case a.due:
+		return tr("⧗ due")
+	case a.completed:
+		return tr("✓ done at ") + a.start.Format("15:04")
+	case a.stop.IsZero():
+		return a.start.Format("15:04") + "–" + tr(" now ")
+	}
+	return a.start.Format("15:04") + "–" + a.stop.Format("15:04")
+}
+
+// renderTimelineEntry is one entry's row: the title with its parent, project
+// and tags after it, then the time and duration columns.
+func (m model) renderTimelineEntry(a dayActivity, index, innerW int, cols timelineCols) string {
 	focused := m.calendar.focusTimeline && index == m.calendar.entryCursor
 	cur := "  "
 	if focused {
 		cur = cursorMark
 	}
+	running := a.stop.IsZero() && !a.completed && !a.due
 
-	running := a.stop.IsZero() && !a.completed
-	endStr := tr(" now ")
-	switch {
-	case a.completed:
-		// Completion event collapses the range to "done at HH:MM"; duration is 0.
-		endStr = a.start.Format("15:04")
-	case !running:
-		endStr = a.stop.Format("15:04")
+	// The title and what places it share what the right-hand columns leave.
+	// The context gives way first, down to three fifths of the width for
+	// the title; a title shorter than that leaves the rest to the context.
+	// The row's fixed cells: cursor 2, mark 1, and a space either side of
+	// the title block, plus the duration and its gap when the day has one.
+	fixed := 4 + 1 + cols.rangeW
+	if cols.durW > 0 {
+		fixed += 2 + cols.durW
 	}
-	rangeStr := a.start.Format("15:04") + "–" + endStr
-	if a.completed {
-		rangeStr = tr("✓ done at ") + a.start.Format("15:04")
+	leftW := max(innerW-fixed-1, 8)
+	titleLen := len([]rune(cleanText(a.title)))
+	titleW := min(titleLen, leftW)
+	if metaW := timelineMetaWidth(a); metaW > 0 && titleW+1+metaW > leftW {
+		titleW = max(leftW-1-metaW, min(titleLen, leftW*3/5))
 	}
-	if a.due {
-		rangeStr = tr("⧗ due")
-		if a.start.Before(startOfDay(m.frameTime)) {
-			rangeStr = tr("⧗ overdue")
-		}
-	}
-	durStr := formatDuration(a.duration())
-
-	// Fixed right-hand block (range + duration); title/project/tags share the rest.
-	// Rune count, not len(): the range separator is a multi-byte en dash.
-	leftW := innerW - len([]rune(rangeStr)) - 16
-	if leftW < 8 {
-		leftW = 8
-	}
-
-	title := truncate(a.title, leftW)
-	used := len([]rune(title))
+	title := truncate(a.title, titleW)
 	left := normalStyle.Render(title)
 	if focused {
 		left = selectedStyle.Render(title)
 	}
-	if pad := leftW - used; pad > 0 {
-		left += strings.Repeat(" ", pad)
+	used := len([]rune(title))
+	if meta, w := timelineMeta(a, leftW-used-1); w > 0 {
+		left += " " + meta
+		used += 1 + w
 	}
+	left += strings.Repeat(" ", max(leftW-used, 0))
 
-	durStyled := timerStyle.Render(padRight(durStr, 8))
+	row := cur + m.timelineDot(a) + " " + left + " " + dimStyle.Render(padRight(timelineRange(a, m.frameTime), cols.rangeW))
+	if cols.durW == 0 {
+		return row
+	}
+	dur := strings.Repeat(" ", cols.durW)
 	switch {
 	case running:
-		durStyled = calTodayStyle.Render(padRight(durStr+" ◉", 8))
-	case a.completed, a.due:
-		// No duration for a completion or deadline event; pad to keep column
-		// alignment honest across mixed rows.
-		durStyled = dimStyle.Render(strings.Repeat(" ", 8))
+		dur = calTodayStyle.Render(padRight(formatDuration(a.duration())+" ◉", cols.durW))
+	case !a.completed && !a.due:
+		dur = timerStyle.Render(padRight(formatDuration(a.duration()), cols.durW))
 	}
-
-	dot := timerStyle.Render("●")
-	switch {
-	case a.completed, a.doneThatDay:
-		dot = checkDoneStyle.Render("✓")
-	case a.due:
-		dot = depOverdueStyle.Render("◆")
-		if a.start.Before(startOfDay(m.frameTime)) {
-			dot = overdueStyle.Render("◆")
-		}
-	}
-	return cur + dot + " " + left + " " +
-		dimStyle.Render(rangeStr) + "  " + durStyled
+	return row + "  " + dur
 }
 
-// renderTimelineSub renders the second line of a calendar entry: project (if
-// set) followed by the entry's tags. Returns "" when the entry has neither —
-// in which case the caller skips the line so bare entries stay 1-line.
-//
-// Drops tags first, then project, if the combined plain width would overflow
-// innerW. Width is computed on the plain text and the result is styled at the
-// end, since truncating a styled string would slice into ANSI escapes.
-//
-// hasNext extends the vertical "│" connector into this sub-line's gutter so
-// the column doesn't visually break between an entry's body and the next
-// entry. When false (last visible entry, no clipped bot) the gutter is blank.
-func (m model) renderTimelineSub(a dayActivity, innerW int, hasNext bool) string {
-	if a.project == "" && len(a.tags) == 0 && a.parentTitle == "" {
-		return ""
+// timelineDot is the mark at the head of an entry's row: a tick for work
+// closed that day, a diamond for a deadline, a dot for time logged.
+func (m model) timelineDot(a dayActivity) string {
+	switch {
+	case a.completed, a.doneThatDay:
+		return checkDoneStyle.Render("✓")
+	case a.due && a.start.Before(startOfDay(m.frameTime)):
+		return overdueStyle.Render("◆")
+	case a.due:
+		return depOverdueStyle.Render("◆")
 	}
-	const indentW = 4 // visual cells: "  │ " or "    "
-	indent := "    "
-	if hasNext {
-		indent = "  " + ruleStyle.Render("│") + " "
-	}
-	avail := innerW - indentW
-	if avail < 4 {
-		return ""
-	}
+	return timerStyle.Render("●")
+}
 
-	// Parent reference takes priority: a subtask's own title is often too terse
-	// to place on its own, so it's shown (truncated to fit) ahead of any
-	// project/tags, which then lay out in whatever width remains.
+// timelineMetaWidth is the width of an entry's full context: the "↳ parent"
+// of a subtask, its project and its tags.
+func timelineMetaWidth(a dayActivity) int {
+	w, parts := 0, 0
+	if a.parentTitle != "" {
+		w += len([]rune(cleanText(a.parentTitle))) + 2
+		parts++
+	}
+	if a.project != "" {
+		w += len([]rune(cleanText(a.project))) + 2
+		parts++
+	}
+	for _, tag := range a.tags {
+		w += len([]rune(cleanText(tag))) + 4 // "⟨#tag⟩ "
+	}
+	if len(a.tags) > 0 {
+		parts++
+	}
+	return w + max(parts-1, 0)
+}
+
+// timelineMeta renders an entry's context in at most avail cells, and its
+// width. The parent comes first, clipped to fit, since a subtask's title is
+// often too terse to place on its own; then the project and the tags in the
+// width left, tags dropped first. Width is counted on the plain text and the
+// parts styled at the end, as clipping a styled string would cut its escapes.
+func timelineMeta(a dayActivity, avail int) (string, int) {
+	if avail < 4 {
+		return "", 0
+	}
 	parentPlain := ""
 	if a.parentTitle != "" {
-		parentPlain = "↳ " + a.parentTitle
-		if len([]rune(parentPlain)) > avail {
-			parentPlain = truncate(parentPlain, avail)
-		}
+		parentPlain = truncate("↳ "+a.parentTitle, avail)
 	}
 	parentW := len([]rune(parentPlain))
 	rest := avail - parentW
 	if parentW > 0 {
 		rest-- // separating space before project/tags
 	}
-	if rest < 0 {
-		rest = 0
-	}
 
 	projPlain := ""
 	if a.project != "" {
 		projPlain = "[" + cleanText(a.project) + "]"
 	}
-	tagsPlainW := 0
-	for _, tag := range a.tags {
-		// "⟨#tag⟩ " = 4 cells of decoration + tag width.
-		tagsPlainW += len([]rune(tag)) + 4
-	}
 	projW := len([]rune(projPlain))
-
-	showProj := projW > 0
-	showTags := len(a.tags) > 0
-	sep := 0
-	if showProj && showTags {
-		sep = 1
+	tagsW := 0
+	for _, tag := range a.tags {
+		tagsW += len([]rune(cleanText(tag))) + 4
 	}
-	if showProj && showTags && projW+sep+tagsPlainW > rest {
+	showProj := projW > 0 && projW <= rest
+	showTags := len(a.tags) > 0
+	if showProj && showTags && projW+1+tagsW > rest {
 		showTags = false
 	}
-	if showProj && projW > rest {
-		showProj = false
-	}
-	if parentW == 0 && !showProj && !showTags {
-		return ""
+	if !showProj && showTags && tagsW > rest {
+		showTags = false
 	}
 
 	var b strings.Builder
-	b.WriteString(indent)
-	if parentW > 0 {
-		b.WriteString(dimStyle.Render(parentPlain))
+	w := 0
+	add := func(styled string, width int) {
+		if w > 0 {
+			b.WriteString(" ")
+			w++
+		}
+		b.WriteString(styled)
+		w += width
 	}
-	if parentW > 0 && (showProj || showTags) {
-		b.WriteString(" ")
+	if parentW > 0 {
+		add(dimStyle.Render(parentPlain), parentW)
 	}
 	if showProj {
-		b.WriteString(projLabelStyle.Render(projPlain))
-	}
-	if showProj && showTags {
-		b.WriteString(" ")
+		add(projLabelStyle.Render(projPlain), projW)
 	}
 	if showTags {
-		b.WriteString(renderTagsPart(a.tags))
+		// renderTagsPart ends each chip with a space; the last one is padding.
+		add(renderTagsPart(a.tags), tagsW)
 	}
-	return b.String()
+	return b.String(), w
 }
