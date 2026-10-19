@@ -54,16 +54,6 @@ jobs:
           GOOS=linux   GOARCH=arm64 go build -trimpath -ldflags "$LDFLAGS" -o tjek-linux-arm64 .
           GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "$LDFLAGS" -o tjek.exe .
 
-      # tjek was called taskr, and an install from then updates itself by
-      # fetching the asset with its own name (selfUpdateAsset in the build it
-      # runs). The same bytes under those names let it update into tjek, which
-      # then renames itself on its first run (adoptFormerName).
-      - name: Assets under the former names
-        run: |
-          cp tjek taskr
-          cp tjek-linux-arm64 taskr-linux-arm64
-          cp tjek.exe taskr.exe
-
       # A Windows download that carries its README and licence, for someone
       # who fetches by hand rather than through Scoop. The bare tjek.exe
       # stays: self-update fetches it by that name.
@@ -71,10 +61,8 @@ jobs:
         run: zip -X -j tjek-windows-amd64.zip tjek.exe README.md LICENSE
 
       # Lets anyone verify a download, and gives packagers something to pin.
-      # The former names are in it because an old install verifies its
-      # download against its own name's line.
       - name: Checksums
-        run: sha256sum tjek tjek-linux-arm64 tjek.exe tjek-windows-amd64.zip taskr taskr-linux-arm64 taskr.exe > SHA256SUMS
+        run: sha256sum tjek tjek-linux-arm64 tjek.exe tjek-windows-amd64.zip > SHA256SUMS
 
       # SHA256SUMS proves a download matches what this workflow published. It
       # cannot prove anything about the publisher, because it is published by
@@ -97,12 +85,9 @@ jobs:
       # a release asset so
       # `scoop install .../releases/latest/download/tjek.json` always points
       # at the newest release without anything to bump.
-      # taskr.json is the same manifest under the name a Scoop install made
-      # before the rename fetches on `scoop update`; it installs tjek.
       - name: Package manifests
         run: |
           packaging/generate-packages.sh "${{ github.ref_name }}" .
-          cp tjek.json taskr.json
 
       # The release body is this tag's CHANGELOG section, so the release page
       # says what changed in the words it was written in rather than listing
@@ -114,7 +99,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           V: ${{ github.ref_name }}
         run: |
-          assets=(tjek tjek-linux-arm64 tjek.exe tjek-windows-amd64.zip SHA256SUMS tjek.json taskr taskr-linux-arm64 taskr.exe taskr.json)
+          assets=(tjek tjek-linux-arm64 tjek.exe tjek-windows-amd64.zip SHA256SUMS tjek.json)
           if packaging/release-notes.sh "$V" CHANGELOG.md > "$RUNNER_TEMP/notes.md"; then
             gh release create "$V" --title "$V" --notes-file "$RUNNER_TEMP/notes.md" "${assets[@]}"
           else

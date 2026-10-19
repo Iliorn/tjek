@@ -81,10 +81,6 @@ git push origin v1.10.0       # ← triggers the build + release
   after the tag. There is no AUR package: Arch uses the Linux binary. Do not
   attach macOS binaries or `.app` bundles to releases; Homebrew installs are
   pointed at Homebrew rather than having their managed files replaced.
-- **The former names ship too.** tjek was called taskr, and an install from
-  then fetches `taskr`, `taskr-linux-arm64`, `taskr.exe` or `taskr.json`, so
-  the release attaches the same bytes under those names and lists them in
-  `SHA256SUMS`.
 - **Self-update** (Settings → "Update to latest release") reads
   `/repos/iliorn/tjek/releases/latest` over stdlib `net/http`
   (`fetchLatestRelease`, `downloadReleaseAsset`), so it needs no other tool
