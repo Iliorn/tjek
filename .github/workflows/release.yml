@@ -64,11 +64,17 @@ jobs:
           cp tjek-linux-arm64 taskr-linux-arm64
           cp tjek.exe taskr.exe
 
+      # A Windows download that carries its README and licence, for someone
+      # who fetches by hand rather than through Scoop. The bare tjek.exe
+      # stays: self-update fetches it by that name.
+      - name: Windows zip
+        run: zip -X -j tjek-windows-amd64.zip tjek.exe README.md LICENSE
+
       # Lets anyone verify a download, and gives packagers something to pin.
       # The former names are in it because an old install verifies its
       # download against its own name's line.
       - name: Checksums
-        run: sha256sum tjek tjek-linux-arm64 tjek.exe taskr taskr-linux-arm64 taskr.exe > SHA256SUMS
+        run: sha256sum tjek tjek-linux-arm64 tjek.exe tjek-windows-amd64.zip taskr taskr-linux-arm64 taskr.exe > SHA256SUMS
 
       # SHA256SUMS proves a download matches what this workflow published. It
       # cannot prove anything about the publisher, because it is published by
@@ -108,7 +114,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           V: ${{ github.ref_name }}
         run: |
-          assets=(tjek tjek-linux-arm64 tjek.exe SHA256SUMS tjek.json taskr taskr-linux-arm64 taskr.exe taskr.json)
+          assets=(tjek tjek-linux-arm64 tjek.exe tjek-windows-amd64.zip SHA256SUMS tjek.json taskr taskr-linux-arm64 taskr.exe taskr.json)
           if packaging/release-notes.sh "$V" CHANGELOG.md > "$RUNNER_TEMP/notes.md"; then
             gh release create "$V" --title "$V" --notes-file "$RUNNER_TEMP/notes.md" "${assets[@]}"
           else

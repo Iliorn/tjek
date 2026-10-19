@@ -13,6 +13,10 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+### Added
+
+- Releases carry `tjek-windows-amd64.zip`: `tjek.exe` with the README and licence.
+
 ### Fixed
 
 - On a sync server, the CLI and TUI use the fleet's column names, not stale local ones.

@@ -33,7 +33,8 @@ From the [Releases](https://github.com/iliorn/tjek/releases) page:
 | `tjek` | Linux x64 |
 | `tjek-linux-arm64` | Linux arm64 (Raspberry Pi, ARM servers) |
 | `tjek.exe` | Windows x64 |
-| `SHA256SUMS` | checksums for the three binaries |
+| `tjek-windows-amd64.zip` | Windows x64, with the README and licence |
+| `SHA256SUMS` | checksums for the downloads |
 | `tjek.json` | Scoop manifest (Windows) |
 
 Put it somewhere on your `PATH` (for example `~/.local/bin`). Later updates
