@@ -2,10 +2,12 @@
 //
 //	go run -C scripts/icon .
 //
-// The icon is "[✓]", white brackets round a green check, set in JetBrains Mono ExtraBold, with a thin
-// dark outline and no background: the mark as a terminal would print it,
-// standing on whatever the taskbar or desktop is. The outline is what keeps
-// the white and the green legible on a light one. Each size is drawn from the font itself,
+// The icon is "[✓]", pale brackets round a green check, set in JetBrains Mono
+// ExtraBold, with no outline and no background: the mark as a terminal would
+// print it, standing on whatever the taskbar or desktop is. Each glyph is
+// lit from above, light at the top and deeper at the foot, and a soft shadow
+// falls under the mark, as under Windows 11's own icons; those, not a drawn
+// edge, are what lift it off the taskbar. Each size is drawn from the font itself,
 // not scaled from another, set tighter than the font's advances so it is
 // nearly as tall as it is wide, and fills more of the square the smaller it
 // gets, so it stands as large as the square logos beside it on a taskbar.
@@ -64,13 +66,15 @@ const (
 	root = "../.."
 )
 
-// The brackets are ink and the check is check, the green the app's default
-// theme (TokyoNight) draws a done ✓ in, all ringed by outline, the Tokyo
-// Night base the icon's tile used to be.
+// Each glyph runs from its top colour to its foot colour: the brackets from
+// white to a pale blue-grey, the check from a light green to a deeper one.
+// shadow is the colour under the mark.
 var (
-	ink     = color.NRGBA{0xff, 0xff, 0xff, 0xff}
-	check   = color.NRGBA{0xa8, 0xff, 0x78, 0xff}
-	outline = color.NRGBA{0x16, 0x17, 0x21, 0xff}
+	inkTop   = color.NRGBA{0xff, 0xff, 0xff, 0xff}
+	inkFoot  = color.NRGBA{0xc8, 0xcf, 0xe6, 0xff}
+	tickTop  = color.NRGBA{0xc6, 0xff, 0x8a, 0xff}
+	tickFoot = color.NRGBA{0x3f, 0xbf, 0x6a, 0xff}
+	shadow   = color.NRGBA{0, 0, 0, 90}
 )
 
 // sizes are the sizes Windows asks an icon for, at 100% to 200% scaling.
@@ -169,13 +173,13 @@ func fetchFont() ([]byte, error) {
 }
 
 // render draws the icon at size pixels square on a transparent ground: the
-// outline, then the text over it, with the ink centred.
+// shadow, then the text over it, with the ink and its shadow centred.
 func render(f *opentype.Font, size int) (*image.NRGBA, error) {
 	img := image.NewNRGBA(image.Rect(0, 0, size, size))
 	s := float64(size)
-	// The outline's width, a pixel at the smallest sizes; the text is sized
-	// so text and outline together fill inkFraction of the square.
-	r := math.Max(1, math.Round(s/24))
+	// How far the shadow falls, a pixel at the smallest sizes; the text is
+	// sized so it and its shadow fit the square.
+	drop := math.Max(1, s/32)
 
 	// The glyphs are set one by one, ink box to ink box, glyphGap apart,
 	// rather than at the font's advances: a monospace bracket sits in a cell
@@ -192,16 +196,16 @@ func render(f *opentype.Font, size int) (*image.NRGBA, error) {
 		return nil, err
 	}
 	w, h, _ := setInk(probe)
-	fc, err := face(s * math.Min((s*inkFraction(size)-2*r)/w, (s*inkHeight-2*r)/h))
+	fc, err := face(s * math.Min(s*inkFraction(size)/w, (s*inkHeight-2*drop)/h))
 	if err != nil {
 		return nil, err
 	}
 	inkW, inkH, top := setInk(fc)
 	x := (s - inkW) / 2
-	y := (s-inkH)/2 - top
+	inkY := (s - inkH - drop) / 2
+	y := inkY - top
 	// Each glyph goes into the mask of its own colour and into all, which
-	// the outline is grown from. The glyphs do not touch, so each colour is
-	// drawn once over the outline and no white fringes the green.
+	// the shadow is cast from.
 	all := image.NewAlpha(img.Bounds())
 	brackets := image.NewAlpha(img.Bounds())
 	tick := image.NewAlpha(img.Bounds())
@@ -219,15 +223,31 @@ func render(f *opentype.Font, size int) (*image.NRGBA, error) {
 		x += float64(gb.Max.X-gb.Min.X)/64 + glyphGap*inkH
 	}
 
-	draw.DrawMask(img, img.Bounds(), &image.Uniform{outline}, image.Point{}, dilate(all, r), image.Point{}, draw.Over)
-	draw.DrawMask(img, img.Bounds(), &image.Uniform{ink}, image.Point{}, brackets, image.Point{}, draw.Over)
-	draw.DrawMask(img, img.Bounds(), &image.Uniform{check}, image.Point{}, tick, image.Point{}, draw.Over)
+	cast := shift(blur(all, math.Max(1, s/40)), int(math.Round(drop)))
+	draw.DrawMask(img, img.Bounds(), &image.Uniform{shadow}, image.Point{}, cast, image.Point{}, draw.Over)
+	draw.DrawMask(img, img.Bounds(), lit(img.Bounds(), inkTop, inkFoot, inkY, inkH), image.Point{}, brackets, image.Point{}, draw.Over)
+	draw.DrawMask(img, img.Bounds(), lit(img.Bounds(), tickTop, tickFoot, inkY, inkH), image.Point{}, tick, image.Point{}, draw.Over)
 	return img, nil
+}
+
+// lit is a fill running from top at row y0 to foot at row y0+h, held at
+// either colour beyond them.
+func lit(bounds image.Rectangle, top, foot color.NRGBA, y0, h float64) *image.NRGBA {
+	g := image.NewNRGBA(bounds)
+	mix := func(a, b uint8, t float64) uint8 { return uint8(math.Round(float64(a) + (float64(b)-float64(a))*t)) }
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		t := math.Max(0, math.Min(1, (float64(y)+0.5-y0)/h))
+		c := color.NRGBA{mix(top.R, foot.R, t), mix(top.G, foot.G, t), mix(top.B, foot.B, t), 0xff}
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			g.SetNRGBA(x, y, c)
+		}
+	}
+	return g
 }
 
 // glyphGap is the space between one glyph's ink and the next, as a share of
 // the mark's height; inkHeight is the most of the square's height the mark
-// and its outline may take.
+// and its shadow may take.
 const (
 	glyphGap  = 0.10
 	inkHeight = 0.90
@@ -247,34 +267,40 @@ func setInk(fc font.Face) (w, h, top float64) {
 	return w + float64(n-1)*glyphGap*h, h, top
 }
 
-// dilate grows mask by r pixels in every direction: each pixel takes the
-// strongest coverage within a disc of radius r around it, which keeps the
-// glyphs' anti-aliased edges soft on the outline's edge too.
-func dilate(mask *image.Alpha, r float64) *image.Alpha {
+// blur softens mask with a box blur of radius r, across and then down.
+func blur(mask *image.Alpha, r float64) *image.Alpha {
+	n := int(math.Ceil(r))
+	bounds := mask.Bounds()
+	src := mask
+	for _, step := range []image.Point{{1, 0}, {0, 1}} {
+		out := image.NewAlpha(bounds)
+		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+			for x := bounds.Min.X; x < bounds.Max.X; x++ {
+				sum := 0
+				for d := -n; d <= n; d++ {
+					sum += int(src.AlphaAt(x+d*step.X, y+d*step.Y).A)
+				}
+				out.SetAlpha(x, y, color.Alpha{uint8(sum / (2*n + 1))})
+			}
+		}
+		src = out
+	}
+	return src
+}
+
+// shift moves mask down by dy pixels.
+func shift(mask *image.Alpha, dy int) *image.Alpha {
 	bounds := mask.Bounds()
 	out := image.NewAlpha(bounds)
-	n := int(math.Ceil(r))
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			var a uint8
-			for dy := -n; dy <= n; dy++ {
-				for dx := -n; dx <= n; dx++ {
-					if float64(dx*dx+dy*dy) > r*r {
-						continue
-					}
-					if v := mask.AlphaAt(x+dx, y+dy).A; v > a {
-						a = v
-					}
-				}
-			}
-			out.SetAlpha(x, y, color.Alpha{a})
+			out.SetAlpha(x, y, mask.AlphaAt(x, y-dy))
 		}
 	}
 	return out
 }
 
-// inkFraction is how much of the square's width the text and its outline
-// fill: more at the small sizes, where every pixel of the glyphs counts.
+// inkFraction is how much of the square's width the text fills: more at the small sizes, where every pixel of the glyphs counts.
 func inkFraction(size int) float64 {
 	switch {
 	case size <= 24:

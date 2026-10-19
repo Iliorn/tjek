@@ -67,8 +67,8 @@ git push origin v1.10.0       # ← triggers the build + release
 - **The Windows icon** is `rsrc_windows_amd64.syso` in the module root,
   which `go build` links into a Windows amd64 binary by itself, so the
   release workflow needs no step for it. `scripts/icon/main.go` draws it, a
-  white `[✓]` in JetBrains Mono ExtraBold with a dark outline and no
-  background, so it reads on a light taskbar as on a dark one; after changing it,
+  pale `[✓]` in JetBrains Mono ExtraBold, lit from above with a soft
+  shadow beneath and no outline or background, as Windows 11's own icons are; after changing it,
   `go run -C scripts/icon .` rewrites the `.syso` and `packaging/icon/`, and
   all of them are committed. The script is a module of its own, so its font
   rasterizer (`golang.org/x/image`) is no dependency of tjek, and it fetches
