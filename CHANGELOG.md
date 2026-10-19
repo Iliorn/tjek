@@ -13,6 +13,8 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+## [1.66.0] - 2026-10-19
+
 ### Added
 
 - Settings → Data moves tjek's tasks and settings into a folder you choose, and back.
