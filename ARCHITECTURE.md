@@ -610,10 +610,14 @@ file in the platform's config directory, where it is found before anything
 else resolves), and an existing `~/.tjek` pins an old install there for good
 (no migration to the split layout, by design). Choosing a folder moves
 everything (`datafolder.go`): the app quits, and Main closes the store,
-copies the files, checks the copy, sets the old folders aside as
-`.moved-<time>` and records the choice, undoing every step on a failure,
-then starts tjek again (`restartSelf`; Windows cannot replace a process, so
-there it runs the new one and waits). Moving back files each file by its
+prints each step as it copies the files, checks the copy, sets the old
+folders aside as `.moved-<time>` and records the choice. A failure before
+the record undoes everything; a folder that will not rename once the copy
+is checked (Windows, a file in it held open) is left where it was rather
+than undoing a move that worked, and a later move back sets such a leftover
+aside. Then `afterDataMove` starts tjek again on Linux and macOS (exec); on
+Windows, where a child started after the app quit did not come up, it says
+to start tjek again and waits for enter. Moving back files each file by its
 kind (`kindOfFile`). An install made as taskr is carried over once at
 startup (`adoptFormerName`, `paths.AdoptFormerDirs`): each taskr directory is
 renamed to its tjek name when that name is free, and a binary still called

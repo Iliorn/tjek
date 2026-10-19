@@ -32,11 +32,13 @@ included.
 ### Moving it
 
 Settings → Data → Data folder moves everything into a `tjek` folder inside
-the one you pick, and tjek restarts there. This is the way to go when a
+the one you pick. tjek closes to do it, shows each step, and opens again in
+the new place; on Windows it asks you to start it again. This is the way to go when a
 coding agent may write only inside one folder: move tjek into it, and the
 agent can add and close tasks. Close any other tjek first. The old folders
 are kept beside where they were, named `….moved-<date>`; delete them once
-all is well. Picking the folder again and pressing `x` moves everything back
+all is well. If Windows will not let tjek rename one (a file in it still
+open), it is left as it was and tjek says so; tjek no longer reads it. Picking the folder again and pressing `x` moves everything back
 to the standard places.
 
 The choice is kept in a file named `location` in the standard settings

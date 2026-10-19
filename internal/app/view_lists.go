@@ -1564,7 +1564,7 @@ func (m model) settingsIntro(g settingsGroup) []string {
 	case "Server":
 		return []string{tr("Make this machine the server your other devices sync with. One machine is enough.")}
 	case "Data":
-		return []string{tr("Where tjek keeps your tasks and settings. Choose a folder to move them there; tjek restarts in it.")}
+		return []string{tr("Where tjek keeps your tasks and settings. Choose a folder to move them there.")}
 	}
 	return nil
 }

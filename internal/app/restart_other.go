@@ -8,10 +8,14 @@ import (
 	"syscall"
 )
 
-// restartSelf replaces this process with a fresh tjek, with the same
-// arguments and environment. It returns only when that fails, with the code
-// to exit with.
-func restartSelf() int {
+// afterDataMove ends a run that moved tjek's data (moved) or tried to. After
+// a move this process is replaced by a fresh tjek, with the same arguments
+// and environment, which opens in the new place. It returns only when there
+// is nothing to start, or starting failed, with the code to exit with.
+func afterDataMove(moved bool) int {
+	if !moved {
+		return 1
+	}
 	exe, err := os.Executable()
 	if err == nil {
 		err = syscall.Exec(exe, os.Args, os.Environ())

@@ -3,8 +3,10 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -72,7 +74,7 @@ func TestMoveDataThereAndBack(t *testing.T) {
 	from, _ := currentLayout()
 	standard, _ := standardLayout()
 	target := filepath.Join(home, "work", "tjek")
-	aside, err := moveData(from, folderLayout(target), target, "one")
+	res, err := moveData(from, folderLayout(target), target, "one", func(string) {})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,10 +86,10 @@ func TestMoveDataThereAndBack(t *testing.T) {
 			t.Errorf("%s did not come along: %v", name, err)
 		}
 	}
-	if len(aside) == 0 {
+	if len(res.aside) == 0 || len(res.left) != 0 {
 		t.Fatal("the old folders were not set aside")
 	}
-	for _, dir := range aside {
+	for _, dir := range res.aside {
 		if !strings.HasSuffix(dir, ".moved-one") {
 			t.Errorf("set aside as %s", dir)
 		}
@@ -99,7 +101,7 @@ func TestMoveDataThereAndBack(t *testing.T) {
 	closeStore()
 
 	cur, _ := currentLayout()
-	if _, err := moveData(cur, standard, "", "two"); err != nil {
+	if _, err := moveData(cur, standard, "", "two", func(string) {}); err != nil {
 		t.Fatal(err)
 	}
 	if paths.Chosen() != "" {
@@ -110,6 +112,57 @@ func TestMoveDataThereAndBack(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(standard[paths.Config], "settings.json")); err != nil {
 		t.Errorf("the settings are not back in the config folder: %v", err)
+	}
+	assertMilk(t)
+}
+
+// A folder Windows will not rename (a file in it held open) does not undo a
+// move whose copy is safe: it is left where it was, and tjek reads the new
+// place. Moving back later sets that leftover aside instead of refusing.
+func TestMoveDataLeavesAFolderThatWillNotRename(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs a folder this user cannot rename in")
+	}
+	home := t.TempDir()
+	setTestHome(t, home)
+	renameTries, renamePause = 2, time.Millisecond
+	t.Cleanup(func() { renameTries, renamePause = 10, 200*time.Millisecond })
+	if code := runCLI([]string{"add", "Buy milk"}, false); code != 0 {
+		t.Fatalf("add exited %d", code)
+	}
+	checkpointStore()
+	closeStore()
+	from, _ := currentLayout()
+	standard, _ := standardLayout()
+
+	// The data folder's parent refuses renames, as Windows does for a folder
+	// with an open file in it.
+	parent := filepath.Dir(from[paths.Data])
+	if err := os.Chmod(parent, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(home, "work", "tjek")
+	res, err := moveData(from, folderLayout(target), target, "one", func(string) {})
+	_ = os.Chmod(parent, 0o755)
+	if err != nil {
+		t.Fatalf("the move should go through, got %v", err)
+	}
+	if len(res.left) != 1 || !samePath(res.left[0], from[paths.Data]) {
+		t.Errorf("left = %v, want the data folder", res.left)
+	}
+	if paths.Chosen() != target {
+		t.Errorf("tjek reads %q, want the new place", paths.Chosen())
+	}
+	assertMilk(t)
+	closeStore()
+
+	cur, _ := currentLayout()
+	res, err = moveData(cur, standard, "", "two", func(string) {})
+	if err != nil {
+		t.Fatalf("moving back over the leftover: %v", err)
+	}
+	if _, err := os.Stat(from[paths.Data] + ".old-two"); err != nil {
+		t.Errorf("the leftover was not set aside: %v", err)
 	}
 	assertMilk(t)
 }
@@ -144,11 +197,11 @@ func TestMoveDataRefusesAndLeavesThingsAlone(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(occupied, "tasks.db"), []byte("someone else's"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := moveData(from, folderLayout(occupied), occupied, "x"); err == nil || !strings.Contains(err.Error(), "already exists") {
+	if _, err := moveData(from, folderLayout(occupied), occupied, "x", func(string) {}); err == nil || !strings.Contains(err.Error(), "already exists") {
 		t.Errorf("a target holding a store should be refused, got %v", err)
 	}
 	inside := filepath.Join(from[paths.Data], "sub", "tjek")
-	if _, err := moveData(from, folderLayout(inside), inside, "x"); err == nil {
+	if _, err := moveData(from, folderLayout(inside), inside, "x", func(string) {}); err == nil {
 		t.Error("a target inside the data folder should be refused")
 	}
 

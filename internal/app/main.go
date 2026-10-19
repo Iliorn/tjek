@@ -109,16 +109,18 @@ func Main(version string) {
 	}
 	// Final best-effort sync on exit so the session's last edits propagate
 	// immediately (no-op unless sync is configured).
+	// Settings → Data folder: the move waits for the app to have let go of
+	// the store. Each step is printed, so a stall shows where it is.
+	fm, ok := final.(model)
+	moving := ok && fm.moveDataTo != nil
+	if moving {
+		fmt.Println(tr("Saving and closing…"))
+	}
 	maybeAutoSyncCLI()
 	checkpointStore()
-	// Settings → Data folder: the move waits for the app to have let go of
-	// the store, then tjek starts again in the new place.
-	if fm, ok := final.(model); ok && fm.moveDataTo != nil {
+	if moving {
 		stopTrace() // its log is in the state folder, which moves
-		code := 1
-		if finishDataMove(*fm.moveDataTo) {
-			code = restartSelf()
-		}
+		code := afterDataMove(finishDataMove(*fm.moveDataTo))
 		restoreConsole()
 		os.Exit(code)
 	}

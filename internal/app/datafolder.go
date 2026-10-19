@@ -100,18 +100,31 @@ func carried(name string) bool {
 	return name != paths.LocationFile && name != paths.LocationFile+".tmp" && name != "notes"
 }
 
+// moveResult is what a move did besides moving: the folders it set aside,
+// and the ones Windows would not let it rename, which are left as they were.
+type moveResult struct {
+	aside []string
+	left  []string
+}
+
 // moveData moves what from holds into to, sets the old folders aside with
 // stamp, and records chosen as the new place ("" for the standard places).
-// It returns the folders set aside. On an error nothing has moved.
-func moveData(from, to dataLayout, chosen, stamp string) ([]string, error) {
+// say reports each step as it starts. On an error nothing has moved.
+//
+// Setting an old folder aside is tidiness, not safety: once the copy is
+// checked, the data is safe in its new place. So a folder Windows will not
+// rename (a file in it still open somewhere) is left where it was, rather
+// than undoing a move that worked.
+func moveData(from, to dataLayout, chosen, stamp string, say func(string)) (moveResult, error) {
+	var res moveResult
 	sources, targets := from.dirs(), to.dirs()
 	for _, src := range sources {
 		for _, dst := range targets {
 			if samePath(src, dst) {
-				return nil, fmt.Errorf("tjek's data is already in %s", dst)
+				return res, fmt.Errorf("tjek's data is already in %s", dst)
 			}
 			if within(dst, src) || within(src, dst) {
-				return nil, fmt.Errorf("%s and %s are inside one another", src, dst)
+				return res, fmt.Errorf("%s and %s are inside one another", src, dst)
 			}
 		}
 	}
@@ -119,13 +132,14 @@ func moveData(from, to dataLayout, chosen, stamp string) ([]string, error) {
 	type item struct{ src, dst string }
 	var items []item
 	var store string
+	var stale []string // standard folders holding an earlier copy, moving back
 	for _, src := range sources {
 		entries, err := os.ReadDir(src)
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
 		if err != nil {
-			return nil, err
+			return res, err
 		}
 		for _, e := range entries {
 			if !carried(e.Name()) {
@@ -133,7 +147,15 @@ func moveData(from, to dataLayout, chosen, stamp string) ([]string, error) {
 			}
 			dst := filepath.Join(to[kindOfFile(e.Name())], e.Name())
 			if _, err := os.Lstat(dst); err == nil {
-				return nil, fmt.Errorf("%s already exists; choose an empty folder", dst)
+				// The standard places are tjek's own, and what is in them now
+				// is an earlier copy a move could not set aside: it goes aside
+				// now. A folder someone chose may hold anything; it is refused.
+				if chosen != "" {
+					return res, fmt.Errorf("%s already exists; choose an empty folder", dst)
+				}
+				if dir := filepath.Dir(dst); !containsPath(stale, dir) {
+					stale = append(stale, dir)
+				}
 			}
 			items = append(items, item{filepath.Join(src, e.Name()), dst})
 			if e.Name() == "tasks.db" {
@@ -142,54 +164,90 @@ func moveData(from, to dataLayout, chosen, stamp string) ([]string, error) {
 		}
 	}
 
+	var staleAside []string
+	undoStale := func() {
+		for i := len(staleAside) - 1; i >= 0; i-- {
+			_ = os.Rename(staleAside[i], strings.TrimSuffix(staleAside[i], ".old-"+stamp))
+		}
+	}
+	for _, dir := range stale {
+		to := dir + ".old-" + stamp
+		if err := renameRetrying(dir, to); err != nil {
+			undoStale()
+			return res, fmt.Errorf("could not set the earlier copy in %s aside (is tjek open in another window?): %w", dir, err)
+		}
+		staleAside = append(staleAside, to)
+	}
+
 	var copied []string
 	undoCopies := func() {
 		for _, d := range copied {
 			_ = os.RemoveAll(d)
 		}
+		undoStale()
 	}
+	say(fmt.Sprintf(tr("Copying to %s…"), strings.Join(targets, ", ")))
 	for _, it := range items {
 		if err := os.MkdirAll(filepath.Dir(it.dst), 0o755); err != nil {
 			undoCopies()
-			return nil, err
+			return res, err
 		}
 		copied = append(copied, it.dst)
 		if err := copyTree(it.src, it.dst); err != nil {
 			undoCopies()
-			return nil, fmt.Errorf("copying %s: %w", it.src, err)
+			return res, fmt.Errorf("copying %s: %w", it.src, err)
 		}
 	}
 	if store != "" {
+		say(tr("Checking the copy…"))
 		if err := checkStore(store); err != nil {
 			undoCopies()
-			return nil, fmt.Errorf("the copied task store does not read back: %w", err)
+			return res, fmt.Errorf("the copied task store does not read back: %w", err)
 		}
 	}
-
+	// The old folders go aside before the new place is recorded: the record
+	// lives in the standard config folder, which may be one of them.
+	say(tr("Setting the old folders aside…"))
 	var aside []string
-	undoAside := func() {
-		for i := len(aside) - 1; i >= 0; i-- {
-			_ = os.Rename(aside[i], strings.TrimSuffix(aside[i], ".moved-"+stamp))
-		}
-	}
 	for _, src := range sources {
 		if _, err := os.Stat(src); err != nil {
 			continue
 		}
 		to := src + ".moved-" + stamp
-		if err := os.Rename(src, to); err != nil {
-			undoAside()
-			undoCopies()
-			return nil, fmt.Errorf("could not set %s aside (is tjek open in another window?): %w", src, err)
+		if err := renameRetrying(src, to); err != nil {
+			res.left = append(res.left, src)
+			continue
 		}
 		aside = append(aside, to)
 	}
 	if err := paths.SetChosen(chosen); err != nil {
-		undoAside()
+		for i := len(aside) - 1; i >= 0; i-- {
+			_ = os.Rename(aside[i], strings.TrimSuffix(aside[i], ".moved-"+stamp))
+		}
 		undoCopies()
-		return nil, fmt.Errorf("could not record the new place: %w", err)
+		return moveResult{}, fmt.Errorf("could not record the new place: %w", err)
 	}
-	return aside, nil
+	res.aside = append(staleAside, aside...)
+	return res, nil
+}
+
+// renameTries and renamePause bound how long a rename waits out a file held
+// open: Windows refuses to rename a folder while anything has a file in it
+// open, and a virus scanner or the search indexer lets go within moments.
+var (
+	renameTries = 10
+	renamePause = 200 * time.Millisecond
+)
+
+func renameRetrying(from, to string) error {
+	var err error
+	for i := 0; i < renameTries; i++ {
+		if err = os.Rename(from, to); err == nil {
+			return nil
+		}
+		time.Sleep(renamePause)
+	}
+	return err
 }
 
 // checkStore opens the store at path read-only and has SQLite check it.
@@ -278,10 +336,11 @@ func containsPath(list []string, p string) bool {
 	return false
 }
 
-// finishDataMove makes the move the app asked for, once it has quit, and
-// reports it. It returns whether tjek should start again: true when the
-// data moved, false when it stayed where it was.
+// finishDataMove makes the move the app asked for, once it has quit, saying
+// each step as it goes, so that if one hangs the screen says which. It
+// returns whether the data moved.
 func finishDataMove(mv dataMove) bool {
+	say := func(line string) { fmt.Println(line) }
 	closeStore()
 	from, err := currentLayout()
 	if err == nil {
@@ -290,17 +349,18 @@ func finishDataMove(mv dataMove) bool {
 			to, err = standardLayout()
 		}
 		if err == nil {
-			var aside []string
-			if aside, err = moveData(from, to, mv.folder, time.Now().Format("20060102-150405")); err == nil {
+			var res moveResult
+			if res, err = moveData(from, to, mv.folder, time.Now().Format("20060102-150405"), say); err == nil {
 				where := mv.folder
 				if where == "" {
 					where = to[paths.Data]
 				}
-				fmt.Printf(tr("Moved tjek's data to %s."), where)
-				fmt.Println()
-				if len(aside) > 0 {
-					fmt.Printf(tr("The old folders are kept as %s; delete them when all is well."), strings.Join(aside, ", "))
-					fmt.Println()
+				say(fmt.Sprintf(tr("Moved tjek's data to %s."), where))
+				if len(res.aside) > 0 {
+					say(fmt.Sprintf(tr("The old folders are kept as %s; delete them when all is well."), strings.Join(res.aside, ", ")))
+				}
+				if len(res.left) > 0 {
+					say(fmt.Sprintf(tr("%s could not be renamed and is left as it was; tjek no longer reads it, so delete it when all is well."), strings.Join(res.left, ", ")))
 				}
 				return true
 			}
@@ -382,7 +442,7 @@ func (m model) askDataMove(folder string) (tea.Model, tea.Cmd) {
 	if folder != "" {
 		where = exportFolderDisplay(folder)
 	}
-	m.confirmMsg = fmt.Sprintf(tr("Move tjek's data to %s and restart? Close any other tjek first. (y/n)"), where)
+	m.confirmMsg = fmt.Sprintf(tr("Move tjek's data to %s? tjek closes to do it; close any other tjek first. (y/n)"), where)
 	m.confirmOnYes = (*model).confirmDataMove
 	m.mode = modeConfirm
 	return m, nil
