@@ -13,6 +13,8 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+## [1.65.0] - 2026-10-19
+
 ### Added
 
 - Releases carry `tjek-windows-amd64.zip`: `tjek.exe` with the README and licence.
