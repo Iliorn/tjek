@@ -13,6 +13,8 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+## [1.66.1] - 2026-10-19
+
 ### Fixed
 
 - Moving the data folder shows each step, waits out a held file, and on Windows asks to restart.
