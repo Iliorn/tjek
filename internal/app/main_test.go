@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
@@ -130,10 +129,7 @@ func releaseStoreSingleton(t *testing.T) {
 // to "not opened yet", so the next caller opens one wherever the paths point
 // then, for writing as the app does until a test's runCLI says otherwise.
 func closeStoreSingleton() {
-	if db != nil {
-		_ = db.Close()
-	}
-	db, dbErr, dbOnce = nil, nil, sync.Once{}
+	closeStore()
 	storeMode = accessWrite
 }
 

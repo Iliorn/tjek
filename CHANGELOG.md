@@ -13,6 +13,14 @@ belongs in the commit message, where it is kept next to the code it explains.
 
 ## [Unreleased]
 
+### Added
+
+- Settings → Data moves tjek's tasks and settings into a folder you choose, and back.
+
+### Changed
+
+- The Windows icon is shaded with a soft shadow instead of a dark outline.
+
 ## [1.65.0] - 2026-10-19
 
 ### Added

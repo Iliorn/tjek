@@ -127,6 +127,8 @@ func (m model) updateForMode(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateEditStages(msg)
 	case modeEditExportFolder:
 		return m.updateEditExportFolder(msg)
+	case modeEditDataFolder:
+		return m.updateEditDataFolder(msg)
 	case modeImportFile:
 		return m.updateImportFile(msg)
 	case modePickPath:
@@ -1872,6 +1874,8 @@ func (m model) handleSettingsEnter() (tea.Model, tea.Cmd) {
 	switch m.settingsCursor {
 	case settingExportFolder:
 		return m.openExportFolderEditor()
+	case settingDataFolder:
+		return m.openDataFolderEditor()
 	case settingImportFile:
 		return m.openImportPrompt()
 	case settingStages:

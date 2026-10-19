@@ -603,10 +603,18 @@ Rules:
 
 Resolve every path through `paths.Dir`/`paths.For`/`paths.Ensure`, never
 `os.UserHomeDir` plus a literal. There are four kinds (config, data, state,
-cache), mapped to XDG, `%APPDATA%`/`%LOCALAPPDATA%` or `~/Library`. Two
-overrides come first: `TJEK_HOME` collapses all four into one directory, and
-an existing `~/.tjek` pins an old install there for good (no migration to the
-split layout, by design). An install made as taskr is carried over once at
+cache), mapped to XDG, `%APPDATA%`/`%LOCALAPPDATA%` or `~/Library`. Three
+overrides come first: `TJEK_HOME` collapses all four into one directory, as
+does a folder chosen in Settings (`paths.Chosen`, named in the `location`
+file in the platform's config directory, where it is found before anything
+else resolves), and an existing `~/.tjek` pins an old install there for good
+(no migration to the split layout, by design). Choosing a folder moves
+everything (`datafolder.go`): the app quits, and Main closes the store,
+copies the files, checks the copy, sets the old folders aside as
+`.moved-<time>` and records the choice, undoing every step on a failure,
+then starts tjek again (`restartSelf`; Windows cannot replace a process, so
+there it runs the new one and waits). Moving back files each file by its
+kind (`kindOfFile`). An install made as taskr is carried over once at
 startup (`adoptFormerName`, `paths.AdoptFormerDirs`): each taskr directory is
 renamed to its tjek name when that name is free, and a binary still called
 taskr renames itself. Only the data directory is created eagerly, so a new writer calls

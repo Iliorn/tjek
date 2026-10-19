@@ -431,6 +431,7 @@ func TestSettingsPaneShowsTheCursorsGroup(t *testing.T) {
 		"Shared projects": "Join a project",
 		"Server":          "Run server here",
 		"Export":          "Auto-export folder",
+		"Data":            "Data folder",
 		"About":           "Check for updates",
 		"Columns":         "Last comment",
 		"Keys":            "Merge tags",

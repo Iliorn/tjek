@@ -856,6 +856,24 @@ var daTranslations = map[string]string{
 	"%d links to tasks left out":                                "%d links til udeladte opgaver",
 	"tab completes the name · enter confirms · esc cancels":     "tab fuldfører navnet · enter bekræfter · esc annullerer",
 
+	// ── Settings: data folder ──
+	"Data": "Data",
+	"Where tjek keeps your tasks and settings. Choose a folder to move them there; tjek restarts in it.": "Hvor tjek gemmer dine opgaver og indstillinger. Vælg en mappe for at flytte dem dertil; tjek genstarter i den.",
+	"Data folder":    "Datamappe",
+	"standard place": "standardplacering",
+	"TJEK_HOME sets the folder; unset it to choose one here":                "TJEK_HOME bestemmer mappen; fjern den for at vælge her",
+	"tjek's data is already in the standard place":                          "tjeks data ligger allerede på standardplaceringen",
+	"tjek's data is already in %s":                                          "tjeks data ligger allerede i %s",
+	"the standard place":                                                    "standardplaceringen",
+	"Move tjek's data to %s and restart? Close any other tjek first. (y/n)": "Flyt tjeks data til %s og genstart? Luk andre tjek først. (y/n)",
+	"Folder to keep tjek's data in":                                         "Mappe til tjeks data",
+	"Folder for tjek's data (blank: the standard place)":                    "Mappe til tjeks data (tom: standardplaceringen)",
+	"↑/↓ move · → open · ← up · enter picks the marked folder · space this one · x the standard place · / type a path · esc cancels": "↑/↓ flyt · → åbn · ← op · enter vælger den markerede mappe · mellemrum denne · x standardplaceringen · / skriv en sti · esc annullerer",
+	"Moved tjek's data to %s.":                                      "tjeks data er flyttet til %s.",
+	"The old folders are kept as %s; delete them when all is well.": "De gamle mapper er gemt som %s; slet dem, når alt virker.",
+	"tjek: the data was not moved: %v":                              "tjek: data blev ikke flyttet: %v",
+	"Start tjek again to open it there (%v).":                       "Start tjek igen for at åbne den der (%v).",
+
 	// ── Adding tasks ──
 	"A task needs a title": "En opgave skal have en titel",
 
@@ -1702,6 +1720,24 @@ var deTranslations = map[string]string{
 	"%d repeat rules":                                           "%d Wiederholungsregeln",
 	"%d links to tasks left out":                                "%d Verweise auf ausgelassene Aufgaben",
 	"tab completes the name · enter confirms · esc cancels":     "Tab vervollständigt · Enter bestätigt · Esc bricht ab",
+
+	// ── Settings: data folder ──
+	"Data": "Daten",
+	"Where tjek keeps your tasks and settings. Choose a folder to move them there; tjek restarts in it.": "Wo tjek deine Aufgaben und Einstellungen ablegt. Wähle einen Ordner, um sie dorthin zu verschieben; tjek startet darin neu.",
+	"Data folder":    "Datenordner",
+	"standard place": "Standardort",
+	"TJEK_HOME sets the folder; unset it to choose one here":                "TJEK_HOME legt den Ordner fest; entferne es, um hier zu wählen",
+	"tjek's data is already in the standard place":                          "tjeks Daten liegen schon am Standardort",
+	"tjek's data is already in %s":                                          "tjeks Daten liegen schon in %s",
+	"the standard place":                                                    "den Standardort",
+	"Move tjek's data to %s and restart? Close any other tjek first. (y/n)": "tjeks Daten nach %s verschieben und neu starten? Schließe vorher jedes andere tjek. (y/n)",
+	"Folder to keep tjek's data in":                                         "Ordner für tjeks Daten",
+	"Folder for tjek's data (blank: the standard place)":                    "Ordner für tjeks Daten (leer: der Standardort)",
+	"↑/↓ move · → open · ← up · enter picks the marked folder · space this one · x the standard place · / type a path · esc cancels": "↑/↓ bewegen · → öffnen · ← hoch · Enter wählt den markierten Ordner · Leertaste diesen · x der Standardort · / Pfad eingeben · Esc bricht ab",
+	"Moved tjek's data to %s.":                                      "tjeks Daten liegen jetzt in %s.",
+	"The old folders are kept as %s; delete them when all is well.": "Die alten Ordner bleiben als %s; lösche sie, wenn alles läuft.",
+	"tjek: the data was not moved: %v":                              "tjek: die Daten wurden nicht verschoben: %v",
+	"Start tjek again to open it there (%v).":                       "Starte tjek erneut, um es dort zu öffnen (%v).",
 
 	// ── Adding tasks ──
 	"A task needs a title": "Eine Aufgabe braucht einen Titel",

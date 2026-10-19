@@ -299,7 +299,7 @@ func manPage() string {
 	b.WriteString("XDG on Linux (\\fI~/.config/tjek\\fR, \\fI~/.local/share/tjek\\fR,\n")
 	b.WriteString("\\fI~/.local/state/tjek\\fR), %APPDATA% and %LOCALAPPDATA% on Windows,\n")
 	b.WriteString("\\fI~/Library/Application Support\\fR on macOS. An existing \\fI~/.tjek\\fR\n")
-	b.WriteString("holds all of them, and so does \\fBTJEK_HOME\\fR when set.\n")
+	b.WriteString("holds all of them, and so do a folder chosen in Settings and \\fBTJEK_HOME\\fR.\n")
 	b.WriteString("\\fBtjek doctor\\fR prints the directories in use.\n")
 	b.WriteString(".TP\n.I tasks.db\nThe task store (SQLite, WAL mode). Data directory.\n")
 	b.WriteString(".TP\n.I settings.json\nPreferences: theme, language, sequencing weights, board columns. Config directory.\n")

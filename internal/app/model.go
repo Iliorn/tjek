@@ -64,6 +64,7 @@ const (
 	settingShareJoin
 	settingShowGroups
 	settingHideWaiting
+	settingDataFolder
 	// settingColFirst is the first of the Columns page's rows, one per
 	// listColumnKeys entry (settingColumnKey); they run to numSettingsRows.
 	settingColFirst
@@ -152,6 +153,7 @@ const (
 	modeEditServerToken
 	modeEditStages
 	modeEditExportFolder
+	modeEditDataFolder
 	modeImportFile
 	// modePickPath browses for a file or folder in place of typing its path
 	// (pathpicker.go).
@@ -390,8 +392,13 @@ type model struct {
 	recurPick  recurPicker
 	// confirmOnYes is the action modeConfirm runs on y/enter; nil is a no-op.
 	// Reading pending* fields at call time keeps each action a plain method.
-	confirmOnYes         func(*model) tea.Cmd
-	pendingDeleteID      string
+	confirmOnYes    func(*model) tea.Cmd
+	pendingDeleteID string
+	// pendingDataFolder is the folder a data move is being confirmed into
+	// ("" for the standard places); moveDataTo, once confirmed, is the move
+	// Main makes after the app quits (datafolder.go).
+	pendingDataFolder    string
+	moveDataTo           *dataMove
 	pendingComment       int
 	pendingDep           int
 	pendingTag           int

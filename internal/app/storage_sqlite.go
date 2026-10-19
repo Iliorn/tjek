@@ -162,6 +162,16 @@ func openStoreFileAt(path string, readOnly bool) (*sql.DB, error) {
 // reports busy and the WAL simply persists — the next clean exit gets it.
 func checkpointStore() { checkpointDB(db) }
 
+// closeStore closes the process's store and puts openStore back to "not
+// opened yet", so the next open goes wherever the paths point then. A data
+// move (datafolder.go) closes it before carrying the file off.
+func closeStore() {
+	if db != nil {
+		_ = db.Close()
+	}
+	db, dbErr, dbOnce = nil, nil, sync.Once{}
+}
+
 func checkpointDB(h *sql.DB) {
 	if h == nil {
 		return

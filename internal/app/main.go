@@ -99,7 +99,8 @@ func Main(version string) {
 	// events the console-event reader would have delivered; see input.go.
 	stopResize := startResizePoller(p)
 	defer stopResize()
-	if _, err := p.Run(); err != nil {
+	final, err := p.Run()
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		// Last, so it survives Bubble Tea's stack dump on screen.
 		noteCrashToUser()
@@ -110,4 +111,15 @@ func Main(version string) {
 	// immediately (no-op unless sync is configured).
 	maybeAutoSyncCLI()
 	checkpointStore()
+	// Settings → Data folder: the move waits for the app to have let go of
+	// the store, then tjek starts again in the new place.
+	if fm, ok := final.(model); ok && fm.moveDataTo != nil {
+		stopTrace() // its log is in the state folder, which moves
+		code := 1
+		if finishDataMove(*fm.moveDataTo) {
+			code = restartSelf()
+		}
+		restoreConsole()
+		os.Exit(code)
+	}
 }

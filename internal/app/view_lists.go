@@ -1496,6 +1496,9 @@ var settingsGroups = []settingsGroup{
 		settingExportFolder,
 		settingImportFile,
 	}},
+	{title: "Data", rows: []int{
+		settingDataFolder,
+	}},
 	{title: "Keys", rows: settingKeyRows()},
 	{title: "About", rows: []int{
 		settingVersion,
@@ -1548,7 +1551,8 @@ func (m model) settingsRowVisible(id int) bool {
 // settingsIntro is the line or two under the section bar that says what a page
 // is for. Sync and Server read alike and do opposite things — one connects to
 // a server, the other makes this machine one — so those two pages open by
-// saying which they are.
+// saying which they are. Data says what choosing a folder does before
+// anyone does it.
 func (m model) settingsIntro(g settingsGroup) []string {
 	switch g.title {
 	case "Sync":
@@ -1559,6 +1563,8 @@ func (m model) settingsIntro(g settingsGroup) []string {
 		return intro
 	case "Server":
 		return []string{tr("Make this machine the server your other devices sync with. One machine is enough.")}
+	case "Data":
+		return []string{tr("Where tjek keeps your tasks and settings. Choose a folder to move them there; tjek restarts in it.")}
 	}
 	return nil
 }
@@ -1572,7 +1578,7 @@ func settingsEditsText(id int) bool {
 	}
 	switch id {
 	case settingStages, settingSyncServer, settingSyncToken, settingServerListen, settingServerToken,
-		settingExportFolder, settingImportFile, settingName, settingShareJoin:
+		settingExportFolder, settingImportFile, settingName, settingShareJoin, settingDataFolder:
 		return true
 	}
 	return false
@@ -1713,6 +1719,7 @@ func (m model) renderSettingsSection(w int) (string, int) {
 		settingCheckUpdate:       tr("Check for updates"),
 		settingExportFolder:      tr("Auto-export folder"),
 		settingImportFile:        tr("Import from file"),
+		settingDataFolder:        tr("Data folder"),
 		settingSubtaskTags:       tr("Subtasks copy tags"),
 		settingHideWaiting:       tr("Hide until start date"),
 		settingName:              tr("Your name"),
@@ -1812,6 +1819,7 @@ func (m model) renderSettingsSection(w int) (string, int) {
 		settingCheckUpdate:       tr("press enter to check"),
 		settingExportFolder:      exportFolderDisplay(m.exportFolder),
 		settingImportFile:        tr("choose a file"),
+		settingDataFolder:        dataFolderDisplay(),
 		settingSubtaskTags:       "‹ " + subtaskTagsVal + " ›",
 		settingHideWaiting:       "‹ " + hideWaitingVal + " ›",
 		settingName:              authorName(appSettings{Name: m.userName}),

@@ -11,13 +11,16 @@
 //
 //  1. TJEK_HOME, if set — one directory for everything, for people who would
 //     rather have a single thing to back up than a tidy split.
-//  2. An existing ~/.tjek — older installs put everything there, and moving a user's database out from under them to satisfy a
+//  2. A folder chosen in Settings, named in LocationFile — one directory for
+//     everything too, for a person who would rather click than set a
+//     variable, and an agent that may write only inside one folder.
+//  3. An existing ~/.tjek — older installs put everything there, and moving a user's database out from under them to satisfy a
 //     specification is not an upgrade. It keeps working, forever.
-//  3. The platform convention: XDG on Linux/BSD (and anywhere the XDG_*
+//  4. The platform convention: XDG on Linux/BSD (and anywhere the XDG_*
 //     variables are set deliberately), %APPDATA%/%LOCALAPPDATA% on Windows,
 //     ~/Library/Application Support on macOS.
 //
-// Rule 3 only ever applies to a fresh install, which is why rule 2 has no
+// Rule 4 only ever applies to a fresh install, which is why rule 3 has no
 // migration step and no prompt: nothing moves, nothing needs to be told.
 package paths
 
@@ -51,6 +54,59 @@ func HomeOverride() string {
 	return strings.TrimSpace(os.Getenv("TJEK_HOME"))
 }
 
+// LocationFile is the file naming a folder chosen in Settings. It lives in
+// the platform's config directory (LocationPath) and holds the folder's path.
+const LocationFile = "location"
+
+// LocationPath is where the chosen folder is named: always the platform's
+// own config directory, never the chosen folder or ~/.tjek, so it is found
+// before anything else is resolved and survives moving out of either.
+func LocationPath() string {
+	base, err := platformBase(Config)
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(base, AppDirName, LocationFile)
+}
+
+// Chosen is the folder LocationFile names, or "" when none is chosen. A
+// relative path is no choice: it would name a different folder from every
+// working directory.
+func Chosen() string {
+	data, err := os.ReadFile(LocationPath())
+	if err != nil {
+		return ""
+	}
+	dir := strings.TrimSpace(string(data))
+	if !filepath.IsAbs(dir) {
+		return ""
+	}
+	return dir
+}
+
+// SetChosen names dir as the folder for everything, or with "" forgets the
+// choice, so the standard places apply again.
+func SetChosen(dir string) error {
+	path := LocationPath()
+	if path == "" {
+		return os.ErrNotExist
+	}
+	if dir == "" {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, []byte(dir+"\n"), 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
 // legacyHome returns ~/.tjek when it already exists as a directory.
 func legacyHome() string {
 	home, err := os.UserHomeDir()
@@ -70,6 +126,15 @@ func Dir(kind Kind) (string, error) {
 	if override := HomeOverride(); override != "" {
 		return override, nil
 	}
+	if chosen := Chosen(); chosen != "" {
+		return chosen, nil
+	}
+	return Standard(kind)
+}
+
+// Standard is where a kind lives when no folder is chosen and TJEK_HOME is
+// unset: ~/.tjek when it exists, else the platform convention.
+func Standard(kind Kind) (string, error) {
 	if legacy := legacyHome(); legacy != "" {
 		return legacy, nil
 	}
@@ -181,5 +246,5 @@ func For(kind Kind, name ...string) string {
 // ~/.tjek directory. The doctor says so, since it explains why the XDG paths
 // are not in use.
 func UsingLegacyLayout() bool {
-	return HomeOverride() == "" && legacyHome() != ""
+	return HomeOverride() == "" && Chosen() == "" && legacyHome() != ""
 }

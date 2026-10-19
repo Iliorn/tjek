@@ -123,6 +123,11 @@ func diagnoseStorage() []diagnostic {
 		})
 	} else if home := paths.HomeOverride(); home != "" {
 		out = append(out, diagnostic{Name: "layout", Value: "single directory (TJEK_HOME)"})
+	} else if paths.Chosen() != "" {
+		out = append(out, diagnostic{
+			Name: "layout", Value: "single directory (chosen in Settings)",
+			Detail: "named in " + paths.LocationPath(),
+		})
 	} else {
 		for _, k := range []struct {
 			name string

@@ -32,6 +32,7 @@ const (
 	pickJoinFile
 	pickExportFolder
 	pickImportFile
+	pickDataFolder
 )
 
 // pathPickSpec is one kind of pick: whether it is a folder or a file of one
@@ -53,6 +54,8 @@ var pathPickSpecs = map[pathPick]pathPickSpec{
 		placeholder: "Folder to keep tjek-export.json in (blank turns it off)"},
 	pickImportFile: {exts: []string{".json", ".JSON"}, title: "A tjek/Taskwarrior export (.json)", mode: modeImportFile,
 		placeholder: "Path to a tjek export (.json)"},
+	pickDataFolder: {folder: true, title: "Folder to keep tjek's data in", mode: modeEditDataFolder,
+		placeholder: "Folder for tjek's data (blank: the standard place)"},
 }
 
 // pathPicker is an open picker.
@@ -149,8 +152,9 @@ func (m model) updatePathPicker(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "/":
 			return m.typePickedPath(fp.CurrentDirectory+string(filepath.Separator), "")
 		case "x":
-			// The export folder's prompt reads a blank as "turn it off".
-			if m.picker.purpose == pickExportFolder {
+			// The export folder's prompt reads a blank as "turn it off", the
+			// data folder's as "back to the standard place".
+			if m.picker.purpose == pickExportFolder || m.picker.purpose == pickDataFolder {
 				m.mode = spec.mode
 				m.textInput.SetValue("")
 				return m.updateForMode(tea.KeyMsg{Type: tea.KeyEnter})
@@ -265,6 +269,8 @@ func (m model) renderPathPicker(w int) string {
 	switch {
 	case m.picker.purpose == pickExportFolder:
 		hint = tr("↑/↓ move · → open · ← up · enter picks the marked folder · space this one · x turns export off · / type a path · esc cancels")
+	case m.picker.purpose == pickDataFolder:
+		hint = tr("↑/↓ move · → open · ← up · enter picks the marked folder · space this one · x the standard place · / type a path · esc cancels")
 	case spec.folder:
 		hint = tr("↑/↓ move · → open · ← up · enter picks the marked folder · space this one · / type a path · esc cancels")
 	}

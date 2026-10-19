@@ -10,9 +10,10 @@ Tasks are kept in a SQLite database. Where it and tjek's other files go
 depends on what tjek finds, in this order:
 
 1. **`TJEK_HOME`**, if set: everything in that one directory.
-2. **`~/.tjek/`**, if that directory exists. Installs from before v1.32
+2. **A folder chosen in Settings → Data**: everything in that one directory.
+3. **`~/.tjek/`**, if that directory exists. Installs from before v1.32
    keep everything in one directory like this.
-3. Otherwise each platform's usual places:
+4. Otherwise each platform's usual places:
 
 tjek was called taskr until v1.42. Its first run renames taskr's directories
 to tjek's (`~/.taskr` to `~/.tjek`, `~/.config/taskr` to `~/.config/tjek`, and
@@ -27,6 +28,20 @@ so on), and a binary still called `taskr` to `tjek`; nothing else moves.
 
 An `XDG_*` variable you have set wins on every platform, macOS and Windows
 included.
+
+### Moving it
+
+Settings → Data → Data folder moves everything into a `tjek` folder inside
+the one you pick, and tjek restarts there. This is the way to go when a
+coding agent may write only inside one folder: move tjek into it, and the
+agent can add and close tasks. Close any other tjek first. The old folders
+are kept beside where they were, named `….moved-<date>`; delete them once
+all is well. Picking the folder again and pressing `x` moves everything back
+to the standard places.
+
+The choice is kept in a file named `location` in the standard settings
+folder, so every tjek, the agent's included, finds it without anything to
+set up. `TJEK_HOME` still wins over it.
 
 To back up, copy the tasks directory, or run `tjek export --include-done backup.json`
 (without `--include-done` the export leaves out completed tasks).
