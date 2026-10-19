@@ -100,6 +100,7 @@ func Main(version string) {
 	stopResize := startResizePoller(p)
 	defer stopResize()
 	final, err := p.Run()
+	noteProgramEnded()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		// Last, so it survives Bubble Tea's stack dump on screen.
