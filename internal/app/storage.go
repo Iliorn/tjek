@@ -124,6 +124,12 @@ type appSettings struct {
 	// there would mean nothing without this file open beside it.
 	DetailPosition string `json:"detail_position,omitempty"`
 
+	// StartTab is the tab the app opens on: a tab's word ("tasks", "board",
+	// …) or "last" for LastTab, the one the previous session ended on. Absent
+	// means Tasks (starttab.go).
+	StartTab string `json:"start_tab,omitempty"`
+	LastTab  string `json:"last_tab,omitempty"`
+
 	// Columns switches the task lists' optional columns ("score", "due",
 	// "size", "project", "tags", "waits") on and off. A column it does not
 	// name keeps its default (listColumnsFromSettings).
@@ -131,9 +137,10 @@ type appSettings struct {
 
 	// Search is the committed `/` filter on the Tasks tab, restored at startup
 	// so a filter you were working under survives a restart like every other
-	// view preference. Only the Tasks tab's query is kept: it is the tab the
-	// app opens on, and the other tabs that share the query (Board, Stats)
-	// restore theirs from tabViews, which starts empty. Written when the
+	// view preference. Only the Tasks tab's query is kept, restored to Tasks
+	// whichever tab the app opens on (StartTab); the other tabs that share the
+	// query (Board, Stats) restore theirs from tabViews, which starts empty.
+	// Written when the
 	// search settles (committed, cancelled, or cleared with esc), never per
 	// keystroke — settings.json is rewritten atomically on every save.
 	Search string `json:"search,omitempty"`

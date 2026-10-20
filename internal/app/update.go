@@ -1330,6 +1330,15 @@ func (m *model) switchTab(t tab) {
 
 	m.invalidateDetailCache()
 	m.markFilterDirty()
+
+	// The tab to reopen on is saved as it changes, not at quit, so a session
+	// that ends without quitting (a closed window) still leaves it behind.
+	if t != tabSettings && t != m.lastTab {
+		m.lastTab = t
+		if m.startTab == startTabLast {
+			m.persistSettings()
+		}
+	}
 }
 
 // startEditTimeEntry opens the inline editor for an entry's times,
@@ -1619,6 +1628,8 @@ func (m *model) persistSettings() {
 		SyncBoardDisabled: !m.boardCfg.sync,
 		Search:            m.persistedSearch(),
 		DetailPosition:    m.detailPos.String(),
+		StartTab:          startTabString(m.startTab),
+		LastTab:           startTabString(m.lastTab),
 		Columns:           m.columns.settings(),
 		Keys:              activeKeys,
 
@@ -1979,6 +1990,8 @@ func (m *model) settingsAdjust(dir int) tea.Cmd {
 		m.cycleLang(dir)
 	case settingDetailPos:
 		m.cycleDetailPos(dir)
+	case settingStartTab:
+		m.cycleStartTab(dir)
 	case settingSubtaskTags:
 		m.subtaskTags = !m.subtaskTags
 		m.persistSettings()

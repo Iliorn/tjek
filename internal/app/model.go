@@ -65,6 +65,7 @@ const (
 	settingShowGroups
 	settingHideWaiting
 	settingDataFolder
+	settingStartTab
 	// settingColFirst is the first of the Columns page's rows, one per
 	// listColumnKeys entry (settingColumnKey); they run to numSettingsRows.
 	settingColFirst
@@ -470,7 +471,11 @@ type model struct {
 	// detailPos is which side of the list the detail pane takes (right, left,
 	// or stacked at the bottom). Read by sideBySide, so it decides the layout
 	// for every height helper at once rather than per renderer.
-	detailPos    detailPos
+	detailPos detailPos
+	// startTab is the tab a session opens on (startTabLast for the one the
+	// last session ended on), and lastTab that one (starttab.go).
+	startTab     tab
+	lastTab      tab
 	updateStatus string
 	// updateLatest is the newer release a check found, which the download
 	// bar names; updateDL is that download while it runs.
@@ -683,6 +688,8 @@ func initialModel(repo Repository) model {
 		context:           settings.Context,
 		themeName:         th.name,
 		detailPos:         detailPosFromSettings(settings.DetailPosition),
+		startTab:          startTabFromSettings(settings.StartTab),
+		lastTab:           startTabFromSettings(settings.LastTab),
 		columns:           listColumnsFromSettings(settings.Columns),
 		// The top of the one settings pane, General's first row. The zero
 		// value is a row ID, not a position, and it happens to be the first
@@ -713,6 +720,9 @@ func initialModel(repo Repository) model {
 		m.searchInput.SetValue(settings.Search)
 		m.pushFocus(stateSearch)
 	}
+	// Opening on another tab goes through switchTab, which files the query
+	// under Tasks as any other move off it does.
+	m.switchTab(openingTab(m.startTab, m.lastTab, m.boardCfg))
 	m.userName = settings.Name
 	m.repo.SetAuthor(authorName(settings))
 	if shared, err := loadSharedConfig(); err != nil {

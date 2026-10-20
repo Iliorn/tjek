@@ -1457,6 +1457,7 @@ type settingsGroup struct {
 var settingsGroups = []settingsGroup{
 	{title: "General", rows: []int{
 		settingName,
+		settingStartTab,
 		settingAutoCloseParent,
 		settingAutoCloseSubtasks,
 		settingSubtaskTags,
@@ -1706,6 +1707,7 @@ func (m model) renderSettingsSection(w int) (string, int) {
 		settingTheme:             tr("Theme"),
 		settingLanguage:          tr("Language"),
 		settingDetailPos:         tr("Detail pane"),
+		settingStartTab:          tr("Start on"),
 		settingStages:            tr("Board columns"),
 		settingSyncAuto:          tr("Sync automatically"),
 		settingSyncBoard:         tr("Sync board columns"),
@@ -1806,6 +1808,7 @@ func (m model) renderSettingsSection(w int) (string, int) {
 		settingTheme:             "‹ " + m.themeName + " ›",
 		settingLanguage:          "‹ " + activeLang.displayName() + " ›",
 		settingDetailPos:         "‹ " + trDetailPos(m.detailPos) + " ›",
+		settingStartTab:          "‹ " + trStartTab(m.startTab) + " ›",
 		settingStages:            m.boardCfg.stagesDisplay(),
 		settingSyncAuto:          "‹ " + syncAutoVal + " ›",
 		settingSyncBoard:         "‹ " + syncBoardVal + " ›",
