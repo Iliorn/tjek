@@ -11,6 +11,17 @@ reader is deciding whether to upgrade, not reviewing the change. The reasoning
 belongs in the commit message, where it is kept next to the code it explains.
 `TestChangelogEntriesAreOneLine` enforces it.
 
+## [1.67.0] - 2026-10-21
+
+### Added
+
+- Settings → General → Start on picks the tab tjek opens on, or the one you last used.
+
+### Changed
+
+- Last comment, Waits on and Blocks columns widen into free space on wide windows.
+- An unfolded subtask's title runs to the edge of the list instead of being cut short.
+
 ## [1.66.2] - 2026-10-19
 
 ### Changed
