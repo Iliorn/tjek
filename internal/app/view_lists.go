@@ -1081,15 +1081,22 @@ func (m model) renderHistoryLine(t todo.Todo, index, cursor int, active bool, co
 // parent's: the indent and tree connector drawn in front of it.
 const subtaskIndentW = 4
 
+// subtaskRowLeadW is what a subtask row draws before its title: the indent,
+// the tree connector and the checkbox ("   ├ [ ] ").
+const subtaskRowLeadW = 9
+
 func (m *model) renderSubtaskLine(sub *todo.Todo, subIndex, subTotal int, cols listCols, flatIndex, cursor int, active bool) string {
 	connector := "├"
 	if subIndex == subTotal-1 {
 		connector = "└"
 	}
-	titleW := cols.titleW - subtaskIndentW
-	if titleW < 10 {
-		titleW = 10
+	// A subtask row draws none of the list's other columns, so its title
+	// runs on to the pane's edge rather than stopping at the title column.
+	titleW := m.termWidth - 8 - runeLen(cursorGap) - subtaskRowLeadW
+	if sub.IsTimerRunning() {
+		titleW -= 2
 	}
+	titleW = max(titleW, cols.titleW-subtaskIndentW, 10)
 	title := truncate(sub.Title, titleW)
 	if sub.IsTimerRunning() {
 		title = "⧗ " + title

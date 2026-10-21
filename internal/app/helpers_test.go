@@ -1641,3 +1641,19 @@ func TestExtraColumnTakesSpareWidth(t *testing.T) {
 		}
 	}
 }
+func TestSubtaskTitleTakesTheRowsWidth(t *testing.T) {
+	m := newTestModel()
+	sub := &todo.Todo{ID: "s", ParentID: "p", Title: strings.Repeat("word ", 30)}
+	for _, width := range []int{60, 120, 200} {
+		m.termWidth = width
+		cols := taskListCols(width, false, 20, 0, false, 0, 0)
+		line := strings.TrimRight(m.renderSubtaskLine(sub, 0, 1, cols, 1, 0, true), "\n")
+		got := ansi.StringWidth(line)
+		if got > width-8 {
+			t.Errorf("width %d: subtask row is %d cells, pane holds %d", width, got, width-8)
+		}
+		if whole := strings.Contains(ansi.Strip(line), strings.TrimSpace(sub.Title)); whole != (width == 200) {
+			t.Errorf("width %d: title whole = %v", width, whole)
+		}
+	}
+}
