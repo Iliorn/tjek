@@ -213,7 +213,9 @@ func (m model) groupTaskCols(tasks []todo.Todo, showProject bool, sel int) (list
 	deps := m.groupDepsFor(tasks, nested, sel)
 	contentMax, tagsMax, projectMax := 0, 0, 0
 	hasDue := false
+	extraMax := map[string]int{}
 	for i := range tasks {
+		widenExtraMax(&m, &tasks[i], extraMax)
 		// The width each row draws: a task row's whole label (badges
 		// included), a subtask row's title behind its indent.
 		if nested[i] {
@@ -231,7 +233,7 @@ func (m model) groupTaskCols(tasks []todo.Todo, showProject bool, sel int) (list
 			projectMax = max(projectMax, runeLen(tasks[i].Project))
 		}
 	}
-	cols := taskListColsShown(m.termWidth, false, contentMax, tagsMax, hasDue, dueColMax(tasks, m.frameTime), projectMax, m.columns)
+	cols := taskListColsShown(m.termWidth, false, contentMax, tagsMax, hasDue, dueColMax(tasks, m.frameTime), projectMax, m.columns, extraMax)
 	cols.deps = deps
 	return cols, nested
 }
@@ -871,7 +873,7 @@ func (m model) renderTaskList() string {
 	// Column widths (widest row content + widest tag cell) are derived from the
 	// active set and cached by refreshTaskColMetrics, so the frame doesn't
 	// rescan every task — see cache.go.
-	cols := taskListColsShown(m.termWidth, false, m.cache.activeColContentMax, m.cache.activeColTagsMax, m.cache.activeColHasDue, dueColMax(m.cache.active, m.frameTime), m.cache.activeColProjectMax, m.columns)
+	cols := taskListColsShown(m.termWidth, false, m.cache.activeColContentMax, m.cache.activeColTagsMax, m.cache.activeColHasDue, dueColMax(m.cache.active, m.frameTime), m.cache.activeColProjectMax, m.columns, m.cache.activeColExtraMax)
 	total := m.visibleActiveLen()
 	// Cursor/total and sort status are shown in the Overview border title.
 	renderListHeader(b, m.termWidth, false, cols, "")
@@ -1012,7 +1014,7 @@ func (m model) renderHistoryList() string {
 		}
 	}
 	// dueMax (0) is ignored for history — it forces its fixed 12-wide date column.
-	cols := taskListColsShown(m.termWidth, true, contentMax, tagsMax, hasDue, 0, 0, m.columns)
+	cols := taskListColsShown(m.termWidth, true, contentMax, tagsMax, hasDue, 0, 0, m.columns, nil)
 	// Cursor/total and sort status are shown in the History border title.
 	renderListHeader(b, m.termWidth, true, cols, "")
 

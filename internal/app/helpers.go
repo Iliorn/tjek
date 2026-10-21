@@ -492,6 +492,16 @@ var extraColumns = []extraColumn{
 	}},
 }
 
+// widenExtraMax records, per extra column, the widest value t draws in it, so
+// a column can grow into spare width as far as its content goes. Every column
+// is measured, switched on or not, so switching one on needs no refresh.
+func widenExtraMax(m *model, t *todo.Todo, extraMax map[string]int) {
+	for i := range extraColumns {
+		x := &extraColumns[i]
+		extraMax[x.key] = max(extraMax[x.key], runeLen(x.value(m, t)))
+	}
+}
+
 // shownExtras are the extra columns a list draws at its width.
 func shownExtras(c listCols) []shownExtra {
 	var out []shownExtra
@@ -569,13 +579,15 @@ func dueColMax(tasks []todo.Todo, now time.Time) int {
 // visible project name; when it is 0 the Project column collapses entirely (no
 // header label, no reserved space).
 func taskListCols(termWidth int, isHistory bool, contentMax, tagsMax int, hasDue bool, dueMax, widestProject int) listCols {
-	return taskListColsShown(termWidth, isHistory, contentMax, tagsMax, hasDue, dueMax, widestProject, defaultListColumns())
+	return taskListColsShown(termWidth, isHistory, contentMax, tagsMax, hasDue, dueMax, widestProject, defaultListColumns(), nil)
 }
 
 // taskListColsShown is taskListCols with the columns show switches off left
 // out. The history list keeps its dates whatever show says: they are what a
-// finished task is listed by.
-func taskListColsShown(termWidth int, isHistory bool, contentMax, tagsMax int, hasDue bool, dueMax, widestProject int, show listColumns) listCols {
+// finished task is listed by. extraMax is the widest value of each extra
+// column (widenExtraMax), which a column grows towards once the title and
+// Project have the room they need.
+func taskListColsShown(termWidth int, isHistory bool, contentMax, tagsMax int, hasDue bool, dueMax, widestProject int, show listColumns, extraMax map[string]int) listCols {
 	inner := termWidth - 8 // panel content width (margin + border + padding)
 	const fixed = 6        // cursor + checkbox + fold icon
 	if !show["tags"] {
@@ -742,6 +754,19 @@ func taskListColsShown(termWidth int, isHistory bool, contentMax, tagsMax int, h
 				grow = spare
 			}
 			c.projectW += grow
+		}
+	}
+
+	// Then the extra columns take what is still free, in order, each up to
+	// its widest value, so a long comment is not clipped beside empty space.
+	for i := range c.extras {
+		x := &c.extras[i]
+		want := hugColW(extraMax[x.col.key], listHeader(x.col.header))
+		if !x.show || x.w >= want {
+			continue
+		}
+		if spare := inner - fixed - c.titleW - colsW() - tagsReserve; spare > 0 {
+			x.w += min(want-x.w, spare)
 		}
 	}
 

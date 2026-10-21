@@ -83,8 +83,9 @@ type cacheState struct {
 	// subtaskProgress per task and dominated the render).
 	activeColContentMax int
 	activeColTagsMax    int
-	activeColHasDue     bool // true when at least one visible active task has a due date
-	activeColProjectMax int  // widest project name rune count in the active list (0 = none)
+	activeColHasDue     bool           // true when at least one visible active task has a due date
+	activeColProjectMax int            // widest project name rune count in the active list (0 = none)
+	activeColExtraMax   map[string]int // widest value of each shown extra column
 }
 
 // ── Cache management ──────────────────────────────────────────────────────────
@@ -297,8 +298,16 @@ func (m *model) refreshClosedToday() {
 func (m *model) refreshTaskColMetrics() {
 	contentMax, tagsMax, projectMax := 0, 0, 0
 	hasDue := false
+	extraMax := map[string]int{}
 	active := m.cache.active
 	for i := range active {
+		// Unfolded subtasks draw these columns too.
+		widenExtraMax(m, &active[i], extraMax)
+		for _, id := range m.subtaskIDs(active[i].ID) {
+			if sub := m.get(id); sub != nil {
+				widenExtraMax(m, sub, extraMax)
+			}
+		}
 		// Same function the row draws with, so the width reserved here and the
 		// width drawn there cannot drift.
 		if w := taskRowLabelWidth(m.taskRowLabel(&active[i])); w > contentMax {
@@ -318,6 +327,7 @@ func (m *model) refreshTaskColMetrics() {
 	m.cache.activeColTagsMax = tagsMax
 	m.cache.activeColHasDue = hasDue
 	m.cache.activeColProjectMax = projectMax
+	m.cache.activeColExtraMax = extraMax
 }
 
 // rankedScore is the score shown beside a task's position: its own, lifted by

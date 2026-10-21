@@ -1612,3 +1612,32 @@ func TestDownloadReleaseAssetReportsProgress(t *testing.T) {
 		t.Errorf("last report = %v, want %d of %d", last, n, n)
 	}
 }
+
+// An extra column grows into the width the title and Project leave free, as
+// far as its widest value, and no further than the pane.
+func TestExtraColumnTakesSpareWidth(t *testing.T) {
+	show := defaultListColumns()
+	show["comment"] = true
+	extraMax := map[string]int{"comment": 80}
+	comment := func(c listCols) int {
+		for _, x := range c.extras {
+			if x.col.key == "comment" && x.show {
+				return x.w
+			}
+		}
+		return 0
+	}
+	if w := comment(taskListColsShown(200, false, 30, 0, true, 3, 0, show, extraMax)); w != 80+listColGap {
+		t.Errorf("wide pane: comment column %d, want %d", w, 80+listColGap)
+	}
+	if w := comment(taskListColsShown(200, false, 30, 0, true, 3, 0, show, map[string]int{"comment": 10})); w != 24+listColGap {
+		t.Errorf("short comments: column %d, want its base width %d", w, 24+listColGap)
+	}
+	for _, width := range []int{60, 90, 120} {
+		c := taskListColsShown(width, false, 30, 0, true, 3, 0, show, extraMax)
+		used := 6 + c.titleW + comment(c) + c.dueW + c.lastW + c.sizeW
+		if used > width-8 {
+			t.Errorf("width %d: columns take %d of %d", width, used, width-8)
+		}
+	}
+}
