@@ -7,7 +7,7 @@ go 1.25.0
 // carries stdlib advisories in net/http, crypto/tls and net/url, all of which
 // the sync client and server reach. Releases are built from go.mod, so without
 // this the signed binaries would ship the vulnerable standard library.
-toolchain go1.26.9
+toolchain go1.26.10
 
 require (
 	github.com/charmbracelet/bubbles v1.0.0
