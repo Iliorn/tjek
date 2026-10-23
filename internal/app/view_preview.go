@@ -2,7 +2,9 @@ package app
 
 import (
 	"fmt"
+	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/Iliorn/tjek/todo"
 	"github.com/charmbracelet/x/ansi"
@@ -18,9 +20,18 @@ import (
 // renderQuickAddPreview shows what parseQuickAdd extracts from the current
 // quick-add input: the title in quotes, then a chip per recognised field.
 // Anything that failed to parse stays inside the title quotes, which is the
-// tell that a token was mistyped.
-func renderQuickAddPreview(input string, w int) string {
+// tell that a token was mistyped. pos is the caret, a rune index into input:
+// the word it is in is still being typed, so a token there that does not
+// parse yet (due:toda on its way to due:today) is not named as not understood
+// until the caret leaves it.
+func renderQuickAddPreview(input string, pos, w int) string {
 	p := parseQuickAdd(input)
+	unparsed := p.unparsed
+	if word := caretWord(input, pos); word != "" {
+		if i := slices.Index(unparsed, word); i >= 0 {
+			unparsed = slices.Delete(slices.Clone(unparsed), i, i+1)
+		}
+	}
 
 	title := strings.TrimSpace(p.title)
 	if title == "" {
@@ -29,8 +40,8 @@ func renderQuickAddPreview(input string, w int) string {
 	parts := []string{selectedStyle.Render(`"` + title + `"`)}
 	// Right after the title, so a narrow footer clips the chips before it
 	// clips the one thing that says a token did not take.
-	if len(p.unparsed) > 0 {
-		parts = append(parts, overdueStyle.Render(fmt.Sprintf(tr("not understood: %s"), strings.Join(p.unparsed, " "))))
+	if len(unparsed) > 0 {
+		parts = append(parts, overdueStyle.Render(fmt.Sprintf(tr("not understood: %s"), strings.Join(unparsed, " "))))
 	}
 	for _, tag := range p.tags {
 		parts = append(parts, tagStyle.Render("#"+tag))
@@ -59,6 +70,33 @@ func renderQuickAddPreview(input string, w int) string {
 
 	line := helpStyle.Render("    → ") + strings.Join(parts, "  ")
 	return ansi.Truncate(line, w, "…")
+}
+
+// caretWord is the word the caret is in or at the end of; "" when the caret
+// is on a space or before a word's first rune, where nothing of it is being
+// typed.
+func caretWord(value string, pos int) string {
+	runes := []rune(value)
+	start, end := caretWordSpan(runes, pos)
+	return string(runes[start:end])
+}
+
+// caretWordSpan is the rune bounds of the word caretWord names, start == end
+// when there is none. Words end at spaces, as strings.Fields splits them.
+func caretWordSpan(runes []rune, pos int) (start, end int) {
+	pos = min(max(pos, 0), len(runes))
+	start = pos
+	for start > 0 && !unicode.IsSpace(runes[start-1]) {
+		start--
+	}
+	if start == pos {
+		return pos, pos
+	}
+	end = pos
+	for end < len(runes) && !unicode.IsSpace(runes[end]) {
+		end++
+	}
+	return start, end
 }
 
 // renderQuickAddSuggestions renders the completion row under the quick-add

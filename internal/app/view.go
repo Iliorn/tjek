@@ -721,7 +721,7 @@ func (m model) footerContentFor(w int) string {
 				return field + "\n" +
 					helpStyle.Render("    "+truncate(quickAddHint(), w))
 			}
-			return field + "\n" + renderQuickAddPreview(m.textInput.Value(), w)
+			return field + "\n" + renderQuickAddPreview(m.textInput.Value(), m.textInput.Position(), w)
 		}
 		if m.mode == modeEditExportFolder || m.mode == modeEditDataFolder || m.mode == modeImportFile || m.mode == modeShareFolder || m.mode == modeShareJoin {
 			return field + "\n" + helpStyle.Render("    "+truncate(tr("tab completes the name · enter confirms · esc cancels"), w))

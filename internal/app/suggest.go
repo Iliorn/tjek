@@ -26,22 +26,10 @@ import (
 // means nothing to complete).
 func quickAddToken(value string, pos int) (sigil, query string, start, end int, ok bool) {
 	runes := []rune(value)
-	if pos < 0 {
-		pos = 0
-	}
-	if pos > len(runes) {
-		pos = len(runes)
-	}
-	start = pos
-	for start > 0 && !unicode.IsSpace(runes[start-1]) {
-		start--
-	}
-	if pos == start {
+	pos = min(max(pos, 0), len(runes))
+	start, end = caretWordSpan(runes, pos)
+	if start == end {
 		return "", "", 0, 0, false
-	}
-	end = pos
-	for end < len(runes) && !unicode.IsSpace(runes[end]) {
-		end++
 	}
 	tok := string(runes[start:end])
 	s := tok[:1]
