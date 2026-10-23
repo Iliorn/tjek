@@ -11,6 +11,12 @@ reader is deciding whether to upgrade, not reviewing the change. The reasoning
 belongs in the commit message, where it is kept next to the code it explains.
 `TestChangelogEntriesAreOneLine` enforces it.
 
+## [1.67.1] - 2026-10-23
+
+### Fixed
+
+- Quick-add no longer calls a token "not understood" while you are still typing it.
+
 ## [1.67.0] - 2026-10-21
 
 ### Added
