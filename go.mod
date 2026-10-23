@@ -1,6 +1,6 @@
 module github.com/Iliorn/tjek
 
-go 1.25.0
+go 1.26.0
 
 // The language/compatibility minimum above is a claim about what source this
 // module needs. This is a claim about what builds it: every Go before 1.25.13
@@ -18,7 +18,7 @@ require (
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/google/uuid v1.6.0
 	github.com/muesli/termenv v0.16.0
-	golang.org/x/sys v0.42.0
+	golang.org/x/sys v0.49.0
 	modernc.org/sqlite v1.52.0
 )
 
