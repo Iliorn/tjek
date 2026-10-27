@@ -1530,6 +1530,7 @@ var listColumnLabels = map[string]string{
 	"score": "Score", "due": "Due", "size": "Size", "project": "Project",
 	"tags": "Tags", "waits": "Waits on", "blocks": "Blocks", "start": "Start", "created": "Created",
 	"changed": "Changed", "time": "Time", "priority": "Priority", "comment": "Last comment",
+	"id": "ID",
 }
 
 // settingsSelectable reports whether the cursor may land on a row. Version is

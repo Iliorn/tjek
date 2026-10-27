@@ -71,7 +71,7 @@ const (
 	settingColFirst
 	// settingKeyFirst is the first of the Keys page's rows, one per
 	// keyPageActions entry (settingKeyAction); they run to numSettingsRows.
-	settingKeyFirst = settingColFirst + 13
+	settingKeyFirst = settingColFirst + 14
 	numSettingsRows = settingKeyFirst + 24
 )
 

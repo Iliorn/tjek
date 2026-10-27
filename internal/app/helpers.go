@@ -376,7 +376,7 @@ type listColumns map[string]bool
 // lists have always had, then the extraColumns.
 var listColumnKeys = []string{
 	"score", "due", "size", "project", "tags",
-	"waits", "blocks", "start", "created", "changed", "time", "priority", "comment",
+	"waits", "blocks", "start", "created", "changed", "time", "priority", "comment", "id",
 }
 
 // defaultListColumns is what a new install shows. The rest are for the user
@@ -489,6 +489,10 @@ var extraColumns = []extraColumn{
 			}
 		}
 		return ""
+	}},
+	// The prefix the CLI prints and takes, so a task can be named to it.
+	{"id", "ID", 8, func(_ *model, t *todo.Todo) string {
+		return shortID(t.ID)
 	}},
 }
 

@@ -522,10 +522,15 @@ func TestColumnsSwitchOnAndOff(t *testing.T) {
 	m = sendKey(t, m, "enter")
 	m.settingsCursor = row("score")
 	m = sendKey(t, m, "enter")
+	m.settingsCursor = row("id")
+	m = sendKey(t, m, "enter")
 	m = sendKey(t, m, "1")
 	plain := ansi.Strip(m.View())
 	if !strings.Contains(plain, tr("Last comment")) || !strings.Contains(plain, "bought the paint") {
 		t.Errorf("Last comment switched on but not drawn:\n%s", plain)
+	}
+	if !strings.Contains(plain, shortID(task.ID)) {
+		t.Errorf("ID switched on but %s not drawn:\n%s", shortID(task.ID), plain)
 	}
 	if strings.Contains(plain, listHeader("Score")) {
 		t.Errorf("Score switched off but still drawn:\n%s", plain)
@@ -535,7 +540,7 @@ func TestColumnsSwitchOnAndOff(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !s.Columns["comment"] || s.Columns["score"] {
+	if !s.Columns["comment"] || !s.Columns["id"] || s.Columns["score"] {
 		t.Errorf("settings.json columns = %v", s.Columns)
 	}
 	if got := listColumnsFromSettings(map[string]bool{"due": false}); got["due"] || !got["score"] {
