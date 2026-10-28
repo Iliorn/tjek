@@ -11,6 +11,12 @@ reader is deciding whether to upgrade, not reviewing the change. The reasoning
 belongs in the commit message, where it is kept next to the code it explains.
 `TestChangelogEntriesAreOneLine` enforces it.
 
+## [1.67.2] - 2026-10-28
+
+### Added
+
+- Settings → Columns can show each task's ID, the prefix the CLI takes.
+
 ## [1.67.1] - 2026-10-23
 
 ### Fixed
